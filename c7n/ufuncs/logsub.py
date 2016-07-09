@@ -40,7 +40,7 @@ def message_event(evt):
     return "%s: %s" % (
         dt.ctime(), "\n".join(textwrap.wrap(evt['message'], 80)))
 
-
+    
 def process_log_event(event, context):
     """Format log events and relay via sns/email"""
     init()
@@ -69,6 +69,11 @@ def process_log_event(event, context):
         "",
         "Log Contents",
         ""]
+
+    # We may get things delivered from log sub that are not in log events
+    for evt in data['logEvents']:
+        if evt not in events:
+            events.append(evt)
 
     for evt in events:
         message.append(message_event(evt))
