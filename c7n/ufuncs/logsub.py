@@ -14,6 +14,7 @@
 """Ops feedback via log subscription
 """
 import boto3
+from botocore.vendored import requests
 
 import base64
 from datetime import datetime
@@ -40,7 +41,45 @@ def message_event(evt):
     return "%s: %s" % (
         dt.ctime(), "\n".join(textwrap.wrap(evt['message'], 80)))
 
-    
+
+def process_sentry_event(event, context):
+    init()
+    serialized = event['awslogs'].pop('data')
+    data = json.loads(zlib.decompress(
+        base64.b64decode(serialized), 16+zlib.MAX_WBITS))
+
+    # Fetch additional logs for context (20s window)
+    timestamps = [e['timestamp'] for e in data['logEvents']]
+    start = min(timestamps) - 1000 * 15
+    end = max(timestamps) + 1000 * 5
+
+    group = data['logGroup']
+    stream = data['logStream']
+
+    # Non policy lambda
+    if group.startswith('/cloud-custodian/'):
+        prefix, account_name, region = group.split('/')
+    elif group.startswith('/aws/lambda'):
+        group.split('/')
+
+        
+    sentry_msg = {
+        'tags': {
+            'policy': 
+            'group': group},
+        'user': {
+            'id': config['account_id'],
+            'username': config['account_name']
+        }
+        
+    breadcrumbs = logs.get_log_events(
+        logGroupName=data['logGroup'],
+        logStreamName=data['logStream'],
+        startTime=start,
+        endTime=end,
+        startFromHead=True)['events']
+
+
 def process_log_event(event, context):
     """Format log events and relay via sns/email"""
     init()
