@@ -54,6 +54,8 @@ class Config(dict):
             'cache_period': 0,
             'dryrun': False})
         d.update(kw)
+        if not os.path.exists(d['output_dir']):
+            os.mkdir(d['output_dir'])
         return cls(d)
 
 
