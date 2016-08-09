@@ -20,15 +20,11 @@ from c7n.query import QueryResourceManager
 from c7n.manager import resources
 from c7n.utils import local_session, type_schema
 
-from c7n.filters import ValueFilter, Filter, FilterRegistry
-from c7n.utils import local_session, type_schema
-
 
 @resources.register('vpc')
 class Vpc(QueryResourceManager):
 
     resource_type = 'aws.ec2.vpc'
-
 
 
 @Vpc.filter_registry.register('subnets')
@@ -88,11 +84,27 @@ class SGPermission(Filter):
     If a group has any permissions that match all conditions, then it
     matches the filter.
 
-    Permissions that match on the group are annotated onto the group.
+    Permissions that match on the group are annotated onto the group and
+    can subsequently be used by the remove-permission action.
+
+    An example::
 
       - type: ingress
         IpProtocol: -1
         FromPort: 445
+
+    We have special handling for matching Ports in ingress/egress permission
+    From/To range::
+
+      - type: ingress
+        Ports: [22, 443, 80]
+
+    As well for assertions that a ingress/egress permission only matches
+    a given set of ports:
+
+      - type: egress
+        OnlyPorts: [22, 443, 80]
+
     """
 
     attrs = set(('IpProtocol', 'FromPort', 'ToPort', 'UserIdGroupPairs',
@@ -172,7 +184,8 @@ class IPPermissionEgress(SGPermission):
 @SecurityGroup.action_registry.register('remove-permissions')
 class RemovePermissions(BaseAction):
 
-    schema = type_schema('remove-permissions')
+    schema = type_schema(
+        'remove-permissions', groups={'type': 'string', 'enum': ['matched', 'all']})
 
     def process(self, resources):
         i_perms = self.data.get('ingress')
