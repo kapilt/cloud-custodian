@@ -93,14 +93,15 @@ class SGPermission(Filter):
         IpProtocol: -1
         FromPort: 445
 
-    We have special handling for matching Ports in ingress/egress permission
-    From/To range::
+    We have specialized handling for matching Ports in ingress/egress
+    permission From/To range::
 
       - type: ingress
         Ports: [22, 443, 80]
 
     As well for assertions that a ingress/egress permission only matches
-    a given set of ports:
+    a given set of ports, *note* onlyports is an inverse match, it matches
+    when a permission includes ports outside of the specified set:
 
       - type: egress
         OnlyPorts: [22, 443, 80]
@@ -108,7 +109,7 @@ class SGPermission(Filter):
     """
 
     attrs = set(('IpProtocol', 'FromPort', 'ToPort', 'UserIdGroupPairs',
-                 'IpRanges', 'PrefixListIds', 'Ports'))
+                 'IpRanges', 'PrefixListIds', 'Ports', 'OnlyPorts'))
 
     def validate(self):
         delta = set(self.data.keys()).difference(self.attrs)
@@ -121,7 +122,7 @@ class SGPermission(Filter):
         self.vfilters = []
         fattrs = list(sorted(self.attrs.intersection(self.data.keys())))
         self.ports = 'Ports' in self.data and self.data['Ports'] or ()
-
+        self.only_ports = 'OnlyPorts' in self.data and self.data['OnlyPorts'] or ()
         for f in fattrs:
             fv = self.data.get(f)
             if isinstance(fv, dict):
@@ -135,19 +136,26 @@ class SGPermission(Filter):
 
     def __call__(self, resource):
         matched = []
-        for p in resource[self.ip_permissions_key]:
+        for perm in resource[self.ip_permissions_key]:
             found = False
             for f in self.vfilters:
-                if f(p):
+                if f(perm):
                     found = True
                     break
-            for p in self.ports:
-                if p >= resource['FromPort'] and p <= resource['ToPort']:
+            if 'FromPort' in perm and 'ToPort' in perm:
+                for port in self.ports:
+                    if port >= perm['FromPort'] and port <= perm['ToPort']:
+                        found = True
+                        break
+                only_found = False
+                for port in self.only_ports:
+                    if port == perm['FromPort'] and port == perm['ToPort']:
+                        only_found = True
+                if self.only_ports and not only_found:
                     found = True
-                    break
             if not found:
                 continue
-            matched.append(p)
+            matched.append(perm)
 
         if matched:
             resource['Matched%s' % self.ip_permissions_key] = matched
