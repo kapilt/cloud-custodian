@@ -13,52 +13,14 @@
 # limitations under the License.
 """
 Elastic Load Balancers
-----------------------
-
-
-TODO
-####
-
-- SSL Policy enforcement
-- Empty instance waste collection
-
-Actions
-#######
-
-filters:
-  - Instances: []
-actions:
-  - type: mark-for-op
-    op: 'delete'
-    days: 7
-
-filters:
-  - type: marked-for-op
-    op: delete
-actions:
-  - delete
-
-
-Filters
-#######
-
-In addition to value filters
-
-.. code-block:: yaml
-
-  filters:
-    # Matches when the backend listener and health check are
-    # not on the same protocol
-    - healthcheck-protocol-mismatch
-
 """
 from concurrent.futures import as_completed
 import logging
 
 from botocore.exceptions import ClientError
 
-from c7n.actions import ActionRegistry, BaseAction
-from c7n.filters import Filter, FilterRegistry, FilterValidationError
+from c7n.actions import ActionRegistry, BaseAction, AutoTagUser
+from c7n.filters import Filter, FilterRegistry, FilterValidationError, DefaultVpcBase
 from c7n import tags
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
@@ -69,7 +31,7 @@ log = logging.getLogger('custodian.elb')
 filters = FilterRegistry('elb.filters')
 actions = ActionRegistry('elb.actions')
 
-
+actions.register('auto-tag-user', AutoTagUser)
 filters.register('tag-count', tags.TagCountFilter)
 filters.register('marked-for-op', tags.TagActionFilter)
 
@@ -82,8 +44,9 @@ class ELB(QueryResourceManager):
     action_registry = actions
 
     def augment(self, resources):
-        return _elb_tags(
+        _elb_tags(
             resources, self.session_factory, self.executor_factory)
+        return resources
 
 
 def _elb_tags(elbs, session_factory, executor_factory):
@@ -91,11 +54,22 @@ def _elb_tags(elbs, session_factory, executor_factory):
     def process_tags(elb_set):
         client = local_session(session_factory).client('elb')
         elb_map = {elb['LoadBalancerName']: elb for elb in elb_set}
-        try:
-            results = client.describe_tags(LoadBalancerNames=elb_map.keys())
-        except ClientError as e:
-            log.exception("Exception Processing ELB: %s", e)
-            raise
+
+        while True:
+            try:
+                results = client.describe_tags(
+                    LoadBalancerNames=elb_map.keys())
+                break
+            except ClientError as e:
+                if e.response['Error']['Code'] != 'LoadBalancerNotFound':
+                    raise
+                msg = e.response['Error']['Message']
+                _, lb_name = msg.strip().rsplit(' ', 1)
+                elb_map.pop(lb_name)
+                if not elb_map:
+                    results = {'TagDescriptions': []}
+                    break
+                continue
         for tag_desc in results['TagDescriptions']:
             elb_map[tag_desc['LoadBalancerName']]['Tags'] = tag_desc['Tags']
 
@@ -110,7 +84,7 @@ class TagDelayedAction(tags.TagDelayedAction):
         'mark-for-op', rinherit=tags.TagDelayedAction.schema,
         ops={'enum': ['delete', 'set-ssl-listener-policy']})
 
-    batch_size = 20
+    batch_size = 1
 
     def process_resource_set(self, resource_set, tags):
         client = local_session(self.manager.session_factory).client('elb')
@@ -122,7 +96,7 @@ class TagDelayedAction(tags.TagDelayedAction):
 @actions.register('tag')
 class Tag(tags.Tag):
 
-    batch_size = 20
+    batch_size = 1
 
     def process_resource_set(self, resource_set, tags):
         client = local_session(
@@ -135,7 +109,7 @@ class Tag(tags.Tag):
 @actions.register('remove-tag')
 class RemoveTag(tags.RemoveTag):
 
-    batch_size = 20
+    batch_size = 1
 
     def process_resource_set(self, resource_set, tag_keys):
         client = local_session(
@@ -151,7 +125,7 @@ class Delete(BaseAction):
     schema = type_schema('delete')
 
     def process(self, load_balancers):
-        with self.executor_factory(max_workers=3) as w:
+        with self.executor_factory(max_workers=2) as w:
             list(w.map(self.process_elb, load_balancers))
 
     def process_elb(self, elb):
@@ -186,11 +160,16 @@ class SetSslListenerPolicy(BaseAction):
         lb_name = elb['LoadBalancerName']
         policy_attributes = [{'AttributeName': attr, 'AttributeValue': 'true'}
             for attr in attrs]
-        client.create_load_balancer_policy(
-            LoadBalancerName=lb_name,
-            PolicyName=policy_name,
-            PolicyTypeName='SSLNegotiationPolicyType',
-            PolicyAttributes=policy_attributes)
+
+        try:
+            client.create_load_balancer_policy(
+                LoadBalancerName=lb_name,
+                PolicyName=policy_name,
+                PolicyTypeName='SSLNegotiationPolicyType',
+                PolicyAttributes=policy_attributes)
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'DuplicatePolicyName':
+                raise
 
         # Apply it to all SSL listeners.
         for ld in elb['ListenerDescriptions']:
@@ -224,6 +203,7 @@ class SSLPolicyFilter(Filter):
 
     filters:
       - type: ssl-policy
+
         whitelist: []
         blacklist:
         - "Protocol-SSLv2"
@@ -343,7 +323,8 @@ class SSLPolicyFilter(Filter):
                     LoadBalancerName=elb_name,
                     PolicyNames=policy_names)['PolicyDescriptions']
             except ClientError as e:
-                if e.response['Error']['Code'] == "LoadBalancerNotFound":
+                if e.response['Error']['Code'] in [
+                        'LoadBalancerNotFound', 'PolicyNotFound']:
                     continue
                 raise
             active_lb_policies = []
@@ -383,3 +364,14 @@ class HealthCheckProtocolMismatch(Filter):
         protocols = [listener['Listener']['InstanceProtocol']
                      for listener in listener_descriptions]
         return health_check_protocol in protocols
+
+
+@filters.register('default-vpc')
+class DefaultVpc(DefaultVpcBase):
+    """ Matches if an elb database is in the default vpc
+    """
+
+    schema = type_schema('default-vpc')
+
+    def __call__(self, elb):
+        return elb.get('VPCId') and self.match(elb.get('VPCId')) or False

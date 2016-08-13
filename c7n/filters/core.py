@@ -20,6 +20,7 @@ import fnmatch
 import logging
 import operator
 import re
+import time
 
 from dateutil.tz import tzutc
 from dateutil.parser import parse
@@ -87,6 +88,7 @@ class FilterRegistry(PluginRegistry):
         self.register('or', Or)
         self.register('and', And)
         self.register('event', EventFilter)
+        self.register('delay', Delay)
 
     def parse(self, data, manager):
         results = []
@@ -137,6 +139,8 @@ class Filter(object):
 
     schema = {'type': 'object'}
 
+    metrics = ()
+
     def __init__(self, data, manager=None):
         self.data = data
         self.manager = manager
@@ -184,11 +188,27 @@ class And(Filter):
         return True
 
 
+class Delay(Filter):
+
+    schema = {'type': 'object', 'additionalProperties': False,
+              'required': ['type', 'seconds'],
+              'properties': {
+                  'type': {'enum': ['delay']},
+                  'seconds': {'type': 'integer'}}}
+
+    def process(self, resources, event=None):
+        if not event:
+            return
+        seconds = self.data.get('seconds')
+        if seconds:
+            time.sleep(seconds)
+
+
 class ValueFilter(Filter):
     """Generic value filter using jmespath
     """
     expr = None
-    op = v = None
+    op = v = vtype = None
 
     schema = {
         'type': 'object',
@@ -199,6 +219,9 @@ class ValueFilter(Filter):
             # Doesn't mix well as enum with inherits that extend
             'type': {'enum': ['value']},
             'key': {'type': 'string'},
+            'value_type': {'enum': [
+                'age', 'integer', 'expiration', 'normalize', 'size']},
+            'default': {'type': 'object'},
             'value': {'oneOf': [
                 {'type': 'array'},
                 {'type': 'string'},
@@ -206,13 +229,15 @@ class ValueFilter(Filter):
                 {'type': 'number'}]},
             'op': {'enum': OPERATORS.keys()}}}
 
+    annotate = True
+
     def validate(self):
         if len(self.data) == 1:
             return self
-        if not 'key' in self.data:
+        if 'key' not in self.data:
             raise FilterValidationError(
                 "Missing 'key' in value filter %s" % self.data)
-        if not 'value' in self.data:
+        if 'value' not in self.data:
             raise FilterValidationError(
                 "Missing 'value' in value filter %s" % self.data)
         if 'op' in self.data:
@@ -230,7 +255,7 @@ class ValueFilter(Filter):
 
     def __call__(self, i):
         matched = self.match(i)
-        if matched:
+        if matched and self.annotate:
             set_annotation(i, ANNOTATION_KEY, self.k)
         return matched
 
@@ -241,6 +266,7 @@ class ValueFilter(Filter):
             self.k = self.data.get('key')
             self.op = self.data.get('op')
             self.v = self.data.get('value')
+            self.vtype = self.data.get('value_type')
 
         if i is None:
             return False
@@ -261,17 +287,59 @@ class ValueFilter(Filter):
             self.expr = jmespath.compile(self.k)
             r = self.expr.search(i)
 
+        # value type conversion
+        if self.vtype is not None:
+            v, r = self.process_value_type(self.v, r)
+        else:
+            v = self.v
+
         # Value match
-        if r is None and self.v == 'absent':
+        if r is None and v == 'absent':
             return True
-        elif self.v == 'not-null' and r:
+        elif v == 'not-null' and r:
             return True
         elif self.op:
             op = OPERATORS[self.op]
-            return op(r, self.v)
+            return op(r, v)
         elif r == self.v:
             return True
         return False
+
+    def process_value_type(self, sentinel, value):
+        if self.vtype == 'normalize':
+            return sentinel, value.strip().lower()
+        elif self.vtype == 'integer':
+            try:
+                v = int(value.strip())
+            except ValueError:
+                v = 0
+        elif self.vtype == 'size':
+            try:
+                return sentinel, len(value)
+            except TypeError:
+                return sentinel, 0
+        elif self.vtype == 'age':
+            if not isinstance(sentinel, datetime):
+                sentinel = datetime.now(tz=tzutc()) - timedelta(sentinel)
+
+            if not isinstance(value, datetime):
+                value = parse(value)
+
+            # Reverse the age comparison, we want to compare the value being
+            # greater than the sentinel typically. Else the syntax for age
+            # comparisons is intuitively wrong.
+            return value, sentinel
+
+        # Allows for expiration filtering, for events in the future as opposed
+        # to events in the past which age filtering allows for.
+        elif self.vtype == 'expiration':
+            if not isinstance(sentinel, datetime):
+                sentinel = datetime.now(tz=tzutc()) + timedelta(sentinel)
+
+            if not isinstance(value, datetime):
+                value = parse(value)
+
+            return sentinel, value
 
 
 class AgeFilter(Filter):
@@ -302,7 +370,8 @@ class AgeFilter(Filter):
             n = datetime.now(tz=tzutc())
             self.threshold_date = n - timedelta(days)
         v = self.get_resource_date(i)
-        return self.threshold_date > v
+        op = OPERATORS[self.data.get('op', 'greater-than')]
+        return op(self.threshold_date, v)
 
 
 class EventFilter(ValueFilter):

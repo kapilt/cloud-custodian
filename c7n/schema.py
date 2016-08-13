@@ -145,7 +145,9 @@ def generate(resource_types=()):
                 'name': {
                     'type': 'string',
                     'pattern': "^[A-z][A-z0-9]*(-[A-z0-9]*[A-z][A-z0-9]*)*$"},
+                'region': {'type': 'string'},
                 'resource': {'type': 'string'},
+                'max-resources': {'type': 'integer'},
                 'comment': {'type': 'string'},
                 'comments': {'type': 'string'},
                 'description': {'type': 'string'},
@@ -319,4 +321,9 @@ if __name__ == '__main__':
     load_resources()
     # dump our schema
     # $ python -m c7n.schema
-    print(json.dumps(generate(), indent=2))
+    try:
+        print(json.dumps(generate(), indent=2))
+    except:
+        import traceback, pdb, sys
+        traceback.print_exc()
+        pdb.post_mortem(sys.exc_info()[-1])
