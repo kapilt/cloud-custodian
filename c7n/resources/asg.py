@@ -154,7 +154,7 @@ class ConfigValidFilter(Filter, LaunchConfigFilterBase):
         for a in amis:
             found = True
             for bd in a.get('BlockDeviceMappings', ()):
-                if 'Ebs' not in bd:
+                if 'Ebs' not in bd or 'SnapshotId' not in bd['Ebs']:
                     continue
                 if bd['Ebs']['SnapshotId'] not in self.snapshots:
                     found = False
@@ -460,6 +460,49 @@ class GroupTagTrim(TagTrim):
                 dict(Key=t, ResourceType='auto-scaling-group',
                      ResourceId=resource['AutoScalingGroupName']))
         client.delete_tags(Tags=tags)
+
+
+@filters.register('capacity-delta')
+class CapacityDelta(Filter):
+
+    schema = type_schema('size-delta')
+
+    def process(self, asgs, event=None):
+        return [a for a in asgs
+                if len(a['Instances']) < a['DesiredCapacity'] or
+                len(a['Instances']) < a['MinSize']]
+
+
+@actions.register('resize')
+class Resize(BaseAction):
+
+    schema = type_schema(
+        'resize',
+        #min_size={'type': 'string'},
+        #max_size={'type': 'string'},
+        desired_size={'type': 'string'},
+        required=('desired_size',))
+
+    def validate(self):
+        if self.data['desired_size'] != 'current':
+            raise FilterValidationError(
+                "only resizing desired/min to current capacity is supported")
+        return self
+
+    def process(self, asgs):
+        client = local_session(self.manager.session_factory).client(
+            'autoscaling')
+        for a in asgs:
+            current_size = len(a['Instances'])
+            min_size = a['MinSize']
+            desired = a['DesiredCapacity']
+            log.debug('desired %d to %s, min %d to %d',
+                      desired, current_size, min_size, current_size)
+            self.manager.retry(
+                client.update_auto_scaling_group,
+                AutoScalingGroupName=a['AutoScalingGroupName'],
+                DesiredCapacity=min((current_size, desired)),
+                MinSize=min((current_size, min_size)))
 
 
 @actions.register('remove-tag')
