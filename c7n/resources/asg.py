@@ -122,8 +122,8 @@ class ConfigValidFilter(Filter, LaunchConfigFilterBase):
         self.security_groups = self.get_security_groups()
         self.key_pairs = self.get_key_pairs()
         self.elbs = self.get_elbs()
-        self.images = self.get_images()
         self.snapshots = self.get_snapshots()
+        self.images = self.get_images()
 
     def get_subnets(self):
         from c7n.resources.vpc import Subnet
@@ -148,7 +148,20 @@ class ConfigValidFilter(Filter, LaunchConfigFilterBase):
     def get_images(self):
         from c7n.resources.ami import AMI
         manager = AMI(self.manager.ctx, {})
-        return set([i['ImageId'] for i in manager.resources()])
+        # amis may not be valid, check their snapshots.
+        amis = manager.resources()
+        valid = set()
+        for a in amis:
+            found = True
+            for bd in a.get('BlockDeviceMappings', ()):
+                if 'Ebs' not in bd:
+                    continue
+                if bd['Ebs']['SnapshotId'] not in self.snapshots:
+                    found = False
+                    break
+            if found:
+                valid.add(a['ImageId'])
+        return valid
 
     def get_snapshots(self):
         from c7n.resources.ebs import Snapshot
