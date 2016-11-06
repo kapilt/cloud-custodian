@@ -216,22 +216,8 @@ class RDSTest(BaseTest):
              }, session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
-
-    def test_rds_minor_upgrade_do(self):
-        session_factory = self.replay_flight_data(
-            'test_rds_minor_upgrade_do')
-        p = self.load_policy(
-            {'name': 'rds-upgrade-do',
-             'resource': 'rds',
-             'filters': [
-                 'upgrade-available',
-                 {'type': 'marked-for-op', 'tag': 'custodian_upgrade',
-                  'op': 'upgrade-minor'}],
-             'actions': [{
-                 'type': 'upgrade-minor',
-                 'immediate': False}]}, session_factory=session_factory)
-        resources = p.run()
-        self.assertEqual(len(resources), 1)
+        self.assertEqual(
+            resources[0]['DBInstanceIdentifier'], 'c7n-mysql-test-001')
 
     def test_rds_minor_upgrade_unavailable(self):
         session_factory = self.replay_flight_data(
@@ -257,24 +243,6 @@ class RDSTest(BaseTest):
              'actions': [
                  {'type': 'upgrade-minor', 'immediate': True},
              ]}, session_factory=session_factory)
-        resources = p.run()
-        self.assertEqual(len(resources), 1)
-        self.assertEqual(
-            resources[0]['DBInstanceIdentifier'], 'c7n-mysql-test-001')
-
-    def test_rds_minor_upgrade_complete(self):
-        session_factory = self.replay_flight_data(
-            'test_rds_minor_upgrade_complete')
-        p = self.load_policy(
-            {'name': 'rds-upgrade-complete',
-             'resource': 'rds',
-             'filters': [
-                 {'type': 'upgrade-available', 'value': False},
-                 {'type': 'marked-for-op', 'tag': 'custodian_upgrade',
-                  'op': 'upgrade-minor'}],
-             'actions': [{
-                 'type': 'remove-tag', 'tags': ['custodian_upgrade']}]},
-            session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertEqual(
