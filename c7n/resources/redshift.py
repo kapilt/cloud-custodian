@@ -172,7 +172,8 @@ class Delete(BaseAction):
             except ClientError as e:
                 if e.response['Error']['Code'] == "InvalidClusterState":
                     self.log.warning(
-                        "Cannot delete cluster when not in 'Available' state: %s" %db['ClusterIdentifier'])
+                        "Cannot delete cluster when not 'Available' state: %s",
+                        db['ClusterIdentifier'])
                     continue
                 raise
 
@@ -337,7 +338,7 @@ class RedshiftSnapshot(QueryResourceManager):
                 separator=':')
         return self._generate_arn
 
-    class Meta(object):
+    class resource_type(object):
 
         service = 'redshift'
         type = 'redshift-snapshot'
@@ -348,7 +349,6 @@ class RedshiftSnapshot(QueryResourceManager):
         dimension = None
         date = 'SnapshotCreateTime'
 
-    resource_type = Meta
 
 @RedshiftSnapshot.filter_registry.register('age')
 class RedshiftSnapshotAge(AgeFilter):
