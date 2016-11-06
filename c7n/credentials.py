@@ -29,8 +29,14 @@ class SessionFactory(object):
         self.assume_role = assume_role
 
     def __call__(self, assume=True, region=None):
+
+        # Don't sts assume out of region, do the assumption in the
+        # region that we're running in by default
+        initial_region = region or self.region
+        if assume and self.assume_role:
+            initial_region = None
         session = Session(
-            region_name=region or self.region,
+            region_name=initial_region,
             profile_name=self.profile)
         if self.assume_role and assume:
             session = assumed_session(
