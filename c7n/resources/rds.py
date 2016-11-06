@@ -693,3 +693,19 @@ class RDSSnapshotDelete(BaseAction):
             c.delete_db_snapshot(
                 DBSnapshotIdentifier=s['DBSnapshotIdentifier'])
 
+
+@resources.register('rds-subnet-group')
+class RDSSubnetGroup(QueryResourceManager):
+    """RDS subnet group."""
+
+    class resource_type(object):
+        service = 'rds'
+        type = 'rds-subnet-group'
+        id = name = 'DBSubnetGroupName'
+        enum_spec = (
+            'describe_db_subnet_groups', 'DBSubnetGroups', None)
+        filter_name = 'DBSubnetGroupName'
+        filter_type = 'scalar'
+        dimension = None
+        date = None
+
