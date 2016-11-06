@@ -1,17 +1,17 @@
 {
     "status_code": 200, 
     "data": {
-        "Marker": "c3Fsc2VydmVyLWV4CjExLjAwLjYwMjAuMC52MQ==", 
+        "Marker": "c3Fsc2VydmVyLWV4CjEyLjAwLjQ0MjIuMC52MQ==", 
         "ResponseMetadata": {
             "RetryAttempts": 0, 
             "HTTPStatusCode": 200, 
-            "RequestId": "3b172cca-a295-11e6-8cf7-ab55fb0890db", 
+            "RequestId": "1f2b2399-a04f-11e6-b477-e1f735825652", 
             "HTTPHeaders": {
-                "x-amzn-requestid": "3b172cca-a295-11e6-8cf7-ab55fb0890db", 
+                "x-amzn-requestid": "1f2b2399-a04f-11e6-b477-e1f735825652", 
                 "vary": "Accept-Encoding", 
-                "content-length": "112254", 
+                "content-length": "110131", 
                 "content-type": "text/xml", 
-                "date": "Fri, 04 Nov 2016 13:47:30 GMT"
+                "date": "Tue, 01 Nov 2016 16:20:37 GMT"
             }
         }, 
         "DBEngineVersions": [
@@ -979,12 +979,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1034,12 +1028,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1083,12 +1071,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1126,12 +1108,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1163,12 +1139,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1194,12 +1164,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1219,12 +1183,6 @@
                         "IsMajorVersionUpgrade": false, 
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.2.0.4.v9"
-                    }, 
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
                     }
                 ]
             }, 
@@ -1238,14 +1196,7 @@
                 "DBEngineDescription": "Oracle Database Standard Edition One", 
                 "EngineVersion": "11.2.0.4.v9", 
                 "DBEngineVersionDescription": "Oracle 11.2.0.4.v9", 
-                "ValidUpgradeTarget": [
-                    {
-                        "Engine": "oracle-se2", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.1.0.2.v5"
-                    }
-                ]
+                "ValidUpgradeTarget": []
             }, 
             {
                 "Engine": "oracle-se1", 
@@ -2320,18 +2271,10 @@
             }, 
             {
                 "Engine": "sqlserver-ee", 
+                "DBEngineVersionDescription": "SQL Server 11.00.6020.0.v1", 
                 "DBParameterGroupFamily": "sqlserver-ee-11.0", 
                 "DBEngineDescription": "Microsoft SQL Server Enterprise Edition", 
-                "EngineVersion": "11.00.6020.0.v1", 
-                "DBEngineVersionDescription": "SQL Server 11.00.6020.0.v1", 
-                "ValidUpgradeTarget": [
-                    {
-                        "Engine": "sqlserver-ee", 
-                        "IsMajorVersionUpgrade": true, 
-                        "AutoUpgrade": false, 
-                        "EngineVersion": "12.00.5000.0.v1"
-                    }
-                ]
+                "EngineVersion": "11.00.6020.0.v1"
             }, 
             {
                 "Engine": "sqlserver-ee", 
@@ -2339,14 +2282,6 @@
                 "DBEngineDescription": "Microsoft SQL Server Enterprise Edition", 
                 "EngineVersion": "12.00.5000.0.v1", 
                 "DBEngineVersionDescription": "SQL Server 2014 12.00.5000.0.v1", 
-                "ValidUpgradeTarget": []
-            }, 
-            {
-                "Engine": "sqlserver-ee", 
-                "DBParameterGroupFamily": "sqlserver-ee-13.0", 
-                "DBEngineDescription": "Microsoft SQL Server Enterprise Edition", 
-                "EngineVersion": "13.00.2164.0.v1", 
-                "DBEngineVersionDescription": "SQL Server 2016 13.00.2164.0.v1", 
                 "ValidUpgradeTarget": []
             }, 
             {
@@ -2458,6 +2393,21 @@
                         "AutoUpgrade": false, 
                         "EngineVersion": "11.00.6020.0.v1"
                     }, 
+                    {
+                        "Engine": "sqlserver-ex", 
+                        "IsMajorVersionUpgrade": true, 
+                        "AutoUpgrade": false, 
+                        "EngineVersion": "12.00.5000.0.v1"
+                    }
+                ]
+            }, 
+            {
+                "Engine": "sqlserver-ex", 
+                "DBParameterGroupFamily": "sqlserver-ex-11.0", 
+                "DBEngineDescription": "Microsoft SQL Server Express Edition", 
+                "EngineVersion": "11.00.6020.0.v1", 
+                "DBEngineVersionDescription": "SQL Server 11.00.6020.0.v1", 
+                "ValidUpgradeTarget": [
                     {
                         "Engine": "sqlserver-ex", 
                         "IsMajorVersionUpgrade": true, 
