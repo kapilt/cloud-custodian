@@ -96,7 +96,8 @@ class SubnetFilter(net_filters.SubnetFilter):
         return group_ids
 
     def process(self, resources, event=None):
-        self.groups = RedshiftSubnetGroup({}, self.manager).resources()
+        self.groups = {r['ClusterSubnetGroupName']: r for r in
+                       RedshiftSubnetGroup(self.manager.ctx, {}).resources()}
         return super(SubnetFilter, self).process(resources, event)
 
 
