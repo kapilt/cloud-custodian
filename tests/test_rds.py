@@ -246,6 +246,8 @@ class RDSTest(BaseTest):
                  'immediate': False}]}, session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
+        self.assertEqual(
+            resources[0]['DBInstanceIdentifier'], 'c7n-mysql-test-03')
 
     def test_rds_db_instance_eligible_for_backup(self):
         resource = {
