@@ -374,10 +374,10 @@ def get_partition_strategy(account_info, bucket, strategy=None):
 
 def get_keys_charset(keys, bid):
     """ Use set of keys as selector for character superset
-    
+
     Note this isn't optimal, its probabilistic on the keyset char population.
     """
-    # use the keys found to sample possible chars    
+    # use the keys found to sample possible chars
     chars = set()
     for k in keys:
         chars.update(k[:4])
