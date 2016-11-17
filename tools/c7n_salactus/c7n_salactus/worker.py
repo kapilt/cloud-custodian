@@ -104,6 +104,8 @@ def get_session(account_info):
     assumed sessions are automatically refreshed.
     """
     s = getattr(CONN_CACHE, '%s-session' % account_info['name'], None)
+    if s is not None:
+        return s
     if account_info.get('role'):
         s = assumed_session(account_info['role'], SESSION_NAME)
     else:
