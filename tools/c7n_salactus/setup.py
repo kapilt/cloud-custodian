@@ -27,7 +27,7 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'c7n-salactus = salactus:main']},
-    install_requires=["c7n"],
+            'c7n-salactus = c7n_salactus.cli:cli']},
+    install_requires=["c7n", "click"],
 )
 

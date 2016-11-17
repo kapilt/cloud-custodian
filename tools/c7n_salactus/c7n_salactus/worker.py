@@ -36,13 +36,9 @@ monitor:
  - buckets-unknown-errors:hash
  - buckets-denied:set
 
-
 """
-
-import argparse
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-import json
 import logging
 import itertools
 import math
@@ -74,6 +70,7 @@ REDIS_HOST = os.environ["SALACTUS_REDIS"]
 
 # Minimum size of the bucket before partitioning
 PARTITION_BUCKET_SIZE_THRESHOLD = 100000
+#PARTITION_BUCKET_SIZE_THRESHOLD = 20000
 
 # Page size for keys found during partition
 PARTITION_KEYSET_THRESHOLD = 500
@@ -191,6 +188,9 @@ def page_strip(page, bucket):
     for k in contents:
         k.pop('Owner', None)
         k.pop('LastModified', None)
+        k.pop('ETag', None)
+        k.pop('StorageClass', None)
+        k.pop('Size', None)
     return page
 
 
@@ -222,7 +222,11 @@ def process_account(account_info):
     log.info("processing account %s", account_info)
     session = get_session(account_info)
     client = session.client('s3', config=s3config)
-    buckets = [n['Name'] for n in client.list_buckets()['Buckets']]
+    buckets = client.list_buckets()['Buckets']
+    account_buckets = account_info.pop('buckets', None)
+    buckets = [n['Name'] for n in buckets
+               if not account_buckets or
+               n['Name'] in account_buckets]
     log.info("processing %d buckets in account %s",
              len(buckets), account_info['name'])
     for bucket_set in chunks(buckets, 50):
@@ -271,6 +275,9 @@ def process_bucket_set(account_info, buckets):
             info['keycount'] = bucket_key_count(cw, info)
             connection.hset('bucket-size', bid, info['keycount'])
             log.info("processing bucket %s", info)
+            connection.hset(
+                'buckets-start',
+                bucket_id(account_info, info['name']), time.time())
             if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
                 invoke(process_bucket_partitions, account_info, info)
             else:
@@ -459,6 +466,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-')):
     # Pregen on ngram means we have many potentially useless prefixes
     # todo carry charset forward as param, and go incremental on prefix
     # ngram expansion
+    connection.hincrby('bucket-partition', bid, len(prefixes))
     return bulk_invoke(
         process_bucket_iterator, [account_info, bucket], prefixes)
 
@@ -556,9 +564,6 @@ def process_bucket_iterator(account_info, bucket,
         params.update(continuation)
     paginator = s3.get_paginator(contents_method).paginate(**params)
     with bucket_ops(account_info, bucket['name'], 'page'):
-        connection.hset(
-            'buckets-start',
-            bucket_id(account_info, bucket['name']), time.time())
         for page in paginator:
             page = page_strip(page, bucket)
             if page.get(contents_key):
@@ -614,37 +619,3 @@ def process_keyset(account_info, bucket, key_set):
                 'keys-denied',
                 bucket_id(account_info, bucket['name']),
                 denied_count)
-
-
-def setup_parser():
-    parser = argparse.ArgumentParser(
-        description="Scan s3 at scale, format")
-    parser.add_argument("--accounts", required=True)
-    parser.add_argument("--tag", required=True)
-    return parser
-
-
-def main():
-    parser = setup_parser()
-    options = parser.parse_args()
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s: %(name)s:%(levelname)s %(message)s")
-    logging.getLogger('botocore').setLevel(level=logging.WARNING)
-    with open(options.accounts) as fh:
-        data = json.load(fh)
-        for account in data:
-            if options.tag not in account.get('tags', ()):
-                continue
-            invoke(process_account, account)
-
-
-if __name__ == '__main__':
-    try:
-        main()
-    except (SystemExit, KeyboardInterrupt) as e:
-        raise
-    except:
-        import traceback, sys, pdb
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
