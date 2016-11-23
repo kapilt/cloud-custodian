@@ -295,16 +295,16 @@ class SGPermission(Filter):
     def __call__(self, resource):
         matched = []
         for perm in resource[self.ip_permissions_key]:
-            found = False
+            found = None
             for f in self.vfilters:
                 if f(perm):
                     found = True
-                    break
-            if not found:
+                else:
+                    found = False
+            if found is None or found:
                 found = self.process_ports(perm)
-            if not found:
+            if found is None or found:
                 found = self.process_cidrs(perm)
-
             if not found:
                 continue
             matched.append(perm)
