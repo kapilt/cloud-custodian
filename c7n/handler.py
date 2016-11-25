@@ -68,8 +68,7 @@ def dispatch_event(event, context):
     if error:
         log.debug("Skipping failed operation: %s" % error)
         return
-
     policies = load(Config.empty(), 'config.json', format='json')
     for p in policies:
         p.push(event, context)
-
+    return True
