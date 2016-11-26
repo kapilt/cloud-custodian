@@ -24,8 +24,19 @@ from c7n.filters import Filter, FilterRegistry, ValueFilter
 from c7n.manager import ResourceManager, resources
 from c7n.utils import local_session, get_account_id, type_schema
 
+
 filters = FilterRegistry('aws.account.actions')
 actions = ActionRegistry('aws.account.filters')
+
+
+def get_account(session_factory):
+    session = local_session(session_factory)
+    client = session.client('iam')
+    aliases = client.list_account_aliases().get(
+        'AccountAliases', ('',))
+    name = aliases and aliases[0] or ""
+    return {'account_id': get_account_id(session),
+            'account_name': name}
 
 
 @resources.register('account')
@@ -34,19 +45,25 @@ class Account(ResourceManager):
     filter_registry = filters
     action_registry = actions
 
+    class resource_type(object):
+        id = 'account_id'
+        name = 'account_name'
+
+    def get_model(self):
+        return self.resource_type
+
     def resources(self):
-        session = local_session(self.session_factory)
-        client = session.client('iam')
-        return self.filter_resources(
-            [{'account_id': get_account_id(session),
-              'account_name': client.list_account_aliases(
-              ).get('AccountAliases', ('',))[0]}])
+        return self.filter_resources([get_account(self.session_factory)])
+
+    def get_resources(self, resource_ids):
+        return [get_account(self.session_factory)]
 
 
 @filters.register('check-cloudtrail')
 class CloudTrailEnabled(Filter):
-    """Is cloud trail enabled for this account, returns
-    annotated account resource if trail is not enabled.
+    """Verify cloud trail enabled for this account per specifications.
+
+    Returns an annotated account resource if trail is not enabled.
     """
     schema = type_schema(
         'check-cloudtrail',
@@ -112,8 +129,9 @@ class ConfigEnabled(Filter):
         resources[0]['config_recorders'] = recorders
         resources[0]['config_channels'] = channels
         if self.data.get('global-resources'):
-            recorders = [r for r in recorders
-                         if r['recordingGroup'].get('includeGlobalResources')]
+            recorders = [
+                r for r in recorders
+                if r['recordingGroup'].get('includeGlobalResourceTypes')]
         if self.data.get('all-resources'):
             recorders = [r for r in recorders
                          if r['recordingGroup'].get('allSupported')]
@@ -140,7 +158,7 @@ class IAMSummary(ValueFilter):
     Example iam summary wrt to matchable fields::
 
       {
-    "UsersQuota": 5000,
+            "UsersQuota": 5000,
             "GroupsPerUserQuota": 10,
             "AttachedPoliciesPerGroupQuota": 10,
             "PoliciesQuota": 1000,
@@ -174,6 +192,22 @@ class IAMSummary(ValueFilter):
             "UserPolicySizeQuota": 2048
         }
 
+    For example to determine if an account has either not been
+    enabled with root mfa or has root api keys.
+
+    .. code-block: yaml
+
+      policies:
+        - name: root-keys-or-no-mfa
+          resource: account
+          filters:
+            - or:
+              - type: iam-summary
+                key: AccountMFAEnabled
+                value: 0
+              - type: iam-summary
+                key: AccountAccessKeysPresent
+                value: 0
     """
     schema = type_schema('iam-summary', rinherit=ValueFilter.schema)
 
@@ -205,7 +239,44 @@ class AccountPasswordPolicy(ValueFilter):
 
 @filters.register('service-limit')
 class ServiceLimit(Filter):
-    """Check if account's service limits are past a given threshold."""
+    """Check if account's service limits are past a given threshold.
+
+    Supported limits are per trusted advisor, which is variable based
+    on usage in the account and support level enabled on the account.
+
+      - service: AutoScaling limit: Auto Scaling groups
+      - service: AutoScaling limit: Launch configurations
+      - service: EBS limit: Active snapshots
+      - service: EBS limit: Active volumes
+      - service: EBS limit: General Purpose (SSD) volume storage (GiB)
+      - service: EBS limit: Magnetic volume storage (GiB)
+      - service: EBS limit: Provisioned IOPS
+      - service: EBS limit: Provisioned IOPS (SSD) storage (GiB)
+      - service: EC2 limit: Elastic IP addresses (EIPs)
+
+      # Note this is extant for each active instance type in the account
+      # however the total value is against sum of all instance types.
+      # see issue https://github.com/capitalone/cloud-custodian/issues/516
+
+      - service: EC2 limit: On-Demand instances - m3.medium
+
+      - service: EC2 limit: Reserved Instances - purchase limit (monthly)
+      - service: ELB limit: Active load balancers
+      - service: IAM limit: Groups
+      - service: IAM limit: Instance profiles
+      - service: IAM limit: Roles
+      - service: IAM limit: Server certificates
+      - service: IAM limit: Users
+      - service: RDS limit: DB instances
+      - service: RDS limit: DB parameter groups
+      - service: RDS limit: DB security groups
+      - service: RDS limit: DB snapshots per user
+      - service: RDS limit: Storage quota (GB)
+      - service: RDS limit: Internet gateways
+      - service: SES limit: Daily sending quota
+      - service: VPC limit: VPCs
+      - service: VPC limit: VPC Elastic IP addresses (EIPs)
+    """
 
     schema = type_schema(
         'service-limit',
@@ -235,7 +306,6 @@ class ServiceLimit(Filter):
         services = self.data.get('services')
         limits = self.data.get('limits')
         exceeded = []
-
 
         for resource in checks['flaggedResources']:
             if threshold is None and resource['status'] == 'ok':

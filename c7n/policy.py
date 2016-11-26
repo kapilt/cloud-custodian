@@ -59,9 +59,14 @@ class PolicyCollection(object):
 
     def policies(self, filters=None, resource_type=None):
         # self.options is the CLI options specified in cli.setup_parser()
-        policies = [Policy(p, self.options) for p in self.data.get(
-            'policies', [])
-                    if resource_type and resource_type == p.resource_type or 1]
+        policies = []
+        for p in self.data.get('policies', []):
+            policy = Policy(p, self.options)
+            if 'resource_type' in self.options and self.options.resource_type:
+                if policy.resource_type == self.options.resource_type:
+                    policies.append(policy)
+            else:
+                policies.append(policy)
 
         if not filters:
             return policies
@@ -85,7 +90,7 @@ class PolicyExecutionMode(object):
     def __init__(self, policy):
         self.policy = policy
 
-    def run(self):
+    def run(self, event=None, lambda_context=None):
         """Run the actual policy."""
         raise NotImplementedError("subclass responsibility")
 
@@ -300,7 +305,7 @@ class PeriodicMode(LambdaMode, PullMode):
 
     POLICY_METRICS = ('ResourceCount', 'ResourceTime', 'ActionTime')
 
-    def run(self):
+    def run(self, event, lambda_context):
         return PullMode.run(self)
 
 
@@ -346,11 +351,13 @@ class ConfigRuleMode(LambdaMode):
             if (match and resources) or (not match and not resources):
                 evaluation = {
                     'compliance_type': 'COMPLIANT',
-                    'annotation': 'The resource is compliant with this rule.'}
+                    'annotation': 'The resource is compliant with policy:%s.' % (
+                        self.policy.name)}
             else:
                 evaluation = {
-                    'compliance_type': 'NOT_COMPLIANT',
-                    'annotation': 'The resources is not compliant.'
+                    'compliance_type': 'NON_COMPLIANT',
+                    'annotation': 'Resource is not compliant with policy:%s' % (
+                        self.policy.name)
                 }
 
         client = utils.local_session(

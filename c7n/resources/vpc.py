@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from c7n.actions import BaseAction
+from c7n.actions import BaseAction, ModifyGroupsAction
 from c7n.filters import (
     DefaultVpcBase, Filter, FilterValidationError, ValueFilter)
-
+import c7n.filters.vpc as net_filters
 from c7n.query import QueryResourceManager, ResourceQuery
 from c7n.manager import resources
 from c7n.utils import local_session, type_schema
@@ -62,6 +62,8 @@ class SecurityGroup(QueryResourceManager):
 
     class resource_type(ResourceQuery.resolve('aws.ec2.security-group')):
         config_type = "AWS::EC2::SecurityGroup"
+        filter_name = "GroupIds"
+        name = "GroupId"
 
 
 class SGUsage(Filter):
@@ -175,7 +177,7 @@ class UsedSecurityGroup(SGUsage):
             r for r in resources
             if r['GroupId'] not in used
             and 'VpcId' in r]
-        unused = set(self.filter_peered_refs(unused))
+        unused = set([g['GroupId'] for g in self.filter_peered_refs(unused)])
         return [r for r in resources if r['GroupId'] not in unused]
 
 
@@ -225,13 +227,14 @@ class SGDefaultVpc(DefaultVpcBase):
 
 
 class SGPermission(Filter):
-    """Base class for verifying security group permissions
+    """Filter for verifying security group ingress and egress permissions
 
     All attributes of a security group permission are available as
     value filters.
 
     If multiple attributes are specified the permission must satisfy
-    all of them.
+    all of them. Note that within an attribute match against a list value
+    of a permission we default to or.
 
     If a group has any permissions that match all conditions, then it
     matches the filter.
@@ -239,21 +242,41 @@ class SGPermission(Filter):
     Permissions that match on the group are annotated onto the group and
     can subsequently be used by the remove-permission action.
 
-    An example::
+    We have specialized handling for matching `Ports` in ingress/egress
+    permission From/To range. The following example matches on ingress
+    rules which allow for a range that includes all of the given ports.
+
+    .. code-block: yaml
+
+      - type: ingress
+        Ports: [22, 443, 80]
+
+    As well for verifying that a rule only allows for a specific set of ports
+    as in the following example. The delta between this and the previous
+    example is that if the permission allows for any ports not specified here,
+    then the rule will match. ie. OnlyPorts is a negative assertion match,
+    it matches when a permission includes ports outside of the specified set.
+
+    .. code-block: yaml
+
+      - type: ingress
+        OnlyPorts: [22]
+
+    For simplifying ipranges handling which is specified as a list on a rule
+    we provide a `Cidr` key which can be used as a value type filter evaluated
+    against each of the rules. If any iprange cidr match then the permission
+    matches.
+
+    .. code-block: yaml
 
       - type: ingress
         IpProtocol: -1
         FromPort: 445
 
-    We have specialized handling for matching Ports in ingress/egress
-    permission From/To range::
-
-      - type: ingress
-        Ports: [22, 443, 80]
-
     As well for assertions that a ingress/egress permission only matches
-    a given set of ports, *note* onlyports is an inverse match, it matches
-    when a permission includes ports outside of the specified set:
+    a given set of ports, *note* onlyports is an inverse match.
+
+    .. code-block: yaml
 
       - type: egress
         OnlyPorts: [22, 443, 80]
@@ -263,6 +286,7 @@ class SGPermission(Filter):
           - value_type: cidr
           - op: in
           - value: x.y.z
+
     """
 
     perm_attrs = set((
@@ -296,23 +320,23 @@ class SGPermission(Filter):
         return super(SGPermission, self).process(resources, event)
 
     def process_ports(self, perm):
-        found = False
+        found = None
         if 'FromPort' in perm and 'ToPort' in perm:
             for port in self.ports:
                 if port >= perm['FromPort'] and port <= perm['ToPort']:
                     found = True
                     break
+                found = False
             only_found = False
             for port in self.only_ports:
                 if port == perm['FromPort'] and port == perm['ToPort']:
                     only_found = True
             if self.only_ports and not only_found:
-                found = True
+                found = found is None or found and True or False
         return found
 
     def process_cidrs(self, perm):
-        found = False
-
+        found = None
         if 'IpRanges' in perm and 'Cidr' in self.data:
             match_range = self.data['Cidr']
             match_range['key'] = 'CidrIp'
@@ -322,21 +346,30 @@ class SGPermission(Filter):
                 found = vf(ip_range)
                 if found:
                     break
+                else:
+                    found = False
         return found
 
     def __call__(self, resource):
         matched = []
         for perm in resource[self.ip_permissions_key]:
-            found = False
+            found = None
             for f in self.vfilters:
                 if f(perm):
                     found = True
+                else:
+                    found = False
                     break
-            if not found:
-                found = self.process_ports(perm)
-            if not found:
-                found = self.process_cidrs(perm)
-
+            if found is None or found:
+                port_found = self.process_ports(perm)
+                if port_found is not None:
+                    found = (
+                        found is not None and port_found & found or port_found)
+            if found is None or found:
+                cidr_found = self.process_cidrs(perm)
+                if cidr_found is not None:
+                    found = (
+                        found is not None and cidr_found & found or cidr_found)
             if not found:
                 continue
             matched.append(perm)
@@ -371,6 +404,17 @@ class IPPermissionEgress(SGPermission):
             'type': {'enum': ['egress']}
             },
         'required': ['type']}
+
+
+@SecurityGroup.action_registry.register('delete')
+class Delete(BaseAction):
+
+    schema = type_schema('delete')
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('ec2')
+        for r in resources:
+            client.delete_security_group(GroupId=r['GroupId'])
 
 
 @SecurityGroup.action_registry.register('remove-permissions')
@@ -425,52 +469,19 @@ class NetworkInterface(QueryResourceManager):
 
 
 @NetworkInterface.filter_registry.register('subnet')
-class InterfaceSubnet(ValueFilter):
+class InterfaceSubnetFilter(net_filters.SubnetFilter):
 
-    schema = type_schema('subnet', rinherit=ValueFilter.schema)
-    annotate = False
-
-    def process(self, resources, event=None):
-        subnets = set([r['SubnetId'] for r in resources])
-        manager = Subnet(self.manager.ctx, {})
-        self.subnets = {s['SubnetId']: s for s
-                        in manager.get_resources(list(subnets))}
-        return super(InterfaceSubnet, self).process(resources, event)
-
-    def __call__(self, resource):
-        return self.match(self.subnets[resource['SubnetId']])
+    RelatedIdsExpression = "SubnetId"
 
 
-@NetworkInterface.filter_registry.register('group')
-class InterfaceGroup(ValueFilter):
+@NetworkInterface.filter_registry.register('security-group')
+class InterfaceSecurityGroupFilter(net_filters.SecurityGroupFilter):
 
-    annotate = False
-    schema = type_schema('group', rinherit=ValueFilter.schema)
-
-    def process(self, resources, event=None):
-        groups = set()
-        for r in resources:
-            for g in r['Groups']:
-                groups.add(g['GroupId'])
-        manager = SecurityGroup(self.manager.ctx, {})
-        self.groups = {s['GroupId']: s for s
-                       in manager.resources()}
-        # todo, something odd here
-        #in manager.get_resources(sorted(list(groups)))}
-        return super(InterfaceGroup, self).process(resources, event)
-
-    def __call__(self, resource):
-        matched = []
-        for g in resource.get('Groups', ()):
-            if self.match(self.groups[g['GroupId']]):
-                matched.append(g['GroupId'])
-        if matched:
-            resource['MatchedSecurityGroups'] = matched
-            return True
+    RelatedIdsExpression = "Groups[].GroupId"
 
 
 @NetworkInterface.action_registry.register('remove-groups')
-class InterfaceRemoveGroups(BaseAction):
+class InterfaceRemoveGroups(ModifyGroupsAction):
     """Remove security groups from an interface.
 
     Can target either physical groups as a list of group ids or
@@ -490,35 +501,12 @@ class InterfaceRemoveGroups(BaseAction):
            'isolation-group': {'type': 'string'}})
 
     def process(self, resources):
-        target_group_ids = self.data.get('groups', 'matched')
-        isolation_group = self.data.get('isolation-group')
-
         client = local_session(self.manager.session_factory).client('ec2')
-
-        for r in resources:
-            rgroups = [g['GroupId'] for g in r['Groups']]
-            if target_group_ids == 'matched':
-                group_ids = r.get('MatchedSecurityGroups', ())
-            elif target_group_ids == 'all':
-                group_ids = rgroups
-            elif isinstance(target_group_ids, list):
-                group_ids = target_group_ids
-            else:
-                continue
-
-            if not group_ids:
-                continue
-
-            for g in group_ids:
-                if g in rgroups:
-                    rgroups.remove(g)
-
-            if not rgroups:
-                rgroups.append(isolation_group)
-
+        groups = super(InterfaceRemoveGroups, self).get_groups(resources)
+        for idx, r in enumerate(resources):
             client.modify_network_interface_attribute(
                 NetworkInterfaceId=r['NetworkInterfaceId'],
-                Groups=rgroups)
+                Groups=groups[idx])
 
 
 @resources.register('route-table')
@@ -531,7 +519,10 @@ class RouteTable(QueryResourceManager):
 @resources.register('peering-connection')
 class PeeringConnection(QueryResourceManager):
 
-    resource_type = 'aws.ec2.vpc-peering-connection'
+    class resource_type(ResourceQuery.resolve(
+            'aws.ec2.vpc-peering-connection')):
+        enum_spec = ('describe_vpc_peering_connections',
+                     'VpcPeeringConnections', None)
 
 
 @resources.register('network-acl')
