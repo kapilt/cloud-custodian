@@ -10,8 +10,7 @@ class LambdaTest(BaseTest):
             'resource': 'lambda',
             'filters': [
                 {'FunctionName': 'superduper'}],
-            'actions': [
-                {'type': 'delete', 'qualifier': 'development'}]
+            'actions': [{'type': 'delete'}]
             }, session_factory=factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
