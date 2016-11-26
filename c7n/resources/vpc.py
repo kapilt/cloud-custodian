@@ -207,9 +207,10 @@ class Stale(Filter):
                 if s['GroupId'] in group_map:
                     r = group_map[s['GroupId']]
                     if 'StaleIpPermissions' in s:
-                        r['c7n.stale_ingress'] = s['StaleIpPermissions']
+                        r['MatchedIpPermissions'] = s['StaleIpPermissions']
                     if 'StaleIpPermissionsEgress' in s:
-                        r['c7n.stale_egress'] = s['StaleIpPermissionsEgress']
+                        r['MatchedIpPermissionsEgress'] = s[
+                            'StaleIpPermissionsEgress']
                     results.append(r)
         self.log.debug("Found %d stale security groups", stale_count)
         return results
