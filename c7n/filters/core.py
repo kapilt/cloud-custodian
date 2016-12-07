@@ -179,7 +179,7 @@ class Or(Filter):
         return False
 
     def process_set(self, resources, event):
-        resource_type = self.manager.query.resolve(self.manager.resource_type)
+        resource_type = self.manager.get_model()
         resource_map = {r[resource_type.id]: r for r in resources}
         results = set()
         for f in self.filters:
@@ -266,12 +266,12 @@ class ValueFilter(Filter):
                 if t.get('Key') == tk:
                     r = t.get('Value')
                     break
-        elif '.' not in k and '[' not in k and '(' not in k:
+        elif k in i:
             r = i.get(k)
         elif self.expr:
             r = self.expr.search(i)
         else:
-            self.expr = jmespath.compile(self.k)
+            self.expr = jmespath.compile(k)
             r = self.expr.search(i)
         return r
 
@@ -310,6 +310,8 @@ class ValueFilter(Filter):
             return True
         elif v == 'not-null' and r:
             return True
+        elif v == 'empty' and not r:
+            return True
         elif self.op:
             op = OPERATORS[self.op]
             try:
@@ -346,7 +348,7 @@ class ValueFilter(Filter):
                 # EMR not having more functionality.
                 try:
                     value = parse(value)
-                except AttributeError:
+                except (AttributeError, TypeError):
                     value = 0
             # Reverse the age comparison, we want to compare the value being
             # greater than the sentinel typically. Else the syntax for age
@@ -403,14 +405,20 @@ class AgeFilter(Filter):
         return v
 
     def __call__(self, i):
-        if not self.threshold_date:
-            days = self.data.get('days', 60)
-            n = datetime.now(tz=tzutc())
-            self.threshold_date = n - timedelta(days)
         v = self.get_resource_date(i)
         if v is None:
             return False
         op = OPERATORS[self.data.get('op', 'greater-than')]
+
+        if not self.threshold_date:
+            days = self.data.get('days', 60)
+            # Work around placebo issues with tz
+            if v.tzinfo:
+                n = datetime.now(tz=tzutc())
+            else:
+                n = datetime.now()
+            self.threshold_date = n - timedelta(days)
+
         return op(self.threshold_date, v)
 
 

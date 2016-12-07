@@ -15,6 +15,8 @@ import logging
 
 from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
+from datetime import datetime, timedelta
+from dateutil.tz import tzutc
 
 from c7n.actions import ActionRegistry, BaseAction
 from c7n.filters import (
@@ -25,7 +27,8 @@ from c7n.manager import resources
 from c7n.resources.kms import ResourceKmsKeyAlias
 from c7n.query import QueryResourceManager, ResourceQuery
 from c7n.utils import (
-    local_session, set_annotation, query_instances, chunks, type_schema)
+    local_session, set_annotation, query_instances, chunks,
+    type_schema, worker)
 from c7n.resources.ami import AMI
 
 log = logging.getLogger('custodian.ebs')
@@ -50,7 +53,7 @@ class SnapshotAge(AgeFilter):
         days={'type': 'number'},
         op={'type': 'string', 'enum': OPERATORS.keys()})
     date_attribute = 'StartTime'
-    
+
 
 def _filter_ami_snapshots(self, snapshots):
     if not self.data.get('value', True):
@@ -63,30 +66,30 @@ def _filter_ami_snapshots(self, snapshots):
     for i in amis:
         for dev in i.get('BlockDeviceMappings'):
             if 'Ebs' in dev and 'SnapshotId' in dev['Ebs']:
-                ami_snaps.append(dev['Ebs']['SnapshotId'])            
+                ami_snaps.append(dev['Ebs']['SnapshotId'])
     matches = []
     for snap in snapshots:
         if snap['SnapshotId'] not in ami_snaps:
             matches.append(snap)
     return matches
-        
+
 
 @Snapshot.filter_registry.register('skip-ami-snapshots')
 class SnapshotSkipAmiSnapshots(Filter):
-    
+
     schema = type_schema('skip-ami-snapshots', value={'type': 'boolean'})
-    
+
     def validate(self):
         if self.data.get('skip-ami-snapshots', not True or False):
             raise FilterValidationError(
                 "invalid config: expected boolean value")
         return self
-    
+
     def process(self, snapshots, event=None):
         resources = _filter_ami_snapshots(self, snapshots)
         return resources
-    
-    
+
+
 @Snapshot.action_registry.register('delete')
 class SnapshotDelete(BaseAction):
 
@@ -101,8 +104,9 @@ class SnapshotDelete(BaseAction):
         pre = len(snapshots)
         snapshots = filter(None, _filter_ami_snapshots(self, snapshots))
         post = len(snapshots)
-        log.info("Deleting %d snapshots, auto-filtered %d ami-snapshots" %(post, pre-post))
-        
+        log.info("Deleting %d snapshots, auto-filtered %d ami-snapshots",
+                 post, pre-post)
+
         with self.executor_factory(max_workers=3) as w:
             futures = []
             for snapshot_set in chunks(reversed(snapshots), size=50):
@@ -115,6 +119,7 @@ class SnapshotDelete(BaseAction):
                             f.exception()))
         return snapshots
 
+    @worker
     def process_snapshot_set(self, snapshots_set):
         c = local_session(self.manager.session_factory).client('ec2')
         for s in snapshots_set:
@@ -161,6 +166,7 @@ class CopySnapshot(BaseAction):
         with self.executor_factory(max_workers=2) as w:
             list(w.map(self.process_resource_set, chunks(resources, 20)))
 
+    @worker
     def process_resource_set(self, resource_set):
         client = self.manager.session_factory(
             region=self.data['target_region']).client('ec2')
@@ -248,6 +254,44 @@ class KmsKeyAlias(ResourceKmsKeyAlias):
         return self.get_matching_aliases(resources)
 
 
+@filters.register('fault-tolerant')
+class FaultTolerantSnapshots(Filter):
+    """
+    This filter will return any EBS volume that does/does not have a
+    snapshot within the last 7 days. 'Fault-Tolerance' in this instance
+    means that, in the event of a failure, the volume can be restored
+    from a snapshot with (reasonable) data loss
+
+    - name: ebs-volume-tolerance
+    - resource: ebs
+    - filters: [{
+        'type': 'fault-tolerant',
+        'tolerant': True}]
+    """
+    schema = type_schema(
+        'fault-tolerant',
+        tolerant={'type': 'boolean'})
+
+    check_id = 'H7IgTzjTYb'
+
+    def pull_check_results(self):
+        result = set()
+        client = local_session(self.manager.session_factory).client('support')
+        response = client.refresh_trusted_advisor_check(checkId=self.check_id)
+        results = client.describe_trusted_advisor_check_result(
+            checkId=self.check_id, language='en')['result']
+        for r in results['flaggedResources']:
+            result.update([r['metadata'][1]])
+        return result
+
+    def process(self, resources, event=None):
+        flagged = self.pull_check_results()
+        if self.data.get('tolerant', True):
+            return [r for r in resources if r['VolumeId'] not in flagged]
+        return [r for r in resources if r['VolumeId'] in flagged]
+
+
+
 @actions.register('copy-instance-tags')
 class CopyInstanceTags(BaseAction):
     """Copy instance tags to its attached volume.
@@ -286,6 +330,7 @@ class CopyInstanceTags(BaseAction):
             instance_vol_map.setdefault(
                 v['Attachments'][0]['InstanceId'], []).append(v)
 
+        # TODO switch out to instance cache query
         instance_map = {i['InstanceId']: i for i in query_instances(
             local_session(self.manager.session_factory),
             InstanceIds=instance_vol_map.keys())}
@@ -300,7 +345,6 @@ class CopyInstanceTags(BaseAction):
 
     def process_instance_volumes(self, instance, volumes):
         client = local_session(self.manager.session_factory).client('ec2')
-
         for v in volumes:
             copy_tags = self.get_volume_tags(v, instance, v['Attachments'][0])
             if not copy_tags:
@@ -313,7 +357,6 @@ class CopyInstanceTags(BaseAction):
                         self.__class__.__name__.lower(),
                         v['VolumeId'], instance['InstanceId']))
                 continue
-
             try:
                 self.manager.retry(
                     client.create_tags,
@@ -589,8 +632,13 @@ class EncryptInstanceVolumes(BaseAction):
 
 @actions.register('delete')
 class Delete(BaseAction):
+    """Delete an ebs volume.
 
-    schema = type_schema('delete')
+    If the force boolean is true, we will detach an attached volume
+    from an instance. Note this cannot be done for running instance
+    root volumes.
+    """
+    schema = type_schema('delete', force={'type': 'boolean'})
 
     def process(self, volumes):
         with self.executor_factory(max_workers=3) as w:
@@ -599,10 +647,12 @@ class Delete(BaseAction):
     def process_volume(self, volume):
         client = local_session(self.manager.session_factory).client('ec2')
         try:
-            self._run_api(
-                client.delete_volume,
-                VolumeId=volume['VolumeId'],
-                DryRun=self.manager.config.dryrun)
+            if self.data.get('force') and len(volume['Attachments']):
+                client.detach_volume(VolumeId=volume['VolumeId'], Force=True)
+                waiter = client.get_waiter('volume_available')
+                waiter.wait(VolumeIds=[volume['VolumeId']])
+            self.manager.retry(
+                client.delete_volume, VolumeId=volume['VolumeId'])
         except ClientError as e:
             if e.response['Error']['Code'] == "InvalidVolume.NotFound":
                 return

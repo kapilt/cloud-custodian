@@ -19,29 +19,29 @@ from .related import RelatedResourceFilter
 
 
 class SecurityGroupFilter(RelatedResourceFilter):
-
+    """Filter a resource by its associated security groups."""
     schema = type_schema(
         'security-group', rinherit=ValueFilter.schema,
-        match_resource={'type': 'boolean'},
-        operator={'enum': ['and', 'or']})
+        **{'match-resource':{'type': 'boolean'},
+           'operator': {'enum': ['and', 'or']}})
 
     RelatedResource = "c7n.resources.vpc.SecurityGroup"
     AnnotationKey = "matched-security-groups"
 
 
 class SubnetFilter(RelatedResourceFilter):
-
+    """Filter a resource by its associated subnets."""
     schema = type_schema(
         'subnet', rinherit=ValueFilter.schema,
-        match_resource={'type': 'boolean'},
-        operator={'enum': ['and', 'or']})
+        **{'match-resource':{'type': 'boolean'},
+           'operator': {'enum': ['and', 'or']}})
 
     RelatedResource = "c7n.resources.vpc.Subnet"
-    AnnotationKey = "matched-subnets"    
+    AnnotationKey = "matched-subnets"
 
 
 class DefaultVpcBase(Filter):
-
+    """Filter to resources in a default vpc."""
     vpcs = None
     default_vpc = None
 
@@ -52,8 +52,6 @@ class DefaultVpcBase(Filter):
             vpcs = [v['VpcId'] for v
                     in client.describe_vpcs(VpcIds=[vpc_id])['Vpcs']
                     if v['IsDefault']]
-            if not vpcs:
-                self.default_vpc = ""
-            else:
+            if vpcs:
                 self.default_vpc = vpcs.pop()
         return vpc_id == self.default_vpc and True or False
