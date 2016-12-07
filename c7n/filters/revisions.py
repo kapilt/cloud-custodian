@@ -142,7 +142,7 @@ class Diff(Revisions):
         selector = self.data.get('selector', self.SELECTOR_PREVIOUS)
         limit = selector == self.SELECTOR_PREVIOUS and 4
         results = []
-        
+
         for res in resources:
             res = dict(res)
             res.pop('MatchedFilters')
@@ -191,7 +191,7 @@ class Diff(Revisions):
 
     def get_revisions(self, i):
         pass
-    
+
     def process_revisions(self, i):
         for r in self.get_revisions(i):
             return any(self.process_revision(i, r))
@@ -204,7 +204,7 @@ class Diff(Revisions):
         service = session.client(resource_model.service)
         shape_name = resource_model.config_type.split('::')[-1]
         return service.meta.service_model.shape_for(shape_name)
-        
+
 
 class ConfigResourceParser(BaseJSONParser):
 
@@ -222,7 +222,7 @@ class ApplyReverseDiff(object):
 
     def process(self, resources):
         pass
-    
+
     def apply_delta(self, resource, delta):
         handler_names = [h for h in dir(self) if h.startswith('handle_')]
         for hn in handler_names:
@@ -233,9 +233,70 @@ class ApplyReverseDiff(object):
 def delta_selector(expr):
     def decorator(f):
         functools.wrap(f)
+
         def delta_handler(client, resource, change_set):
             changes = [c for c in change_set if c['path'].startswith(expr)]
             return f(client, resource, changes)
+
+
+class ResourceTFStateAdapter(object):
+
+    def __init__(self, resource):
+        self.resource = resource
+
+    def render_module(self, path='root'):
+        raise NotImplementedError()
+
+
+class TFSecurityGroup(ResourceTFStateAdapter):
+
+    def render_module(self, path='root'):
+        module_state = {
+            "path": [path],
+            "outputs": {},
+            "resources": {
+                "aws_security_group.sg_target": self.render_resource()
+            }
+        }
+        return module_state
+
+    def render_resource(self):
+        attributes = {
+            "id": self.resource['GroupId'],
+            "name": self.resource['GroupName'],
+            "owner_id": self.resource['OwnerId'],
+            "description": "",
+            "vpc_id": self.resource['VpcId']
+        }
+        rendered = {
+            "type": "aws_security_group",
+            "depends_on": [],
+            "primary": {
+                "id": self.resource['GroupId'],
+                "meta": {},
+                "tainted": False,
+                "attributes": attributes
+                }
+        }
+        attributes['egress.#'] = len(self.resource['IpPermissionsEgress'])
+        for rule in self.resource['IpPermissionsEgress']:
+            attributes.update(
+                self.format_rule('egress', rule))
+        for rule in self.resource['IpPermissions']:
+            attributes.update(
+                self.format_rule('ingress', rule))
+
+        attributes['tags.%'] = len(self.resource.get('Tags', ()))
+        for t in self.resource.get('Tags', []):
+            attributes['tags.%s' % t['Key']] = t['Value']
+        return rendered
+
+
+class TFPlan(object):
+    pass
+
+class TFPatch(object):
+    pass
 
 
 class SecurityGroupPatch(object):
@@ -261,7 +322,7 @@ class SecurityGroupPatch(object):
         client.create_tags(
             Resources=target['GroupId'],
             Tags=[{'Key': k, 'Value': v} for k, v in target_tags.items() if
-                  k in added or k in changed])                
+                  k in added or k in changed])
         client.remove_tags(
             Resources=target['GroupId'],
             Tags=[{'Key': k, 'Value': v} for k, v in source_tags.items() if
