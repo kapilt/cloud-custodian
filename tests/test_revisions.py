@@ -91,6 +91,8 @@ class DiffLibTest(BaseTest):
         s2 = client.describe_security_groups(GroupIds=[sg_id])[
             'SecurityGroups'][0]
 
+        t_state_sg = TFStateSecurityGroup(s1)
+        t_goal_sg = TFResourceSecurityGroup(s2)
 
         self.compare_diffs(s1, s2)
 

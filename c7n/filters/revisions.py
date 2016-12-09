@@ -18,6 +18,7 @@ of a resource.
 
 import json
 from pprint import pprint
+import zlib
 
 from botocore.exceptions import ClientError
 from botocore.parsers import BaseJSONParser
@@ -161,7 +162,7 @@ class Diff(Revisions):
                 continue
 
             cur = res
-            
+
             for rev in revisions:
                 previous = parser.parse(
                     camelResource(json.loads(rev['configuration'])),
@@ -180,7 +181,7 @@ class Diff(Revisions):
                     break
                 #from deepdiff import DeepDiff
                 #pprint(DeepDiff(previous, cur, ignore_order=True))
-        
+
                 cur = previous
             res['c7n.Revisions'] = revisions
 
@@ -248,7 +249,106 @@ class ResourceTFStateAdapter(object):
         raise NotImplementedError()
 
 
-class TFSecurityGroup(ResourceTFStateAdapter):
+class ResourceTFResourceAdapter(object):
+
+    def render_resource()
+        raise NotImplementedError()
+
+
+class TerraForm(object):
+    # Todo handle importing state
+    def __init__(self, bin_path):
+        self.bin_path = bin_path
+
+    def diff(self, goal, state):
+        plan = self.run_delta_op()
+        return plan
+
+    def show(self, goal, state):
+        output = self.diff(goal, state)
+        with temp_dir:
+            with tempfile.NamedTemporaryFile() as plan_fh:
+                plan_fh.write(output)
+                return subprocess.check_output(
+                    self.bin_path, "show", plan_fh.name)
+
+    def apply(self, goal, state):
+        output = self.diff(goal, state)
+        with temp_dir:
+            with tempfile.NamedTemporaryFile() as plan_fh:
+                plan_fh.write(output)
+                return subprocess.check_output(
+                    self.bin_path, "apply", plan_fh.name)
+
+    def run_delta_op(self, goal, state):
+        rendered_goal = self.render_goal(goal)
+        rendered_state = self.render_state(state)
+        with temp_dir:
+            with tempfile.NamedTemporaryFile() as goal_fh:
+                with tempfile.NamedTemporaryFile() as state_fh:
+                    json.dump(rendered_state, state_fh, indent=2)
+                    json.dump(rendered_goal, goal_fh, indent=2)
+                    subprocess.check_output([
+                        self.bin_path, "plan"
+                    ])
+
+    def render_goal(self, goal):
+        return TFResourceSecurityGroup(goal).render_resource()
+
+    def render_state(self, state):
+        return TFStateSecurityGroup(state).render_module()
+
+
+class TFSecurityGroupBase(object):
+
+    RULE_ATTRS = (
+        ('cidr_blocks', 'IpRanges', 'CidrIp'),
+        # terraform doesn't seem to support cross account/vpc sg rules .7.13
+        ('security_groups', 'UserIdGroupPairs', 'GroupId'),
+        ('prefix_list_ids', 'PrefixListIds', 'PrefixListId'))
+
+    def render_attributes(self):
+        attributes = {
+            "id": self.resource['GroupId'],
+            "name": self.resource['GroupName'],
+            "owner_id": self.resource['OwnerId'],
+            "description": self.resource['Description'],
+            "vpc_id": self.resource['VpcId']
+        }
+        return attributes
+
+    def format_goal_rule(self, prefix, rule):
+        pass
+
+    def format_state_rule(self, prefix, rule):
+        code = self.compute_rule_hash(rule)
+        f = {}
+        for k, a, ke in self.RULE_ATTRS:
+            v = rule.get(a, ())
+            f["%s.%s.%s" % (prefix, code, k)] = len(v)
+            for idx, e in enumerate(v):
+                f["%s.%s.%s.%d" % (prefix, code, k, idx)] = e[ke]
+        f["%s.%s.%s" % (prefix, code, 'protocol')] = rule['IpProtocol']
+        # f["%s.%s.%s" % (prefix, code, 'self')] = rule  # Todo
+        f["%s.%s.%s" % (prefix, code, 'from_port')] = rule['FromPort']
+        f["%s.%s.%s" % (prefix, code, 'to_port')] = rule['ToPort']
+        return f
+
+    def compute_rule_hash(self, rule):
+        buf = "%d-%d-%d-%d" % (
+            rule['FromPort'],
+            rule['ToPort'],
+            rule['Protocol'],
+            False)
+        for k, a, ke in self.RULE_ATTRS:
+            ev = [e[ke] for e in rule[a]]
+            ev.sorted()
+            for e in ev:
+                buf += "%s" % e
+        return abs(zlib.crc32(buf))
+
+
+class TFStateSecurityGroup(ResourceTFStateAdapter, TFSecurityGroupBase):
 
     def render_module(self, path='root'):
         module_state = {
@@ -261,13 +361,7 @@ class TFSecurityGroup(ResourceTFStateAdapter):
         return module_state
 
     def render_resource(self):
-        attributes = {
-            "id": self.resource['GroupId'],
-            "name": self.resource['GroupName'],
-            "owner_id": self.resource['OwnerId'],
-            "description": "",
-            "vpc_id": self.resource['VpcId']
-        }
+        attributes = self.render_attributes()
         rendered = {
             "type": "aws_security_group",
             "depends_on": [],
@@ -281,21 +375,31 @@ class TFSecurityGroup(ResourceTFStateAdapter):
         attributes['egress.#'] = len(self.resource['IpPermissionsEgress'])
         for rule in self.resource['IpPermissionsEgress']:
             attributes.update(
-                self.format_rule('egress', rule))
+                self.format_state_rule('egress', rule))
+        attributes['ingress.#'] = len(self.resource['IpPermissions'])
         for rule in self.resource['IpPermissions']:
             attributes.update(
-                self.format_rule('ingress', rule))
-
+                self.format_state_rule('ingress', rule))
         attributes['tags.%'] = len(self.resource.get('Tags', ()))
         for t in self.resource.get('Tags', []):
             attributes['tags.%s' % t['Key']] = t['Value']
         return rendered
 
 
-class TFPlan(object):
-    pass
+class TFResourceSecurityGroup(ResourceTFResourceAdapter, TFSecurityGroupBase):
 
-class TFPatch(object):
+    def render_resource(self):
+        attributes = self.render_attributes()
+        ingress, egress = [], []
+        for r in self.resource.get('IpPermissions'):
+            pass
+        resource = {
+            "aws_security_group": {
+                "sg_target": attributes}}
+        return resource
+
+
+class TF(object):
     pass
 
 
