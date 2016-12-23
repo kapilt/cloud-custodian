@@ -22,8 +22,6 @@ import traceback
 
 from dateutil.parser import parse as date_parse
 
-from c7n.utils import read_aws_config_file
-
 DEFAULT_REGION = 'us-east-1'
 
 
@@ -36,10 +34,9 @@ def _default_options(p, blacklist=""):
     provider = p.add_argument_group(
         "provider", "AWS account information, defaults per the aws cli")
 
-    default_region = determine_default_region()
     if 'region' not in blacklist:
         provider.add_argument(
-            "-r", "--region", default=default_region,
+            "-r", "--region", default=None,
             help="AWS Region to target (Default: %(default)s)")
     provider.add_argument(
         "--profile",
@@ -222,7 +219,7 @@ def setup_parser():
 
 def determine_default_region():
     """ Return the default region
-    
+
     If the region is not specified on the command line we will use a default.
 
     The priority order for determining this is:
@@ -238,7 +235,6 @@ def determine_default_region():
     config = read_aws_config_file()
     if config.get('default', 'region', fallback=None):
         return config['default']['region']
-    
     return DEFAULT_REGION
 
 
