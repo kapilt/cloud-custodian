@@ -217,27 +217,6 @@ def setup_parser():
     return parser
 
 
-def determine_default_region():
-    """ Return the default region
-
-    If the region is not specified on the command line we will use a default.
-
-    The priority order for determining this is:
-     - AWS_DEFAULT_REGION environment variable
-     - region defined in the file pointed to by AWS_CONFIG_FILE env variable
-       (the default for this file is ~/.aws/config)
-     - The DEFAULT_REGION defined at the top of this file
-    """
-    env_key = 'AWS_DEFAULT_REGION'
-    if os.environ.get(env_key):
-        return os.environ[env_key]
-
-    config = read_aws_config_file()
-    if config.get('default', 'region', fallback=None):
-        return config['default']['region']
-    return DEFAULT_REGION
-
-
 def cmd_version(options):
     from c7n.version import version
     print(version)
