@@ -912,7 +912,7 @@ class EncryptExtantKeys(ScanBucket):
         'type': 'object',
         'additionalProperties': False,
         'properties': {
-            'type': {'pattern': 'encrypt-keys'},
+            'type': {'enum': ['encrypt-keys']},
             'report-only': {'type': 'boolean'},
             'glacier': {'type': 'boolean'},
             'large': {'type': 'boolean'},
