@@ -41,8 +41,7 @@ It integrates with lambda and cloudwatch events to provide for
 real time enforcement of policies with builtin provisioning of the lambdas, or
 as a simple cron job on a server to execute against large existing fleets.
 
-“Engineering the Next Generation of Cloud Governance” by @drewfirment
-https://cloudrumblings.io/cloud-adoption-engineering-the-next-generation-of-cloud-governance-21fb1a2eff60#.5cuxnz2eh
+“`Engineering the Next Generation of Cloud Governance <https://cloudrumblings.io/cloud-adoption-engineering-the-next-generation-of-cloud-governance-21fb1a2eff60>`_” by @drewfirment
 
 
 Features
@@ -65,7 +64,7 @@ Links
 #####
 
 - `Docs <http://www.capitalone.io/cloud-custodian/>`_
-- `Developer Install <http://www.capitalone.io/cloud-custodian/docs/quickstart/developer.html>`_
+- `Developer Install <http://www.capitalone.io/cloud-custodian/docs/developer.html>`_
 
 
 Quick Install
