@@ -19,6 +19,7 @@ import logging
 import zlib
 
 from botocore.exceptions import ClientError
+from concurrent.futures import as_completed
 
 from c7n.registry import PluginRegistry
 from c7n.executor import ThreadPoolExecutor
@@ -103,6 +104,100 @@ class BaseAction(object):
 Action = BaseAction
 
 
+class ResourceMethodAction(BaseAction):
+    """Invoke an api call on each resource.
+
+    Quite a number of procedural actions are simply invoking an api
+    call on a filtered set of resources. The exact handling is mostly
+    boilerplate at that point following an 80/20 rule. This class is
+    an encapsulation of the 80%.
+
+    """
+    # method we'll be invoking
+    method_spec = ()
+
+    # batch size, note this is also a failure domain
+    chunk_size = 20
+
+    # concurrent executions
+    max_workers = 3
+
+    # automatically retry api calls with the following error codes
+    retry = None
+
+    # ignore exceptions with the following error codes
+    ignore_errors = ()
+
+    # on error raise
+    on_error_raise = True
+
+    # implicitly filter resources by state, (attr_name, (valid_enum))
+    attr_filter = ()
+
+    def validate(self):
+        if not self.method_spec:
+            raise SyntaxError("subclass must define method_spec")
+        return self
+
+    def filter_resources(self, resources):
+        rcount = len(resources)
+        attr_name, valid_enum = self.attr_filter
+        resources = [r for r in resources if r.get(attr_name) in valid_enum]
+        if len(resources) != rcount:
+            self.log.warning(
+                "%s implicity filtered %d resources to %d by values %s",
+                rcount,
+                len(resources),
+                ", ".join(map(str, valid_enum))
+                )
+        return resources
+
+    def process(self, resources):
+        if self.attr_filter:
+            resources = self.filter_resources(resources)
+
+        with self.executor_factory(max_workers=self.max_workers) as w:
+            futures = []
+            for resource_set in utils.chunks(resources, self.chunk_size):
+                futures.append(
+                    w.submit(self.process_resource_set, resource_set))
+                for f in as_completed(futures):
+                    if f.exception():
+                        self.log.error(
+                            "Exception on action:%s \n %s" % (
+                                self.data['type'], f.exception()))
+
+    def process_resource_set(self, resources):
+        m = self.manager.get_model()
+        client = utils.local_session(
+            self.manager.session_factory).client(m.service)
+        op_name, result_key, annotation_key = self.method_spec
+        op = getattr(client, op_name)
+
+        if self.retry:
+            args = (op,)
+            op = self.retry
+
+        for r in resources:
+            kw = self.get_resource_params(r)
+            try:
+                result = op(*args, **kw)
+                if result_key and annotation_key:
+                    r[annotation_key] = result.get(result_key)
+            except ClientError as e:
+                if e.response['Error']['Code'] in self.ignore_errors:
+                    continue
+                self.log.error(
+                    "Exception on action:%s resource:%s",
+                    self.data['type'], r[m.id])
+                if self.on_error_raise:
+                    raise
+
+    def get_resource_params(self, r, param_name):
+        m = self.manager.get_model()
+        return {m.id: r[m.id]}
+
+
 class ModifyVpcSecurityGroupsAction(BaseAction):
     """Common actions for modifying security groups on a resource
 
@@ -116,6 +211,7 @@ class ModifyVpcSecurityGroupsAction(BaseAction):
 
     type: modify-security-groups
         add: []
+
         remove: [] | matched
         isolation-group: sg-xyz
     """

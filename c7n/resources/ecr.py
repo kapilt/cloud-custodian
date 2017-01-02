@@ -64,5 +64,5 @@ class ECRCrossAccountAccessFilter(CrossAccountAccessFilter):
         self.log.debug("fetching policy for %d repos" % len(resources))
         with self.executor_factory(max_workers=3) as w:
             resources = filter(None, w.map(_augment, resources))
-
-        return super(ECRCrossAccountAccessFilter, self).process(resources, event)
+        return super(
+            ECRCrossAccountAccessFilter, self).process(resources, event)
