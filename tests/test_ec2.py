@@ -640,8 +640,10 @@ class TestModifySecurityGroupsActionSchema(BaseTest):
 class TestModifySecurityGroupAction(BaseTest):
     def test_security_group_type(self):
         # Test conditions:
-        #   - running two instances; one with TestProductionInstanceProfile and one with none
-        #   - security group named TEST-PROD-ONLY-SG exists in VPC and is attached to both test instances
+        #   - running two instances; one with TestProductionInstanceProfile
+        #     and one with none
+        #   - security group named TEST-PROD-ONLY-SG exists in VPC and is
+        #     attached to both test instances
         session_factory = self.replay_flight_data(
             'test_ec2_security_group_filter')
 
@@ -672,8 +674,10 @@ class TestModifySecurityGroupAction(BaseTest):
 
     def test_security_group_modify_groups_action(self):
         # Test conditions:
-        #   - running two instances; one with TestProductionInstanceProfile and one with none
-        #   - security group named TEST-PROD-ONLY-SG exists in VPC and is attached to both test instances
+        #   - running two instances; one with TestProductionInstanceProfile
+        #     and one with none
+        #   - security group named TEST-PROD-ONLY-SG exists in VPC and is
+        #     attached to both test instances
         session_factory = self.replay_flight_data(
             'test_ec2_modify_groups_action')
         client = session_factory().client('ec2')
@@ -730,17 +734,18 @@ class TestModifySecurityGroupAction(BaseTest):
     def test_ec2_add_security_groups(self):
         # Test conditions:
         #   - running one instance with TestProductionInstanceProfile
-        #   - security group named TEST-PROD-ONLY-SG exists in VPC and is attached to test instance
-        #   - security group with id sg-8a4b64f7 exists in VPC and is selected in a policy to be attached
+        #   - security group named TEST-PROD-ONLY-SG exists in VPC and
+        #     is attached to test instance
+        #   - security group with id sg-8a4b64f7 exists in VPC and is selected
+        #     in a policy to be attached
         session_factory = self.replay_flight_data(
-            'test_ec2_add_security_groups'
-        )
-
+            'test_ec2_add_security_groups')
         policy = self.load_policy({
             'name': 'add-sg-to-prod-instances',
             'resource': 'ec2',
             'filters': [
-                {'type': 'value', 'key': 'IamInstanceProfile.Arn', 'value': '(.*TestProductionInstanceProfile)', 'op': 'regex'}
+                {'type': 'value', 'key': 'IamInstanceProfile.Arn',
+                 'value': '(.*TestProductionInstanceProfile)', 'op': 'regex'}
             ],
             'actions': [
                 {'type': 'modify-security-groups', 'add': 'sg-8a4b64f7'}
