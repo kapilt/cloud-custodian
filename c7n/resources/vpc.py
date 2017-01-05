@@ -602,10 +602,33 @@ class SGPermission(Filter):
             found = self_reference & self.data['SelfReference']
         return found
 
+    def expand_permissions(self, permissions):
+        """Expand each list of cidr, prefix list, user id group pair
+        by port/protocol as an individual rule.
+
+        The console ux automatically expands them out as addition/removal is
+        per this expansion, the describe calls automatically group them.
+        """
+        for p in permissions:
+            np = dict(p)
+            values = {}
+            for k in ('IpRanges',
+                      'Ipv6Ranges',
+                      'PrefixListIds',
+                      'UserIdGroupPairs'):
+                values[k] = np.pop(k, ())
+            for k, v in values.items():
+                if not v:
+                    continue
+                for e in v:
+                    ep = dict(np)
+                    ep[k] = [e]
+                    yield ep
+
     def __call__(self, resource):
         matched = []
         sg_id = resource['GroupId']
-        for perm in resource[self.ip_permissions_key]:
+        for perm in self.expand_permissions(resource[self.ip_permissions_key]):
             found = None
             for f in self.vfilters:
                 if f(perm):
