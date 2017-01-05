@@ -612,11 +612,12 @@ class SGPermission(Filter):
         for p in permissions:
             np = dict(p)
             values = {}
-            for k in ('IpRanges',
-                      'Ipv6Ranges',
-                      'PrefixListIds',
-                      'UserIdGroupPairs'):
+            for k in (u'IpRanges',
+                      u'Ipv6Ranges',
+                      u'PrefixListIds',
+                      u'UserIdGroupPairs'):
                 values[k] = np.pop(k, ())
+                np[k] = []
             for k, v in values.items():
                 if not v:
                     continue
@@ -628,6 +629,7 @@ class SGPermission(Filter):
     def __call__(self, resource):
         matched = []
         sg_id = resource['GroupId']
+
         for perm in self.expand_permissions(resource[self.ip_permissions_key]):
             found = None
             for f in self.vfilters:

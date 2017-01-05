@@ -200,6 +200,7 @@ class SecurityGroupTest(BaseTest):
             resources[0]['MatchedIpPermissions'],
             [{u'FromPort': 60000,
               u'IpProtocol': u'tcp',
+              u'Ipv6Ranges': [],
               u'IpRanges': [{u'CidrIp': u'10.2.0.0/16'}],
               u'PrefixListIds': [],
               u'ToPort': 62000,
@@ -369,6 +370,7 @@ class SecurityGroupTest(BaseTest):
             resources[0]['MatchedIpPermissions'],
             [{u'FromPort': 60000,
               u'IpProtocol': u'tcp',
+              u'Ipv6Ranges': [],
               u'IpRanges': [{u'CidrIp': u'10.2.0.0/16'}],
               u'PrefixListIds': [],
               u'ToPort': 62000,
@@ -571,8 +573,11 @@ class SecurityGroupTest(BaseTest):
         self.assertEqual(
             resources[0].get('MatchedIpPermissions', []),
             [{u'FromPort': 443,
-              u'IpProtocol': 'tcp',
-              u'IpRanges': [{u'CidrIp': '10.42.1.0/24'}],
+              u'IpProtocol': u'tcp',
+              u'Ipv6Ranges': [],
+              u'PrefixListIds': [],
+              u'UserIdGroupPairs': [],
+              u'IpRanges': [{u'CidrIp': u'10.42.1.0/24'}],
               u'ToPort': 443}])
 
     def test_cidr_ingress(self):
@@ -639,24 +644,25 @@ class SecurityGroupTest(BaseTest):
             'name': 'wide-egress',
             'resource': 'security-group',
             'filters': [
+                {'GroupName': 'wide-egress'},
                 {'type': 'egress',
                  'Cidr': {
                      'value': 24,
                      'op': 'lt',
-                     'value_type': 'cidr_size'}},
-                {'GroupName': 'wide-egress'}]
+                     'value_type': 'cidr_size'}}]
             }, session_factory=factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertEqual(
             len(resources[0].get('MatchedIpPermissionsEgress', [])), 1)
+
         self.assertEqual(
             resources[0]['MatchedIpPermissionsEgress'],
             [{u'FromPort': 443,
               u'IpProtocol': u'tcp',
+              u'Ipv6Ranges': [],
               u'IpRanges': [
-                  {u'CidrIp': u'10.42.0.0/16'},
-                  {u'CidrIp': u'10.42.1.0/24'}],
+                  {u'CidrIp': u'10.42.0.0/16'}],
               u'PrefixListIds': [],
               u'ToPort': 443,
               u'UserIdGroupPairs': []}])
