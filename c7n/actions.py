@@ -73,6 +73,11 @@ class BaseAction(object):
         self.data = data or {}
         self.manager = manager
         self.log_dir = log_dir
+        self.log = logging.getLogger(
+            "custodian.%s.%s'" % (
+                self.manager.data['resource'], # resource
+                self.data.get('type', self.__class__.__name__.lower()))
+            )
 
     def validate(self):
         return self

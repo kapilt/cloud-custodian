@@ -144,6 +144,11 @@ class Filter(object):
     def __init__(self, data, manager=None):
         self.data = data
         self.manager = manager
+        self.log = logging.getLogger(
+            "custodian.%s.%s'" % (
+                self.manager.data['resource'],
+                self.data.get('type', self.__class__.__name__.lower()))
+            )
 
     def validate(self):
         """validate filter config, return validation error or self"""
