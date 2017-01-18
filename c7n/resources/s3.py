@@ -199,8 +199,8 @@ def bucket_client(session, b, kms=False):
 
 
 def modify_bucket_tags(session_factory, buckets, add_tags=(), remove_tags=()):
-    client = local_session(session_factory).client('s3')
     for bucket in buckets:
+        client = bucket_client(local_session(session_factory), bucket)
         # all the tag marshalling back and forth is a bit gross :-(
         new_tags = {t['Key']: t['Value'] for t in add_tags}
         for t in bucket.get('Tags', ()):
