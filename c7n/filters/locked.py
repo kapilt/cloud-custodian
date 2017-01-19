@@ -14,6 +14,7 @@ from c7n.utils import local_session, type_schema, get_account_id
 class Locked(Filter):
     """Has the resource been locked using sphere11
     """
+    permissions = ('iam:ListRoles', 'sts:AssumeRole')
 
     schema = type_schema(
         'locked',

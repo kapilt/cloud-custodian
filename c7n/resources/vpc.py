@@ -21,6 +21,7 @@ from c7n.filters import (
     DefaultVpcBase, Filter, FilterValidationError, ValueFilter)
 import c7n.filters.vpc as net_filters
 from c7n.filters.revisions import Diff
+from c7n.filters.locked import Locked
 from c7n.query import QueryResourceManager
 from c7n.manager import resources
 from c7n.utils import local_session, type_schema, get_retry, camelResource
@@ -92,6 +93,13 @@ class SecurityGroup(QueryResourceManager):
         dimension = None
         config_type = "AWS::EC2::SecurityGroup"
         id_prefix = "sg-"
+
+
+@SecurityGroup.filter_registry.register('locked')
+class SecurityGroupLockedFilter(Locked):
+
+    def get_parent_id(self, resource, account_id):
+        return resource.get('VpcId', account_id)
 
 
 @SecurityGroup.filter_registry.register('diff')
