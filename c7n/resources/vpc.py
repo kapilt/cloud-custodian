@@ -42,6 +42,25 @@ class Vpc(QueryResourceManager):
         id_prefix = "vpc-"
 
 
+@Vpc.filter_registry.register('diff')
+class VpcDiffFilter(Diff):
+
+    def diff(self, source, target):
+        updated = []
+        for k in source:
+            if k == 'Tags':
+                continue
+            if source[k] != target[k]:
+                updated.append(k)
+        if updated:
+            return {'updated': updated}
+
+    def transform_revision(self, revision):
+        # config does some odd transforms, walk them back
+        resource = camelResource(json.loads(revision['configuration']))
+        return resource
+
+
 @resources.register('subnet')
 class Subnet(QueryResourceManager):
 
