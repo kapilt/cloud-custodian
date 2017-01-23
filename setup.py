@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="c7n",
-    version='0.8.22.1-alpha',
+    version='0.8.22.1a0',
     description="Cloud Custodian - Policy Rules Engine",
     long_description=read('README.rst'),
     classifiers=[

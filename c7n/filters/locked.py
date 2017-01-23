@@ -34,7 +34,6 @@ class Locked(Filter):
         region = self.data.get('region', 'us-east-1')
         auth = SignatureAuth(credentials, region, 'execute-api')
         account_id = get_account_id(session)
-
         m = self.manager.get_model()
 
         for r in resources:
@@ -45,7 +44,7 @@ class Locked(Filter):
                 r[m.id]), params=params, auth=auth)
             data = result.json()
             if data['LockStatus'] == 'locked':
-                pass
+                data['c7n:locked_date'] = data['RevisionDate']
 
     def get_parent_id(self, resource, account_id):
         return account_id
