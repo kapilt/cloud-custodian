@@ -151,8 +151,8 @@ class SecurityGroupDiff(object):
             return delta
 
     def get_tag_delta(self, source, target):
-        source_tags = {t['Key']: t['Value'] for t in source['Tags']}
-        target_tags = {t['Key']: t['Value'] for t in target['Tags']}
+        source_tags = {t['Key']: t['Value'] for t in source.get('Tags', ())}
+        target_tags = {t['Key']: t['Value'] for t in target.get('Tags', ())}
         target_keys = set(target_tags.keys())
         source_keys = set(source_tags.keys())
         removed = source_keys.difference(target_keys)
