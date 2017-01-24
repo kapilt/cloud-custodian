@@ -46,7 +46,6 @@ class Locked(Filter):
                 account_id,
                 r[m.id]), params=params, auth=auth)
             data = result.json()
-            print r['GroupId'], data
             if data['LockStatus'] == 'locked':
                 r['c7n:locked_date'] = datetime.utcfromtimestamp(
                     data['RevisionDate']).replace(tzinfo=tzutc())
