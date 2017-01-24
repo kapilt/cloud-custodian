@@ -1,10 +1,11 @@
-
+from datetime import datetime
 from urlparse import urlparse
 
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.vendored import requests
 
+from dateutil.tz import tzutc
 
 from c7n.credentials import assumed_session
 from c7n.filters import Filter
@@ -23,19 +24,21 @@ class Locked(Filter):
         region={'type': 'string'},
         required=('endpoint',))
 
-    def process(self, resources):
+    def process(self, resources, event=None):
         session = local_session(self.manager.session_factory)
+
         if self.data.get('role'):
-            session = assumed_session(
+            api_session = assumed_session(
                 self.data.get('role'), 'CustodianSphere11', session)
 
-        credentials = session.get_credentials()
+        credentials = api_session.get_credentials()
         endpoint = self.data['endpoint'].rstrip('/')
         region = self.data.get('region', 'us-east-1')
         auth = SignatureAuth(credentials, region, 'execute-api')
         account_id = get_account_id(session)
         m = self.manager.get_model()
 
+        results = []
         for r in resources:
             params = {'parent_id': self.get_parent_id(r, account_id)}
             result = requests.get("%s/%s/locks/%s" % (
@@ -43,8 +46,12 @@ class Locked(Filter):
                 account_id,
                 r[m.id]), params=params, auth=auth)
             data = result.json()
+            print r['GroupId'], data
             if data['LockStatus'] == 'locked':
-                data['c7n:locked_date'] = data['RevisionDate']
+                r['c7n:locked_date'] = datetime.utcfromtimestamp(
+                    data['RevisionDate']).replace(tzinfo=tzutc())
+                results.append(r)
+        return results
 
     def get_parent_id(self, resource, account_id):
         return account_id

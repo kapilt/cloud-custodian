@@ -15,6 +15,8 @@
 Custodian support for diffing and patching across multiple versions
 of a resource.
 """
+from dateutil.tz import tzlocal, tzutc
+
 from botocore.exceptions import ClientError
 from dateutil.parser import parse as parse_date
 
@@ -23,6 +25,8 @@ from c7n.utils import local_session, type_schema
 
 
 ErrNotFound = "ResourceNotDiscoveredException"
+
+UTC = tzutc()
 
 
 class Diff(Filter):
@@ -62,9 +66,9 @@ class Diff(Filter):
             idx = self.manager.data['filters'].index(self.data)
             found = False
             for n in self.manager.data['filters'][:idx]:
-                if isinstance(n, dict) and n.get('type', '') == 'is-locked':
+                if isinstance(n, dict) and n.get('type', '') == 'locked':
                     found = True
-                if isinstance(n, basestring) and n == 'is-locked':
+                if isinstance(n, basestring) and n == 'locked':
                     found = True
             if not found:
                 raise FilterValidationError(
@@ -123,6 +127,13 @@ class Diff(Filter):
 
     def select_revision(self, revisions):
         for rev in revisions:
+            # Its unclear why/how but config return revs with a tzlocal, we
+            # need to convert back to utc, as when querying revisions we use
+            # need to format in utc.
+            if rev['configurationItemCaptureTime'].tzinfo and \
+               isinstance(rev['configurationItemCaptureTime'].tzinfo, tzlocal):
+                rev['configuraitonItemCaptureTime'] =  rev[
+                    'configurationItemCaptureTime'].astimezone(UTC)
             return {
                 'date': rev['configurationItemCaptureTime'],
                 'version_id': rev['configurationStateId'],
