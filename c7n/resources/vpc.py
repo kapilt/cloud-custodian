@@ -120,6 +120,11 @@ class SecurityGroupDiffFilter(Diff):
                     p.pop('ToPort')
                 if 'Ipv6Ranges' not in p:
                     p[u'Ipv6Ranges'] = []
+                for i in p.get('UserIdGroupPairs', ()):
+                    for k, v in list(i.items()):
+                        if v is None:
+                            i.pop(k)
+
                 for attribute, element_key in (
                         ('IpRanges', u'CidrIp'),):
                     if attribute not in p:

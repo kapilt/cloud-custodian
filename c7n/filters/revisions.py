@@ -101,6 +101,8 @@ class Diff(Filter):
             revisions = config.get_resource_config_history(
                 **params)['configurationItems']
         except ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceNotDiscoveredException':
+                return []
             if e.response['Error']['Code'] != ErrNotFound:
                 self.log.debug(
                     "config - resource %s:%s not found" % (
@@ -127,12 +129,10 @@ class Diff(Filter):
 
     def select_revision(self, revisions):
         for rev in revisions:
-            # Its unclear why/how but config return revs with a tzlocal, we
-            # need to convert back to utc, as when querying revisions we use
-            # need to format in utc.
+            # convert unix timestamp to utc to be normalized with other dates
             if rev['configurationItemCaptureTime'].tzinfo and \
                isinstance(rev['configurationItemCaptureTime'].tzinfo, tzlocal):
-                rev['configuraitonItemCaptureTime'] =  rev[
+                rev['configurationItemCaptureTime'] =  rev[
                     'configurationItemCaptureTime'].astimezone(UTC)
             return {
                 'date': rev['configurationItemCaptureTime'],

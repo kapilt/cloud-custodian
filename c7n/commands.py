@@ -43,7 +43,6 @@ def policy_command(f):
         load_resources()
         collection = policy_load(options, options.config)
         policies = collection.filter(options.policy_filter)
-        
         if options.policy_filter and len(policies) == 0 and len(collection) > 0:
             eprint("Warning: no policies matched the filter ({})".format(options.policy_filter))
             eprint("  Policies:")
