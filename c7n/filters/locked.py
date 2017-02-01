@@ -30,6 +30,8 @@ class Locked(Filter):
         if self.data.get('role'):
             api_session = assumed_session(
                 self.data.get('role'), 'CustodianSphere11', session)
+        else:
+            api_session = session
 
         credentials = api_session.get_credentials()
         endpoint = self.data['endpoint'].rstrip('/')
@@ -37,7 +39,6 @@ class Locked(Filter):
         auth = SignatureAuth(credentials, region, 'execute-api')
         account_id = get_account_id(session)
         m = self.manager.get_model()
-
         results = []
         for r in resources:
             params = {'parent_id': self.get_parent_id(r, account_id)}
@@ -46,6 +47,8 @@ class Locked(Filter):
                 account_id,
                 r[m.id]), params=params, auth=auth)
             data = result.json()
+            if 'Message' in data:
+                raise RuntimeError(data['Message'])
             if data['LockStatus'] == 'locked':
                 r['c7n:locked_date'] = datetime.utcfromtimestamp(
                     data['RevisionDate']).replace(tzinfo=tzutc())
