@@ -216,7 +216,7 @@ class IamInstanceProfileFilterUsage(BaseTest):
 class IamPolicyFilterUsage(BaseTest):
 
     def test_iam_policy_get_resources(self):
-        session_factory = self.record_flight_data('test_iam_policy_get_resource')
+        session_factory = self.replay_flight_data('test_iam_policy_get_resource')
         p = self.load_policy({
             'name': 'iam-attached-profiles',
             'resource': 'iam-policy'}, session_factory=session_factory)
