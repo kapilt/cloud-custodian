@@ -164,7 +164,7 @@ def process_records(records,
             r['eventSource'],
             r.get('userAgent', ''),
             r.get('requestID', ''),
-            r['sourceIPAddress'],
+            r.get('sourceIPAddress', ''),
             uid,
 # TODO make this optional, for now omit for size
 #            json.dumps(r['requestParameters']),
@@ -245,7 +245,8 @@ def process_bucket(
         log.info(
             "Processed paged time:%0.2f size:%s count:%s" % (
                 t-l, object_size, object_count))
-        log.info('Last Page Key: %s', objects[-1]['Key'])
+        if objects:
+            log.info('Last Page Key: %s', objects[-1]['Key'])
 
 
 def get_bucket_path(options):
