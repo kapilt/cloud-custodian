@@ -42,6 +42,11 @@ def policy_command(f):
     def _load_policies(options):
         load_resources()
         collection = policy_load(options, options.config)
+        
+        if collection is None:
+            eprint('Error: empty policy file.  Nothing to do.')
+            sys.exit(1)
+
         policies = collection.filter(options.policy_filter)
         
         if options.policy_filter and len(policies) == 0 and len(collection) > 0:
@@ -112,12 +117,15 @@ def validate(options):
         sys.exit(1)
 
 
-@policy_command
-def access(options, policies):
-    permissions = set()
-    for p in policies:
-        permissions.update(p.get_permissions())
-    pprint.pprint(sorted(list(permissions)))
+# This subcommand is disabled in cli.py.
+# Commmeting it out for coverage purposes.
+#
+#@policy_command
+#def access(options, policies):
+#    permissions = set()
+#    for p in policies:
+#        permissions.update(p.get_permissions())
+#    pprint.pprint(sorted(list(permissions)))
 
 
 @policy_command
@@ -133,7 +141,8 @@ def run(options, policies):
             log.exception(
                 "Error while executing policy %s, continuing" % (
                     policy.name))
-    sys.exit(exit_code)
+    if exit_code != 0:
+        sys.exit(exit_code)
 
 
 @policy_command
@@ -189,6 +198,42 @@ def _schema_get_docstring(starting_class):
     for cls in inspect.getmro(starting_class):
         if inspect.getdoc(cls):
             return inspect.getdoc(cls)
+
+
+def schema_completer(prefix):
+    """ For tab-completion via argcomplete, return completion options.
+    
+    For the given prefix so far, return the possible options.  Note that
+    filtering via startswith happens after this list is returned.
+    """
+    load_resources()
+    components = prefix.split('.')
+    
+    # Completions for resource
+    if len(components) == 1:
+        choices = [r for r in resources.keys() if r.startswith(prefix)]
+        if len(choices) == 1:
+            choices += ['{}{}'.format(choices[0], '.')]
+        return choices
+    
+    if components[0] not in resources.keys():
+        return []
+    
+    # Completions for category
+    if len(components) == 2:
+        choices = ['{}.{}'.format(components[0], x)
+                   for x in ('actions', 'filters') if x.startswith(components[1])]
+        if len(choices) == 1:
+            choices += ['{}{}'.format(choices[0], '.')]
+        return choices
+    
+    # Completions for item
+    elif len(components) == 3:
+        resource_mapping = schema.resource_vocabulary()
+        return ['{}.{}.{}'.format(components[0], components[1], x) 
+                for x in resource_mapping[components[0]][components[1]]]
+
+    return []
 
 
 def schema_cmd(options):

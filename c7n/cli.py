@@ -11,15 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 
+# PYTHON_ARGCOMPLETE_OK  (Must be in first 1024 bytes, so if tab completion
+# is failing, move this above the license)
+
+import argcomplete
 import argparse
 import importlib
 import logging
+import os
 import pdb
 import sys
 import traceback
 from datetime import datetime
 from dateutil.parser import parse as date_parse
+
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = lambda t: None
+
+from c7n.commands import schema_completer
 
 DEFAULT_REGION = 'us-east-1'
 
@@ -133,10 +146,20 @@ def _logs_options(p):
     )
 
 
+def _schema_tab_completer(prefix, parsed_args, **kwargs):
+    # If we are printing the summary we discard the resource
+    if parsed_args.summary:
+        return []
+
+    return schema_completer(prefix)
+
+
 def _schema_options(p):
     """ Add options specific to schema subcommand. """
 
-    p.add_argument('resource', metavar='selector', nargs='?', default=None)
+    p.add_argument(
+        'resource', metavar='selector', nargs='?',
+        default=None).completer = _schema_tab_completer
     p.add_argument(
         '--summary', action="store_true",
         help="Summarize counts of available resources, actions and filters")
@@ -195,6 +218,10 @@ def setup_parser():
     version.add_argument(
         "-v", "--verbose", action="store_true",
         help="Verbose Logging")
+    version.add_argument(
+        "--debug", action="store_true",
+        help="Print info for bug reports")
+
 
     validate_desc = (
         "Validate config files against the custodian jsonschema")
@@ -243,11 +270,31 @@ def setup_parser():
 
 def cmd_version(options):
     from c7n.version import version
-    print(version)
 
+    if not options.debug:
+        print(version)
+        return
+
+    indent = 13
+    import pprint
+    pp = pprint.PrettyPrinter(indent=indent)
+
+    print("\nPlease copy/paste the following info along with any bug reports:\n")
+    print("Custodian:  ", version)
+    pyversion = sys.version.replace('\n', '\n' + ' '*indent)  # For readability
+    print("Python:     ", pyversion)
+    # os.uname is only available on recent versions of Unix
+    try:
+        print("Platform:   ", os.uname())
+    except:  # pragma: no cover
+        print("Platform:  ", sys.platform)
+    print("Using venv: ", hasattr(sys, 'real_prefix'))
+    print("PYTHONPATH: ")
+    pp.pprint(sys.path)
 
 def main():
     parser = setup_parser()
+    argcomplete.autocomplete(parser)
     options = parser.parse_args()
 
     level = options.verbose and logging.DEBUG or logging.INFO
@@ -263,6 +310,12 @@ def main():
             command = getattr(
                 importlib.import_module(command.rsplit('.', 1)[0]),
                 command.rsplit('.', 1)[-1])
+
+        # Set the process name to something cleaner
+        process_name = [os.path.basename(sys.argv[0])]
+        process_name.extend(sys.argv[1:])
+        setproctitle(' '.join(process_name))
+
         command(options)
     except Exception:
         if not options.debug:
