@@ -902,6 +902,13 @@ class RouteTable(QueryResourceManager):
         id_prefix = "rtb-"
 
 
+@RouteTable.filter_registry.register('subnet')
+class SubnetRoute(net_filters.Subnet):
+    """Filter a route table by its associated subnet attributes."""
+
+    RelatedIdsExpression = "Associations[].SubnetId"
+
+
 @RouteTable.filter_registry.register('route')
 class Route(ValueFilter):
     """Filter a route table by its routes' attributes."""
@@ -911,7 +918,7 @@ class Route(ValueFilter):
         for r in resources:
             matched = []
             for route in r['Routes']:
-                if self.__call__(route):
+                if self.match(route):
                     matched.append(route)
             if matched:
                 r.setdefault('c7n:matched-routes', []).extend(matched)
