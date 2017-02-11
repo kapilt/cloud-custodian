@@ -903,7 +903,7 @@ class RouteTable(QueryResourceManager):
 
 
 @RouteTable.filter_registry.register('subnet')
-class SubnetRoute(net_filters.Subnet):
+class SubnetRoute(net_filters.SubnetFilter):
     """Filter a route table by its associated subnet attributes."""
 
     RelatedIdsExpression = "Associations[].SubnetId"
@@ -1077,6 +1077,29 @@ class VPNGateway(QueryResourceManager):
         date = None
         config_type = 'AWS::EC2::VPNGateway'
         id_prefix = "vgw-"
+
+
+@resources.register('vpc-endpoint')
+class VpcEndpoint(QueryResourceManager):
+
+    class resource_type(object):
+        service = 'ec2'
+        type = 'vpc-endpoint'
+        enum_spec = ('describe_vpc_endpoints', 'VpcEndpoints', None)
+        id = 'VpcEndpointId'
+        date = 'CreationTimestamp'
+        filter_name = 'VpcEndpointIds'
+        filter_type = 'list'
+        dimension = None
+        id_prefix = "vpce-"
+
+
+@VpcEndpoint.filter_registry.register('missing-sg')
+class MissingSecurityGroupPermission(Filter):
+    """Endpoints need to be both in route tables, and referenced
+    via prefix list into security groups.
+    """
+
 
 
 @resources.register('key-pair')
