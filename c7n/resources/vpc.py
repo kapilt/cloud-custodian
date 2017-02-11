@@ -678,19 +678,6 @@ class SGPermission(Filter):
 
 @SecurityGroup.filter_registry.register('ingress')
 class IPPermission(SGPermission):
-    """Filter security groups by ingress (inbound) port(s)
-
-    :example:
-
-        .. code-block: yaml
-
-            policies:
-              - name: security-groups-ingress-https
-                resource: security-group
-                filters:
-                  - type: ingress
-                    OnlyPorts: [443]
-    """
 
     ip_permissions_key = "IpPermissions"
     schema = {
@@ -706,22 +693,6 @@ class IPPermission(SGPermission):
 
 @SecurityGroup.filter_registry.register('egress')
 class IPPermissionEgress(SGPermission):
-    """Filter security groups by egress (outbound) port(s)
-
-    :example:
-
-        .. code-block: yaml
-
-            policies:
-              - name: security-groups-egress-https
-                resource: security-group
-                filters:
-                  - type: egress
-                    Cidr:
-                      value: 24
-                      op: lt
-                      value_type: cidr_size
-    """
 
     ip_permissions_key = "IpPermissionsEgress"
     schema = {
@@ -931,6 +902,45 @@ class RouteTable(QueryResourceManager):
         id_prefix = "rtb-"
 
 
+@RouteTable.filter_registry.register('route')
+class Route(ValueFilter):
+    """Filter a route table by its routes' attributes."""
+
+    def process(self, resources, event=None):
+        results = []
+        for r in resources:
+            matched = []
+            for route in r['Routes']:
+                if self.__call__(route):
+                    matched.append(route)
+            if matched:
+                r.setdefault('c7n:matched-routes', []).extend(matched)
+                results.append(r)
+        return results
+
+
+@RouteTable.filter_registry.register('bad-peer')
+class BadPeer(Filter):
+    """Find bad peers in route tables."""
+
+    def process(self, resources, event=None):
+        peers = {p['VpcPeeringConnectionId'] for
+                 p in self.manager.get_resource_manager(
+                     'peering-connection').resources()}
+        results = []
+        for r in resources:
+            for route in r['Routes']:
+                if 'VpcPeeringConnectionId' not in route:
+                    continue
+                if route['VpcPeeringConnectionId'] in peers:
+                    continue
+                r.setdefault('c7n:bad-peer', []).append(
+                    route)
+            if 'c7n:bad-peer' in r:
+                results.append(r)
+        return results
+
+
 @resources.register('peering-connection')
 class PeeringConnection(QueryResourceManager):
 
@@ -945,6 +955,24 @@ class PeeringConnection(QueryResourceManager):
         date = None
         dimension = None
         id_prefix = "pcx-"
+
+
+@PeeringConnection.filter_registry.register('missing-route')
+class MissingRoute(Filter):
+    """Return peers which are missing a route in any route table.
+    """
+    def process(self, resources, event=None):
+        tables = self.manager.get_resource_manager(
+            'route-table').resources()
+        routed_peers = set()
+        for t in tables:
+            for r in t.get('Routes', ()):
+                routed_peers.add(r.get('VpcPeeringConnectionId'))
+        results = []
+        for r in resources:
+            if r['VpcPeeringConnectionId'] not in routed_peers:
+                results.append(r)
+        return results
 
 
 @resources.register('network-acl')
