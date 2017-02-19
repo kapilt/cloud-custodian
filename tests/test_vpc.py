@@ -11,7 +11,60 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from common import BaseTest
+from c7n.filters import FilterValidationError
+
+
+class VpcTest(BaseTest):
+
+    def test_flow_logs(self):
+        factory = self.replay_flight_data(
+            'test_vpc_flow_logs')
+
+        session = factory()
+        ec2 = session.client('ec2')
+        logs = session.client('logs')
+
+        vpc_id = ec2.create_vpc(CidrBlock="10.4.0.0/16")['Vpc']['VpcId']
+        self.addCleanup(ec2.delete_vpc, VpcId=vpc_id)
+
+        p = self.load_policy({
+            'name': 'net-find',
+            'resource': 'vpc',
+            'filters': [
+                {'VpcId': vpc_id},
+                'flow-logs']},
+            session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['VpcId'], vpc_id)
+
+        log_group = 'vpc-logs'
+        logs.create_log_group(logGroupName=log_group)
+        self.addCleanup(logs.delete_log_group, logGroupName=log_group)
+
+        ec2.create_flow_logs(
+            ResourceIds=[vpc_id],
+            ResourceType='VPC',
+            TrafficType='ALL',
+            LogGroupName=log_group,
+            DeliverLogsPermissionArn='arn:aws:iam::644160558196:role/flowlogsRole')
+
+        p = self.load_policy({
+            'name': 'net-find',
+            'resource': 'vpc',
+            'filters': [
+                {'VpcId': vpc_id},
+                {'type': 'flow-logs',
+                 'enabled': True,
+                 'traffic-type': 'all',
+                 'log-group': log_group}]
+        }, session_factory=factory)
+
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
 
 
 class NetworkInterfaceTest(BaseTest):
@@ -428,6 +481,21 @@ class SecurityGroupTest(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
 
+    def test_config_source(self):
+        factory = self.replay_flight_data(
+            'test_security_group_config_source')
+        p = self.load_policy({
+            'name': 'sg-test',
+            'source': 'config',
+            'resource': 'security-group',
+            'filters': [
+                {'type': 'default-vpc'},
+                {'GroupName': 'default'}]},
+            session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['GroupId'], 'sg-6c7fa917')
+
     def test_only_ports_ingress(self):
         p = self.load_policy({
             'name': 'ingress-access',
@@ -666,3 +734,16 @@ class SecurityGroupTest(BaseTest):
               u'PrefixListIds': [],
               u'ToPort': 443,
               u'UserIdGroupPairs': []}])
+
+    def test_egress_validation_error(self):
+        self.assertRaises(
+            FilterValidationError,
+            self.load_policy,
+            {'name': 'sg-find2',
+             'resource': 'security-group',
+             'filters': [
+                {'type': 'egress',
+                 'InvalidKey': True},
+                {'GroupName': 'sg2'}]})
+
+

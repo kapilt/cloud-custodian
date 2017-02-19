@@ -25,14 +25,16 @@ from dateutil import parser
 from c7n.filters.iamaccess import check_cross_account, CrossAccountAccessFilter
 from c7n.mu import LambdaManager, LambdaFunction, PythonPackageArchive
 from c7n.resources.sns import SNS
-from c7n.resources.iam import (UserMfaDevice,
-                               UsedIamPolicies, UnusedIamPolicies,
-                               UsedInstanceProfiles,
-                               UnusedInstanceProfiles,
-                               UsedIamRole, UnusedIamRole,
-                               IamGroupUsers,
-                               UserCredentialReport,
-                               IamRoleInlinePolicy, IamGroupInlinePolicy)
+from c7n.resources.iam import (
+    UserMfaDevice,
+    UsedIamPolicies, UnusedIamPolicies,
+    AllowAllIamPolicies,
+    UsedInstanceProfiles,
+    UnusedInstanceProfiles,
+    UsedIamRole, UnusedIamRole,
+    IamGroupUsers, UserPolicy,
+    UserCredentialReport, UserAccessKey,
+    IamRoleInlinePolicy, IamGroupInlinePolicy)
 from c7n.executor import MainThreadExecutor
 
 
@@ -168,7 +170,7 @@ class IamRoleFilterUsage(BaseTest):
             'resource': 'iam-role',
             'filters': ['used']}, session_factory=session_factory)
         resources = p.run()
-        self.assertEqual(len(resources), 2)
+        self.assertEqual(len(resources), 3)
 
     def test_iam_role_unused(self):
         session_factory = self.replay_flight_data('test_iam_role_unused')
@@ -179,7 +181,41 @@ class IamRoleFilterUsage(BaseTest):
             'resource': 'iam-role',
             'filters': ['unused']}, session_factory=session_factory)
         resources = p.run()
-        self.assertEqual(len(resources), 7)
+        self.assertEqual(len(resources), 6)
+
+
+class IamUserFilterUsage(BaseTest):
+
+    def test_iam_user_policy(self):
+        session_factory = self.replay_flight_data(
+            'test_iam_user_admin_policy')
+        self.patch(
+            UserPolicy, 'executor_factory', MainThreadExecutor)
+        p = self.load_policy({
+            'name': 'iam-user-policy',
+            'resource': 'iam-user',
+            'filters': [{
+                'type': 'policy',
+                'key': 'PolicyName',
+                'value': 'AdministratorAccess'}]},
+            session_factory=session_factory)
+        resources = p.run()
+        self.assertEqual(resources[0]['UserName'], 'alphabet_soup')
+
+    def test_iam_user_access_key_filter(self):
+        session_factory = self.replay_flight_data(
+            'test_iam_user_access_key_active')
+        self.patch(
+            UserAccessKey, 'executor_factory', MainThreadExecutor)
+        p = self.load_policy({
+            'name': 'iam-user-with-key',
+            'resource': 'iam-user',
+            'filters': [{
+                'type': 'access-key',
+                'key': 'Status',
+                'value': 'Active'}]}, session_factory=session_factory)
+        resources = p.run()
+        self.assertEqual(resources[0]['UserName'], 'alphabet_soup')
 
 
 class IamInstanceProfileFilterUsage(BaseTest):
@@ -211,6 +247,16 @@ class IamInstanceProfileFilterUsage(BaseTest):
 
 class IamPolicyFilterUsage(BaseTest):
 
+    def test_iam_policy_get_resources(self):
+        session_factory = self.replay_flight_data('test_iam_policy_get_resource')
+        p = self.load_policy({
+            'name': 'iam-attached-profiles',
+            'resource': 'iam-policy'}, session_factory=session_factory)
+        resources = p.resource_manager.get_resources(
+            ['arn:aws:iam::aws:policy/AWSHealthFullAccess'])
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['PolicyName'], 'AWSHealthFullAccess')
+
     def test_iam_attached_policies(self):
         session_factory = self.replay_flight_data('test_iam_policy_attached')
         self.patch(
@@ -232,6 +278,25 @@ class IamPolicyFilterUsage(BaseTest):
             'filters': ['unused']}, session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 203)
+
+
+class IamPolicyHasAllowAll(BaseTest):
+
+    def test_iam_has_allow_all_policies(self):
+        session_factory = self.replay_flight_data('test_iam_policy_allow_all')
+        self.patch(
+            UnusedIamPolicies, 'executor_factory', MainThreadExecutor)
+        p = self.load_policy({
+            'name': 'iam-has-allow-all',
+            'resource': 'iam-policy',
+            'filters': [
+                {'type': 'value',
+                'key': 'PolicyName',
+                'value': 'AdministratorAccess'},
+                'has-allow-all'
+            ]}, session_factory=session_factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
 
 
 class IamGroupFilterUsage(BaseTest):

@@ -27,6 +27,7 @@ from c7n.filters import (
     FilterRegistry, AgeFilter, ValueFilter, Filter, OPERATORS, DefaultVpcBase
 )
 from c7n.filters.offhours import OffHour, OnHour
+from c7n.filters.health import HealthEventFilter
 import c7n.filters.vpc as net_filters
 
 from c7n.manager import resources
@@ -40,6 +41,7 @@ filters = FilterRegistry('ec2.filters')
 actions = ActionRegistry('ec2.actions')
 
 actions.register('auto-tag-user', AutoTagUser)
+filters.register('health-event', HealthEventFilter)
 
 
 @resources.register('ec2')
@@ -264,6 +266,8 @@ class AttachedVolume(ValueFilter):
                         continue
                     volume_ids.append(bd['Ebs']['VolumeId'])
             for v in manager.get_resources(volume_ids):
+                if not v['Attachments']:
+                    continue
                 volume_map.setdefault(
                     v['Attachments'][0]['InstanceId'], []).append(v)
         return volume_map
@@ -820,7 +824,7 @@ class Snapshot(BaseAction):
 
     def process(self, resources):
         for resource in resources:
-            with self.executor_factory(max_workers=3) as w:
+            with self.executor_factory(max_workers=2) as w:
                 futures = []
                 futures.append(w.submit(self.process_volume_set, resource))
                 for f in as_completed(futures):

@@ -51,7 +51,6 @@ from botocore.exceptions import ClientError
 from botocore.vendored.requests.exceptions import SSLError
 from concurrent.futures import as_completed
 
-from c7n import executor
 from c7n.actions import ActionRegistry, BaseAction, AutoTagUser
 from c7n.filters import (
     FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter)
@@ -199,8 +198,8 @@ def bucket_client(session, b, kms=False):
 
 
 def modify_bucket_tags(session_factory, buckets, add_tags=(), remove_tags=()):
-    client = local_session(session_factory).client('s3')
     for bucket in buckets:
+        client = bucket_client(local_session(session_factory), bucket)
         # all the tag marshalling back and forth is a bit gross :-(
         new_tags = {t['Key']: t['Value'] for t in add_tags}
         for t in bucket.get('Tags', ()):
@@ -252,20 +251,64 @@ class S3CrossAccountFilter(CrossAccountAccessFilter):
         """add in elb access by default
 
         ELB Accounts by region http://goo.gl/a8MXxd
+
+        Redshift Accounts by region https://goo.gl/MKWPTT
+
+        Cloudtrail Accounts by region https://goo.gl/kWQk9D
         """
         accounts = super(S3CrossAccountFilter, self).get_accounts()
         return accounts.union(
-            ['127311923021',  # us-east-1
-             '797873946194',  # us-west-2
-             '027434742980',  # us-west-1
-             '156460612806',  # eu-west-1
-             '054676820928',  # eu-central-1
-             '114774131450',  # ap-southeast-1
-             '582318560864',  # ap-northeast-1
-             '783225319266',  # ap-southeast-2
-             '600734575887',  # ap-northeast-2
-             '507241528517',  # sa-east-1
-             '048591011584',  # gov-cloud-1
+            [
+                # ELB accounts
+                '127311923021',  # us-east-1
+                '033677994240',  # us-east-2
+                '797873946194',  # us-west-2
+                '027434742980',  # us-west-1
+                '985666609251',  # ca-central-1
+                '156460612806',  # eu-west-1
+                '054676820928',  # eu-central-1
+                '652711504416',  # eu-west-2
+                '582318560864',  # ap-northeast-1
+                '600734575887',  # ap-northeast-2
+                '114774131450',  # ap-southeast-1
+                '783225319266',  # ap-southeast-2
+                '718504428378',  # ap-south-1
+                '507241528517',  # sa-east-1
+                '048591011584',  # us-gov-west-1 or gov-cloud-1
+                '638102146993',  # cn-north-1
+
+                # Redshift accounts
+                '368064434614',  # us-east-1
+                '790247189693',  # us-east-2
+                '703715109447',  # us-east-1
+                '473191095985',  # us-west-2
+                '408097707231',  # ap-south-1
+                '713597048934',  # ap-northeast-2
+                '960118270566',  # ap-southeast-1
+                '485979073181',  # ap-southeast-2
+                '615915377779',  # ap-northeast-1
+                '764870610256',  # ca-central-1
+                '434091160558',  # eu-central-1
+                '246478207311',  # eu-west-1
+                '885798887673',  # eu-west-2
+                '392442076723',  # sa-east-1
+
+                # Cloudtrail accounts (psa. folks should be using
+                # cloudtrail service in bucket policies)
+                '086441151436',  # us-east-1
+                '475085895292',  # us-west-2
+                '388731089494',  # us-west-1
+                '113285607260',  # us-west-2
+                '819402241893',  # ca-central-1
+                '977081816279',  # ap-south-1
+                '492519147666',  # ap-northeast-2
+                '903692715234',  # ap-southeast-1
+                '284668455005',  # ap-southeast-2
+                '216624486486',  # ap-northeast-1
+                '035351147821',  # eu-central-1
+                '859597730677',  # eu-west-1
+                '282025262664',  # eu-west-2
+                '814480443879',  # sa-east-1
              ])
 
 
@@ -315,8 +358,6 @@ class GlobalGrantsFilter(Filter):
                 continue
             if not perms or (perms and grant['Permission'] in perms):
                 results.append(grant['Permission'])
-
-        c = bucket_client(self.manager.session_factory(), b)
 
         if results:
             set_annotation(b, 'GlobalPermissions', results)
@@ -464,7 +505,7 @@ class RemovePolicyStatement(BucketActionBase):
         if not found:
             return
 
-        s3 = local_session(self.manager.session_factory).client('s3')
+        s3 = bucket_client(local_session(self.manager.session_factory), bucket)
         if not statements:
             s3.delete_bucket_policy(Bucket=bucket['Name'])
         else:
@@ -502,8 +543,10 @@ class ToggleVersioning(BucketActionBase):
     # mfa delete enablement looks like it needs the serial and a current token.
     def process(self, resources):
         enabled = self.data.get('enabled', True)
-        client = local_session(self.manager.session_factory).client('s3')
+
         for r in resources:
+            client = bucket_client(
+                local_session(self.manager.session_factory), r)
             if 'Versioning' not in r or not r['Versioning']:
                 r['Versioning'] = {'Status': 'Suspended'}
             if enabled and (
@@ -551,8 +594,9 @@ class ToggleLogging(BucketActionBase):
 
     def process(self, resources):
         enabled = self.data.get('enabled', True)
-        client = local_session(self.manager.session_factory).client('s3')
+
         for r in resources:
+            client = bucket_client(local_session(self.manager.session_factory), r)
             target_prefix = self.data.get('target_prefix', r['Name'])
             if 'TargetBucket' in r['Logging']:
                 r['Logging'] = {'Status': 'Enabled'}
@@ -607,7 +651,7 @@ class AttachLambdaEncrypt(BucketActionBase):
         if (not getattr(self.manager.config, 'dryrun', True) and
                 not self.data.get('role', self.manager.config.assume_role)):
             raise ValueError(
-                "attach-encrypt: role must be specified either"
+                "attach-encrypt: role must be specified either "
                 "via assume or in config")
         return self
 
@@ -826,7 +870,7 @@ class ScanBucket(BucketActionBase):
 
     def __init__(self, data, manager=None):
         super(ScanBucket, self).__init__(data, manager)
-        self.denied_buckets = []
+        self.denied_buckets = set()
 
     def get_bucket_style(self, b):
         return (
@@ -849,30 +893,37 @@ class ScanBucket(BucketActionBase):
         return keys
 
     def process(self, buckets):
+        results = self._process_with_futures(self.process_bucket, buckets)
+        self.write_denied_buckets_file()
+        return results
+
+    def _process_with_futures(self, helper, buckets, max_workers=3):
         results = []
-        with self.executor_factory(max_workers=3) as w:
+        with self.executor_factory(max_workers) as w:
             futures = {}
             for b in buckets:
-                futures[w.submit(self.process_bucket, b)] = b
+                futures[w.submit(helper, b)] = b
             for f in as_completed(futures):
                 if f.exception():
+                    b = futures[f]
                     self.log.error(
                         "Error on bucket:%s region:%s policy:%s error: %s",
                         b['Name'], b.get('Location', 'unknown'),
                         self.manager.data.get('name'), f.exception())
-                    self.denied_buckets.append(b['Name'])
+                    self.denied_buckets.add(b['Name'])
                     continue
                 result = f.result()
                 if result:
                     results.append(result)
+        return results
 
+    def write_denied_buckets_file(self):
         if self.denied_buckets and self.manager.log_dir:
             with open(
                     os.path.join(
                         self.manager.log_dir, 'denied.json'), 'w') as fh:
-                json.dump(self.denied_buckets, fh, indent=2)
-            self.denied_buckets = []
-        return results
+                json.dump(list(self.denied_buckets), fh, indent=2)
+            self.denied_buckets = set()
 
     def process_bucket(self, b):
         log.info(
@@ -900,7 +951,7 @@ class ScanBucket(BucketActionBase):
                     if e.response['Error']['Code'] == 'AccessDenied':
                         log.warning(
                             "Access Denied Bucket:%s while scanning" % b['Name'])
-                        self.denied_buckets.append(b['Name'])
+                        self.denied_buckets.add(b['Name'])
                         return
                     log.exception(
                         "Error processing bucket:%s paginator:%s" % (
@@ -1013,10 +1064,13 @@ class EncryptExtantKeys(ScanBucket):
         return perms
 
     def process(self, buckets):
+        self.kms_id = self.data.get('key-id')
+
         t = time.time()
         results = super(EncryptExtantKeys, self).process(buckets)
         run_time = time.time() - t
         remediated_count = object_count = 0
+
         for r in results:
             object_count += r['Count']
             remediated_count += r['Remediated']
@@ -1063,7 +1117,10 @@ class EncryptExtantKeys(ScanBucket):
             info = s3.head_object(Bucket=bucket_name, Key=k)
 
         if 'ServerSideEncryption' in info:
-            return False
+            if self.kms_id and info.get('SSEKMSKeyId', '') == self.kms_id:
+                return False
+            else:
+                return False
 
         if self.data.get('report-only'):
             return k
@@ -1083,7 +1140,8 @@ class EncryptExtantKeys(ScanBucket):
                 return False
             elif not restore_complete(info['Restore']):
                 return False
-            storage_class == 'STANDARD'
+
+            storage_class = 'STANDARD'
 
         crypto_method = self.data.get('crypto', 'AES256')
         key_id = self.data.get('key-id')
@@ -1095,7 +1153,7 @@ class EncryptExtantKeys(ScanBucket):
                   'StorageClass': storage_class,
                   'ServerSideEncryption': crypto_method}
 
-        if key_id and crypto_method is 'aws:kms':
+        if key_id and crypto_method == 'aws:kms':
             params['SSEKMSKeyId'] = key_id
 
         if info['ContentLength'] > MAX_COPY_SIZE and self.data.get(
@@ -1142,7 +1200,6 @@ class EncryptExtantKeys(ScanBucket):
 
         params = {'Bucket': bucket_name,
                   'Key': key['Key'],
-                  'CopySource': "/%s/%s" % (bucket_name, key['Key']),
                   'UploadId': upload_id,
                   'CopySource': source,
                   'CopySourceIfMatch': info['ETag']}
@@ -1255,7 +1312,6 @@ class LogTarget(Filter):
                 yield (t['S3BucketName'], t.get('S3KeyPrefix', ''))
 
     def get_elb_bucket_locations(self):
-        session = local_session(self.manager.session_factory)
         elbs = self.manager.get_resource_manager('elb').resources()
         get_elb_attrs = functools.partial(
             _query_elb_attrs, self.manager.session_factory)
@@ -1325,7 +1381,6 @@ class DeleteGlobalGrants(BucketActionBase):
             'grantees', [
                 GlobalGrantsFilter.AUTH_ALL, GlobalGrantsFilter.GLOBAL_ALL])
 
-        s3 = bucket_client(self.manager.session_factory(), b)
         log.info(b)
 
         acl = b.get('Acl', {'Grants': []})
@@ -1463,6 +1518,8 @@ class DeleteBucket(ScanBucket):
 
     schema = type_schema('delete', **{'remove-contents': {'type': 'boolean'}})
 
+    permissions = ('s3:*',)
+
     bucket_ops = {
         'standard': {
             'iterator': 'list_objects',
@@ -1484,7 +1541,8 @@ class DeleteBucket(ScanBucket):
         Disable versioning on the bucket, so deletes don't
         generate fresh deletion markers.
         """
-        client = local_session(self.manager.session_factory).client('s3')
+        client = bucket_client(
+            local_session(self.manager.session_factory), b)
 
         # Stop replication so we can suspend versioning
         if b.get('Replication') is not None:
@@ -1512,12 +1570,12 @@ class DeleteBucket(ScanBucket):
         # might be worth sanity checking all our permissions
         # on the bucket up front before disabling versioning/replication.
         if self.data.get('remove-contents', True):
-            with self.executor_factory(max_workers=3) as w:
-                list(w.map(self.process_delete_enablement, buckets))
+            self._process_with_futures(self.process_delete_enablement, buckets)
             self.empty_buckets(buckets)
-        with self.executor_factory(max_workers=3) as w:
-            results = w.map(self.delete_bucket, buckets)
-            return filter(None, list(results))
+
+        results = self._process_with_futures(self.delete_bucket, buckets)
+        self.write_denied_buckets_file()
+        return results
 
     def delete_bucket(self, b):
         s3 = bucket_client(self.manager.session_factory(), b)

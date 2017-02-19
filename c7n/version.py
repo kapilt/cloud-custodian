@@ -12,4 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version = "0.8.22.1a"
+version = "0.8.23.0"
+

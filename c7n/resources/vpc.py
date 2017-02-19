@@ -14,6 +14,7 @@
 
 import json
 import itertools
+import operator
 import zlib
 
 from botocore.exceptions import ClientError
@@ -64,6 +65,95 @@ class VpcDiffFilter(Diff):
         return resource
 
 
+@Vpc.filter_registry.register('flow-logs')
+class FlowLogFilter(Filter):
+    """Are flow logs enabled on the resource.
+
+    ie to find all vpcs with flows logs disabled we can do this
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+              - name: flow-logs-enabled
+                resource: vpc
+                filters:
+                  - flow-logs
+
+    or to find all vpcs with flow logs but that don't match a
+    particular configuration.
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+              - name: flow-mis-configured
+                resource: vpc
+                filters:
+                  - type: flow-logs
+                    enabled: true
+                    op: not-equal
+                    # equality operator applies to following keys
+                    traffic-type: all
+                    status: success
+                    log-group: vpc-logs
+
+    """
+
+    schema = type_schema(
+        'flow-logs',
+        **{'enabled': {'type': 'boolean', 'default': False},
+           'op': {'enum': ['equal', 'not-equal'], 'default': 'equal'},
+           'status': {'enum': ['success', 'failed']},
+           'traffic-type': {'enum': ['accept', 'reject', 'all']},
+           'log-group': {'type': 'string'}})
+
+    permissions = ('ec2:DescribeFlowLogs',)
+
+    def process(self, resources, event=None):
+        client = local_session(self.manager.session_factory).client('ec2')
+
+        # TODO given subnet/nic level logs, we should paginate, but we'll
+        # need to add/update botocore pagination support.
+        logs = client.describe_flow_logs().get('FlowLogs', ())
+
+        m = self.manager.get_model()
+        resource_map = {}
+
+        for fl in logs:
+            resource_map.setdefault(fl['ResourceId'], []).append(fl)
+
+        enabled = self.data.get('enabled', False)
+        log_group = self.data.get('log-group')
+        traffic_type = self.data.get('traffic-type')
+        status = self.data.get('status')
+        op = self.data.get('op', 'equal') == 'equal' and operator.eq or operator.ne
+
+        results = []
+        for r in resources:
+            if r[m.id] not in resource_map:
+                if enabled:
+                    continue
+                results.append(r)
+                continue
+            flogs = resource_map[r[m.id]]
+            r['c7n:flow-logs'] = flogs
+            for fl in flogs:
+                if status and not op(fl['Status'], status.upper()):
+                    continue
+                if traffic_type and not op(fl['TrafficType'], traffic_type.upper()):
+                    continue
+                if log_group and not op(fl['LogGroupName'], log_group):
+                    continue
+                results.append(r)
+                break
+
+        return results
+>>>>>>> upstream
+
+
 @resources.register('subnet')
 class Subnet(QueryResourceManager):
 
@@ -78,6 +168,9 @@ class Subnet(QueryResourceManager):
         dimension = None
         config_type = 'AWS::EC2::Subnet'
         id_prefix = "subnet-"
+
+
+Subnet.filter_registry.register('flow-logs', FlowLogFilter)
 
 
 @resources.register('security-group')
@@ -342,8 +435,7 @@ class SGUsage(Filter):
         # Note assuming we also have launch config garbage collection
         # enabled.
         sg_ids = set()
-        from c7n.resources.asg import LaunchConfig
-        for cfg in LaunchConfig(self.manager.ctx, {}).resources():
+        for cfg in self.manager.get_resource_manager('launch-config').resources():
             for g in cfg['SecurityGroups']:
                 sg_ids.add(g)
             for g in cfg['ClassicLinkVPCSecurityGroups']:
@@ -352,8 +444,7 @@ class SGUsage(Filter):
 
     def get_lambda_sgs(self):
         sg_ids = set()
-        from c7n.resources.awslambda import AWSLambda
-        for func in AWSLambda(self.manager.ctx, {}).resources():
+        for func in self.manager.get_resource_manager('lambda').resources():
             if 'VpcConfig' not in func:
                 continue
             for g in func['VpcConfig']['SecurityGroupIds']:
@@ -362,14 +453,14 @@ class SGUsage(Filter):
 
     def get_eni_sgs(self):
         sg_ids = set()
-        for nic in NetworkInterface(self.manager.ctx, {}).resources():
+        for nic in self.manager.get_resource_manager('eni').resources():
             for g in nic['Groups']:
                 sg_ids.add(g['GroupId'])
         return sg_ids
 
     def get_sg_refs(self):
         sg_ids = set()
-        for sg in SecurityGroup(self.manager.ctx, {}).resources():
+        for sg in self.manager.get_resource_manager('security-group').resources():
             for perm_type in ('IpPermissions', 'IpPermissionsEgress'):
                 for p in sg.get(perm_type, []):
                     for g in p.get('UserIdGroupPairs', ()):
@@ -892,6 +983,8 @@ class NetworkInterface(QueryResourceManager):
         date = None
         config_type = "AWS::EC2::NetworkInterface"
         id_prefix = "eni-"
+
+NetworkInterface.filter_registry.register('flow-logs', FlowLogFilter)
 
 
 @NetworkInterface.filter_registry.register('subnet')
