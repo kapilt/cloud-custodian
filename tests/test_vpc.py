@@ -66,6 +66,31 @@ class VpcTest(BaseTest):
         self.assertEqual(len(resources), 1)
 
 
+class NetworkAclTest(BaseTest):
+
+    def test_network_acl(self):
+        factory = self.record_flight_data(
+            'test_network_acl_s3_missing')
+        client = factory().client('ec2')
+        vpc_id = client.create_vpc(CidrBlock="10.4.0.0/16")['Vpc']['VpcId']
+        self.addCleanup(client.delete_vpc, VpcId=vpc_id)
+        acls = client.describe_network_acls(
+            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])['NetworkAcls']
+
+        client.delete_network_acl_entry(
+            NetworkAclId=acls[0]['NetworkAclId'],
+            RuleNumber=acls[0]['Entries'][0]['RuleNumber'],
+            Egress=True)
+        import time
+        time.sleep(5)
+        p = self.load_policy({
+            'name': 'nacl-check',
+            'resource': 'network-acl',
+            'filters': [
+                {'VpcId': vpc_id}, 's3-cidr']})
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
 
 class NetworkInterfaceTest(BaseTest):
 

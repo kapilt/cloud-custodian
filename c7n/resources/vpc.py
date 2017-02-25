@@ -17,6 +17,8 @@ import itertools
 import operator
 import zlib
 
+import jmespath
+
 from c7n.actions import BaseAction, ModifyVpcSecurityGroupsAction
 from c7n.filters import (
     DefaultVpcBase, Filter, FilterValidationError, ValueFilter)
@@ -24,7 +26,8 @@ import c7n.filters.vpc as net_filters
 from c7n.filters.revisions import Diff
 from c7n.query import QueryResourceManager
 from c7n.manager import resources
-from c7n.utils import local_session, type_schema, get_retry, camelResource
+from c7n.utils import (
+    local_session, type_schema, get_retry, camelResource, parse_cidr)
 
 
 @resources.register('vpc')
@@ -516,7 +519,7 @@ class Stale(Filter):
     schema = type_schema('stale')
     permissions = ('ec2:DescribeStaleSecurityGroups',)
 
-    def process(self, resources, events):
+    def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('ec2')
         vpc_ids = set([r['VpcId'] for r in resources if 'VpcId' in r])
         group_map = {r['GroupId']: r for r in resources}
@@ -1057,8 +1060,63 @@ class NetworkAcl(QueryResourceManager):
 
 @NetworkAcl.filter_registry.register('subnet')
 class AclSubnetFilter(net_filters.SubnetFilter):
+    """Filter network acls by the attributes of their attached subnets.
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+              - name: subnet-acl
+                resource: network-acl
+                filters:
+                  - type: subnet
+                    key: "tag:Location"
+                    value: Public
+    """
 
     RelatedIdsExpression = "Associations[].SubnetId"
+
+
+@NetworkAcl.filter_registry.register('s3-cidr')
+class AclAwsS3Cidrs(Filter):
+    """Filter network acls by those that allow access to s3 cidrs.
+
+    Defaults to filtering those that do not allow.
+    """
+
+    schema = type_schema(
+        'aws-s3',
+        egress={'type': 'boolean', 'default': True},
+        ingress={'type': 'boolean', 'default': False},
+        present={'type': 'boolean', 'default': False})
+    permissions = ('ec2:DescribePrefixLists',)
+
+    def process(self, resources, event=None):
+        ec2 = local_session(self.manager.session_factory).client('ec2')
+        cidrs = jmespath.search(
+            "PrefixLists[].Cidrs[]", ec2.describe_prefix_lists())
+        cidrs = [parse_cidr(cidr) for cidr in cidrs]
+        results = []
+
+        check_egress = self.data.get('egress', True)
+        check_ingress = self.data.get('ingress', False)
+
+        for r in resources:
+            not_found = set(cidrs)
+            for entry in r['Entries']:
+                if entry['Egress'] and not check_egress:
+                    continue
+                if not entry['Egress'] and not check_ingress:
+                    continue
+
+                entry_cidr = parse_cidr(entry['CidrBlock'])
+                for c in tuple(not_found):
+                    if c in entry_cidr:
+                        not_found.remove(c)
+            if not_found:
+                results.append(r)
+        return results
 
 
 @resources.register('network-addr')
@@ -1155,5 +1213,4 @@ class KeyPair(QueryResourceManager):
         name = 'KeyName'
         date = None
         dimension = None
-
 
