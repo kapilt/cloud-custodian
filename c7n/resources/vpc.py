@@ -1084,12 +1084,13 @@ class AclAwsS3Cidrs(Filter):
 
     Defaults to filtering those that do not allow.
     """
-
+    # TODO allow for port specification as range
     schema = type_schema(
         'aws-s3',
         egress={'type': 'boolean', 'default': True},
         ingress={'type': 'boolean', 'default': False},
         present={'type': 'boolean', 'default': False})
+
     permissions = ('ec2:DescribePrefixLists',)
 
     def process(self, resources, event=None):
@@ -1100,21 +1101,24 @@ class AclAwsS3Cidrs(Filter):
         results = []
 
         check_egress = self.data.get('egress', True)
-        check_ingress = self.data.get('ingress', False)
+        check_ingress = self.data.get('ingress', True)
+        present = self.data.get('present', False)
 
         for r in resources:
-            not_found = set(cidrs)
+            matched = {cidr: None for cidr in cidrs}
             for entry in r['Entries']:
                 if entry['Egress'] and not check_egress:
                     continue
                 if not entry['Egress'] and not check_ingress:
                     continue
-
                 entry_cidr = parse_cidr(entry['CidrBlock'])
-                for c in tuple(not_found):
-                    if c in entry_cidr:
-                        not_found.remove(c)
-            if not_found:
+                for c in matched:
+                    if c in entry_cidr and matched[c] is None:
+                        matched[c] = (
+                            entry['RuleAction'] == 'allow' and True or False)
+            if present and all(matched.values()):
+                results.append(r)
+            elif not present and not all(matched.values()):
                 results.append(r)
         return results
 
