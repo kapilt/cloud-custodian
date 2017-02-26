@@ -1123,8 +1123,6 @@ class AclAwsS3Cidrs(Filter):
         return results
 
 
-=======
->>>>>>> upstream
 @resources.register('network-addr')
 class Address(QueryResourceManager):
 
