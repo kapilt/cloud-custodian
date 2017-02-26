@@ -1082,13 +1082,25 @@ class AclSubnetFilter(net_filters.SubnetFilter):
 class AclAwsS3Cidrs(Filter):
     """Filter network acls by those that allow access to s3 cidrs.
 
-    Defaults to filtering those that do not allow.
+    Defaults to filtering those nacls that do not allow s3 communication.
+
+    :example:
+
+        Find all nacls that do not allow communication with s3.
+
+        .. code-block: yaml
+
+            policies:
+              - name: s3-not-allowed-nacl
+                resource: network-acl
+                filters:
+                  - s3-cidr
     """
     # TODO allow for port specification as range
     schema = type_schema(
-        'aws-s3',
+        's3-cidr',
         egress={'type': 'boolean', 'default': True},
-        ingress={'type': 'boolean', 'default': False},
+        ingress={'type': 'boolean', 'default': True},
         present={'type': 'boolean', 'default': False})
 
     permissions = ('ec2:DescribePrefixLists',)
