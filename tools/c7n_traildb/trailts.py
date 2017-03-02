@@ -1,3 +1,8 @@
+"""TrailDB to TimeSeries
+
+Todo: Consider direct processing trails here and bypass the traildb/sqlite.
+"""
+
 from collections import defaultdict
 import datetime
 import logging
