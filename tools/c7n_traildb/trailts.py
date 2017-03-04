@@ -1,7 +1,22 @@
+# Copyright 2017 Capital One Services, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """TrailDB to TimeSeries
 
 Todo: Consider direct processing trails here and bypass the traildb/sqlite.
 """
+from __future__ import print_function
 
 from collections import defaultdict
 import datetime
@@ -190,11 +205,12 @@ def index_account(config, region, account, day, incremental):
         st = time.time()
 
         try:
-            s3.head_object(Bucket=bucket, Key=key)
+            key_info = s3.head_object(Bucket=bucket, Key=key)
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
                 log.warning("account:%s region:%s missing key:%s",
                             name, region, key)
+                os.remove(fh.name)
                 return
             raise
         s3.download_file(bucket, key, fh.name)
@@ -218,7 +234,8 @@ def index_account(config, region, account, day, incremental):
                   time.time()-st)
 
     return {'time': time.time()-st, 'records': record_count, 'region': region,
-            'account':  name, 'day': day.strftime("%Y-%m-%d")}
+            'account':  name, 'day': day.strftime("%Y-%m-%d"),
+            'db-date': key_info['LastModified']}
 
 
 def get_date_range(start, end):
@@ -280,17 +297,53 @@ def trailts():
 
 @trailts.command()
 @click.option('-c', '--config', required=True, help="Config file")
+@click.option('-a', '--account', required=True, help="Account name")
+@click.option('-d', '--day', required=True, help="Day")
+@click.option('-r', '--region', required=True, help="region")
+@click.option('-o', '--output', default="trail.db")
+def download(config, account, day, region, output):
+    """Download a traildb file for a given account/day/region"""
+
+    with open(config) as fh:
+        config = yaml.safe_load(fh.read())
+
+    jsonschema.validate(config, CONFIG_SCHEMA)
+
+    found = None
+    for info in config['accounts']:
+        if info['name'] == account:
+            found = info
+            break
+
+    if not found:
+        log.info("Account %s not found", account)
+        return
+
+    s3 = boto3.client('s3')
+    day = parse_date(day)
+
+    key_data = dict(found)
+    key_data['region'] = region
+    key_data['date_fmt'] = "%s/%s/%s" % (
+        day.year, day.month, day.day)
+    key = config['key_template'] % key_data
+
+    s3.download_file(found['bucket'], key, output + '.bz2')
+    subprocess.check_call(["lbzip2", "-d", output + '.bz2'])
+
+
+@trailts.command()
+@click.option('-c', '--config', required=True, help="Config file")
 def status(config):
+    """time series lastest record time by account."""
     with open(config) as fh:
         config = yaml.safe_load(fh.read())
     jsonschema.validate(config, CONFIG_SCHEMA)
-
     last_index = get_incremental_starts(config, None)
-
     accounts = {}
     for (a, region), last in last_index.items():
         accounts.setdefault(a, {})[region] = last
-    print yaml.safe_dump(accounts, default_flow_style=False)
+    print(yaml.safe_dump(accounts, default_flow_style=False))
 
 
 @trailts.command()
@@ -315,6 +368,7 @@ def index(config, start, end, incremental=False, concurrency=5, accounts=None,
 
     if verbose:
         logging.root.setLevel(logging.DEBUG)
+    log.info("tmpdir %s" % os.environ.get('TMPDIR'))
 
     with ProcessPoolExecutor(max_workers=concurrency) as w:
         futures = {}
@@ -338,9 +392,12 @@ def index(config, start, end, incremental=False, concurrency=5, accounts=None,
             _, region, account, d, incremental = futures[f]
 
             result = f.result()
+            if result is None:
+                continue
             log.info(
                 ("processed account:%(account)s day:%(day)s region:%(region)s "
-                 "records:%(records)s time:%(time)0.2f") % result)
+                 "records:%(records)s time:%(time)0.2f db-date:%(db-date)s"
+                 ) % result)
 
 if __name__ == '__main__':
     trailts(auto_envvar_prefix='TRAIL')
