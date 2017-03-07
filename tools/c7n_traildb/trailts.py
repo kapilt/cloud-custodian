@@ -16,7 +16,6 @@
 
 Todo: Consider direct processing trails here and bypass the traildb/sqlite.
 """
-from __future__ import print_function
 
 from collections import defaultdict
 import datetime
@@ -343,7 +342,7 @@ def status(config):
     accounts = {}
     for (a, region), last in last_index.items():
         accounts.setdefault(a, {})[region] = last
-    print(yaml.safe_dump(accounts, default_flow_style=False))
+    print yaml.safe_dump(accounts, default_flow_style=False)
 
 
 @trailts.command()
@@ -384,7 +383,7 @@ def index(config, start, end, incremental=False, concurrency=5, accounts=None,
             for region in account.get('regions'):
                 for d in get_date_range(
                         account_starts[(account['name'], region)], end):
-                    i = bool(incremental and (d.hour or d.minute))
+                    i = bool(d.hour or d.minute)
                     p = (config, region, account, d, i)
                     futures[w.submit(index_account, *p)] = p
 
