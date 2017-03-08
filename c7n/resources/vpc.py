@@ -149,7 +149,9 @@ class Subnet(QueryResourceManager):
         config_type = 'AWS::EC2::Subnet'
         id_prefix = "subnet-"
 
+
 Subnet.filter_registry.register('flow-logs', FlowLogFilter)
+
 
 @resources.register('security-group')
 class SecurityGroup(QueryResourceManager):

@@ -14,7 +14,7 @@
 
 from c7n.utils import local_session, type_schema
 
-from .core import Filter, ValueFilter
+from .core import Filter, ValueFilter, FilterValidationError
 from .related import RelatedResourceFilter
 
 
@@ -56,3 +56,68 @@ class DefaultVpcBase(Filter):
             if vpcs:
                 self.default_vpc = vpcs.pop()
         return vpc_id == self.default_vpc and True or False
+
+
+class NetworkLocation(Filter):
+    """On a network attached resource, determine intersection of
+       security-group attributes to subnet attributes.
+    """
+    schema = type_schema(
+        'network-location', key={'type': 'string'}, required=['key'])
+
+    def validate(self):
+        rfilters = self.manager.filter_registry.keys()
+        if 'subnet' not in rfilters:
+            raise FilterValidationError(
+                "network-location requires resource subnet filter")
+        if 'security-group' not in rfilters:
+            raise FilterValidationError(
+                "network-location requires resource security-group filter")
+
+    def process(self, resources):
+        sg = self.manager.filter_registry.get('security-group')
+        sg_model = sg.get_resource_manager().get_model()
+        related_sg = sg.get_related_resources(resources)
+
+        subnet = self.manager.filter_registry.get('subnet')
+        subnet_model = subnet.get_resource_manager().get_model()
+        related_subnet = subnet.get_related_resources(subnet)
+
+        key = self.data.get('key')
+        results = []
+
+        for r in resources:
+            resource_sgs = [related_sg[sid] for sid in sg.get_related_ids(r)]
+            resource_subnets = [
+                related_subnet[sid] for sid in subnet.get_related_ids(r)]
+
+            subnet_values = {
+                rsub[subnet_model.id]: subnet.get_resource_value(key, rsub)
+                for rsub in resource_subnets}
+            subnet_space = set(filter(None, subnet_values.values()))
+
+            if len(subnet_space) > 1:
+                r['c7n:NetworkLocation'] = {
+                    'reason': 'SubnetLocationCardinality',
+                    'subnets': subnet_values}
+                results.append(r)
+                continue
+
+            sg_values = {
+                rsg[sg_model.id]: sg.get_resource_value(key, rsg)
+                for rsg in resource_sgs}
+
+            sg_space = set(filter(None, sg_values.values()))
+            if len(sg_space) > 1:
+                r['c7n:NetworkLocation'] = {
+                    'reason': 'SecurityGroupLocationCardinality',
+                    'security-groups': sg_values}
+                results.append(r)
+                continue
+
+            if sg_space != subnet_space:
+                r['c7n:NetworkLocation'] = {
+                    'reason': 'LocationMismatch',
+                    'subnets': subnet_values,
+                    'security-groups': sg_values}
+                results.append(r)
