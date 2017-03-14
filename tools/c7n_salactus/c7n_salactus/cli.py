@@ -164,7 +164,7 @@ def format_plain(buckets, fh):
 
 
 def format_csv(buckets, fh):
-    field_names = ['account', 'name', 'matched', 'scanned',
+    field_names = ['account', 'name', 'created', 'matched', 'scanned',
                    'size', 'keys_denied', 'error_count', 'partitions']
 
     totals = Counter()

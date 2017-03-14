@@ -2,6 +2,7 @@ import json
 import os
 from collections import Counter
 
+from dateutil.parser import parse
 
 from c7n_salactus.worker import connection as conn
 
@@ -97,6 +98,10 @@ class Bucket(object):
     @property
     def size(self):
         return int(self.data['bucket-size'].get(self.bucket_id, 0.0))
+
+    @property
+    def created(self):
+        return parse(self.data['bucket-age'][self.bucket_id]).strftime("%Y-%m-%d")
 
     @property
     def matched(self):
