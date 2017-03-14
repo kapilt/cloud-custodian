@@ -231,7 +231,7 @@ def process_account(account_info):
     for b in buckets:
         connection.hset(
             'bucket-age', bucket_id(account_info, b),
-            b['CreationTime'].isoformat())
+            b['CreationDate'].isoformat())
 
     account_buckets = account_info.pop('buckets', None)
     buckets = [n['Name'] for n in buckets
