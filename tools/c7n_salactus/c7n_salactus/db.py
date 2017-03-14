@@ -135,6 +135,7 @@ class Bucket(object):
 
 def get_data():
     data = {}
+    data['bucket-age'] = conn.hgetall('bucket-age')
     data['buckets-denied'] = list(
         conn.smembers('buckets-denied'))
     data['buckets-complete'] = list(
