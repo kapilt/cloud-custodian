@@ -69,7 +69,9 @@ def run(config, tag, bucket, account, debug=False):
     if debug:
         def invoke(f, *args, **kw):
             if f.func_name == 'process_keyset':
-                print("skip keyset")
+                key_count = (len(args[-1].get('Contents', ()))
+                             + len(args[-1].get('Versions', ())))
+                print("debug skip keyset %d" % key_count)
                 return
             return f(*args, **kw)
         worker.invoke = invoke

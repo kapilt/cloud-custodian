@@ -78,6 +78,8 @@ PARTITION_KEYSET_THRESHOLD = 500
 # Length of partition queue before going parallel
 PARTITION_QUEUE_THRESHOLD = 6
 
+DEFAULT_TTL = 60 * 60 * 48
+
 BUCKET_OBJ_DESC = {
     True: ('Versions', 'list_object_versions',
            ('NextKeyMarker', 'NextVersionIdMarker')),
@@ -478,7 +480,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
         process_bucket_iterator, [account_info, bucket], prefixes)
 
 
-@job('bucket-partition', timeout=3600*12, connection=connection)
+@job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL, connection=connection)
 def process_bucket_partitions(
         account_info, bucket, prefix_set=('',), partition='/',
         strategy=None, limit=4):
@@ -568,7 +570,7 @@ def process_bucket_partitions(
         invoke(process_keyset, account_info, bucket, {contents_key: keyset})
 
 
-@job('bucket-page-iterator', timeout=3600*24, connection=connection)
+@job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection)
 def process_bucket_iterator(account_info, bucket,
                             prefix="", delimiter="", **continuation):
     """Bucket pagination
@@ -582,7 +584,9 @@ def process_bucket_iterator(account_info, bucket,
      contents_method,
      _) = BUCKET_OBJ_DESC[bucket['versioned']]
 
-    params = dict(Bucket=bucket['name'], Prefix=prefix)
+    params = dict(Bucket=bucket['name'])
+    if prefix:
+        params['Prefix'] = prefix
     if delimiter:
         params['Delimiter'] = delimiter
     if continuation:
@@ -595,7 +599,7 @@ def process_bucket_iterator(account_info, bucket,
                 invoke(process_keyset, account_info, bucket, page)
 
 
-@job('bucket-keyset-scan', timeout=3600*12, connection=connection)
+@job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection)
 def process_keyset(account_info, bucket, key_set):
     session = get_session(account_info)
     s3 = session.client('s3', region_name=bucket['region'], config=s3config)
