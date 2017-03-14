@@ -152,7 +152,7 @@ def get_data():
     data['keys-matched'] = {
         k: float(v) for k, v in conn.hgetall('keys-matched').items()}
     data['keys-denied'] = {
-        k: float(v) for k, v in conn.hgetall('keys-denied').items()}
+        k: float(v) for k, v in conn.smembers('keys-denied')}
     return data
 
 

@@ -255,14 +255,22 @@ def process_bucket_set(account_info, buckets):
         bid = bucket_id(account_info, b)
         with bucket_ops(account_info, b):
             info = {'name': b}
-            location = client.get_bucket_location(
-                Bucket=b).get('LocationConstraint')
+            error = None
+
+            try:
+                location = client.get_bucket_location(
+                    Bucket=b).get('LocationConstraint')
+            except Exception as e:
+                error = e
+                location = None
+
             if location is None:
                 region = "us-east-1"
             elif location == 'EU':
                 region = "eu-west-1"
             else:
                 region = location
+
             info['region'] = region
             if region not in region_clients:
                 region_clients.setdefault(region, {})
@@ -273,12 +281,22 @@ def process_bucket_set(account_info, buckets):
             else:
                 s3 = region_clients[region]['s3']
                 cw = region_clients[region]['cloudwatch']
+
+            try:
+                info['keycount'] = bucket_key_count(cw, info)
+            except:
+                if location is not None:
+                    raise
+            else:
+                connection.hset('bucket-size', bid, info['keycount'])
+
+            if error:
+                raise error
+
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
                 versioning and versioning.get('Status', '')
                 in ('Enabled', 'Suspended') or False)
-            info['keycount'] = bucket_key_count(cw, info)
-            connection.hset('bucket-size', bid, info['keycount'])
             log.info("processing bucket %s", info)
             connection.hset(
                 'buckets-start',
