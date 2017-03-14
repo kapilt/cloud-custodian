@@ -168,7 +168,7 @@ def format_csv(buckets, fh):
                    'size', 'keys_denied', 'error_count', 'partitions']
 
     totals = Counter()
-    skip = set(('account', 'name', 'percent'))
+    skip = set(('account', 'name', 'percent', 'created'))
     for b in buckets:
         for n in field_names:
             if n in skip:
