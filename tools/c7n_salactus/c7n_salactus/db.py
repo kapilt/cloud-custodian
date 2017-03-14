@@ -26,9 +26,9 @@ class Database(object):
     def buckets(self, accounts=()):
         if accounts:
             return [
-                Bucket(k, self.data) for k in self.data['bucket-size'].keys()
+                Bucket(k, self.data) for k in self.data['bucket-age'].keys()
                 if k.split(":")[0] in accounts]
-        return [Bucket(k, self.data) for k in self.data['bucket-size'].keys()]
+        return [Bucket(k, self.data) for k in self.data['bucket-age'].keys()]
 
     def save(self, path):
         with open(os.path.expanduser(path), 'w') as fh:
