@@ -232,6 +232,10 @@ def process_account(account_info):
     buckets = [n['Name'] for n in buckets
                if not account_buckets or
                n['Name'] in account_buckets]
+    for b in account_buckets:
+        connection.hset(
+            'bucket-age', bucket_id(account_info, b),
+            b['CreationTime'].isoformat())
     log.info("processing %d buckets in account %s",
              len(buckets), account_info['name'])
     for bucket_set in chunks(buckets, 50):
