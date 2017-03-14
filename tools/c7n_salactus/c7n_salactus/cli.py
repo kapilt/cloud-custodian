@@ -221,7 +221,7 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             continue
         if kdenied and not b.keys_denied:
             continue
-        if errors and not b.errors:
+        if errors and not b.error_count:
             continue
         if size and b.size < size:
             continue

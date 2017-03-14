@@ -79,6 +79,13 @@ class Bucket(object):
         self.bucket_id = bucket_id
         self.data = data
 
+    def __repr__(self):
+        return ("<bucket:%s size:%s percent:%s scanned:%s matched:%s "
+                "partitions:%d denied:%s error:%d>") % (
+                    self.bucket_id, self.size, self.percent_scanned,
+                    self.scanned, self.matched, self.partitions,
+                    self.denied, self.error_count)
+
     @property
     def account(self):
         return self.bucket_id.split(':')[0]
