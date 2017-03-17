@@ -260,6 +260,7 @@ def failures():
     q = Queue('failed', connection=worker.connection)
     for i in q.get_jobs():
         click.echo("%s on %s" % (i.func_name, i.origin))
+        click.echo("params %s %s" % (i._args, i._kwargs))
         click.echo(i.exc_info)
 
 

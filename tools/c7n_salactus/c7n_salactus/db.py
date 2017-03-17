@@ -82,10 +82,10 @@ class Bucket(object):
 
     def __repr__(self):
         return ("<bucket:%s size:%s percent:%s scanned:%s matched:%s "
-                "partitions:%d denied:%s error:%d>") % (
+                "partitions:%d psize:%d denied:%s error:%d>") % (
                     self.bucket_id, self.size, self.percent_scanned,
                     self.scanned, self.matched, self.partitions,
-                    self.denied, self.error_count)
+                    self.partition_size, str(self.denied).lower(), self.error_count)
 
     @property
     def account(self):
@@ -110,6 +110,10 @@ class Bucket(object):
     @property
     def scanned(self):
         return int(self.data['keys-scanned'].get(self.bucket_id, 0.0))
+
+    @property
+    def partition_size(self):
+        return self.size / (self.partitions or 1)
 
     @property
     def percent_scanned(self):
