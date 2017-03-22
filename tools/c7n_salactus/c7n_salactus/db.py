@@ -27,9 +27,9 @@ class Database(object):
     def buckets(self, accounts=()):
         if accounts:
             return [
-                Bucket(k, self.data) for k in self.data['bucket-age'].keys()
+                Bucket(k, self.data) for k in self.data['bucket-size'].keys()
                 if k.split(":")[0] in accounts]
-        return [Bucket(k, self.data) for k in self.data['bucket-age'].keys()]
+        return [Bucket(k, self.data) for k in self.data['bucket-size'].keys()]
 
     def save(self, path):
         with open(os.path.expanduser(path), 'w') as fh:
@@ -101,7 +101,9 @@ class Bucket(object):
 
     @property
     def created(self):
-        return parse(self.data['bucket-age'][self.bucket_id]).strftime("%Y-%m-%d")
+        if 'bucket-age' in self.data:
+            return parse(self.data['bucket-age'][self.bucket_id]).strftime("%Y-%m-%d")
+        return ''
 
     @property
     def matched(self):

@@ -24,6 +24,7 @@ import operator
 
 import click
 
+from rq.job import Job
 from rq.registry import FinishedJobRegistry, StartedJobRegistry
 from rq.queue import Queue
 from rq.worker import Worker
@@ -215,6 +216,8 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
     buckets = []
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
+        if b.percent_scanned > 70 and b.size < 100000:
+            continue
         if bucket and b.name not in bucket:
             continue
         if matched and not b.matched:
@@ -231,6 +234,28 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
 
     formatter = format == 'csv' and format_csv or format_plain
     formatter(buckets, output)
+
+
+@cli.command(name='inspect-queue')
+@click.option('--queue', required=True)
+@click.option('--state', default='running')
+def inspect_queue(queue, state):
+    """Show contents of a queue."""
+    conn = worker.connection
+
+    def _repr(j):
+        return "args:%s kw:%s" % (
+            j.args, j.kwargs)
+
+    registry_class = FinishedJobRegistry
+    if state == 'running':
+        registry_class = StartedJobRegistry
+
+    registry = registry_class(queue, conn)
+
+    for jid in registry.get_job_ids():
+        j = Job.fetch(jid, conn)
+        click.echo("%s" % _repr(j))
 
 
 @cli.command()
