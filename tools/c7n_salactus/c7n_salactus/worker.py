@@ -62,6 +62,18 @@ from c7n.credentials import assumed_session
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks
 
+from botocore.vendored import requests
+
+
+# Pick a preferred cipher suite, needs some benchmarking.
+# https://goo.gl/groHHe
+requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
+try:
+    requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
+except AttributeError:
+    # no pyopenssl support used / needed / available
+    pass
+
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
 
@@ -130,7 +142,10 @@ def bulk_invoke(func, args, nargs):
 
     Uses internal implementation details of rq.
     """
-    ctx = func.delay.func_closure[-1].cell_contents
+    for closure in func.delay.func_closure:
+        if getattr(closure.cell_contents, 'queue', None):
+            ctx = closure.cell_contents
+            break
     q = Queue(ctx.queue, connection=connection)
     argv = list(args)
     argv.append(None)
@@ -148,7 +163,7 @@ def bulk_invoke(func, args, nargs):
                 job._id = unicode(uuid4())
                 job.args = argv
                 q.enqueue_job(job, pipeline=pipe)
-
+            pipe.execute()
 
 @contextmanager
 def bucket_ops(account_info, bucket_name, api=""):
@@ -452,6 +467,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
 
     Consider nested buckets with common prefixes, and flat buckets.
     """
+
     bid = bucket_id(account_info, bucket['name'])
     session = get_session(account_info)
     s3 = session.client('s3', region_name=bucket['region'], config=s3config)
