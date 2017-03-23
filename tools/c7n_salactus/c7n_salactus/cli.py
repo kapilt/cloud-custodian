@@ -25,9 +25,10 @@ import operator
 import click
 
 from rq.job import Job
-from rq.registry import FinishedJobRegistry, StartedJobRegistry
-from rq.queue import Queue
+from rq.registry import DeferredJobRegistry, FinishedJobRegistry, StartedJobRegistry
+from rq.queue import Queue, FailedQueue
 from rq.worker import Worker
+import tabulate
 
 from c7n_salactus import worker, db
 
@@ -99,8 +100,9 @@ def save(dbpath):
 
 
 @cli.command()
-@click.option('--dbpath', help='path to json file')
-def reset(dbpath):
+# todo check redis version if >=4 support this
+#@click.option('--async/--sync', default=False)
+def reset(async=None):
     """Save the current state to a json file
     """
     click.echo('Delete db? Are you Sure? [yn] ', nl=False)
@@ -238,24 +240,62 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
 
 @cli.command(name='inspect-queue')
 @click.option('--queue', required=True)
-@click.option('--state', default='running')
-def inspect_queue(queue, state):
+@click.option(
+    '--state', default='running',
+    type=click.Choice(['running', 'pending', 'failed', 'finished']))
+@click.option('--limit', default=40)
+@click.option('--bucket', default=None)
+def inspect_queue(queue, state, limit, bucket):
     """Show contents of a queue."""
     conn = worker.connection
 
-    def _repr(j):
-        return "args:%s kw:%s" % (
-            j.args, j.kwargs)
+    def job_row(j):
+        row = {
+            'account': j.args[0]['name'],
+            'bucket': j.args[1]['name'],
+            'region': j.args[1]['region'],
+            'size': j.args[1]['keycount'],
+            'ttl': j.ttl,
+            'enqueued': j.enqueued_at,
+            'timeout': j.timeout}
+        if 1:
+        #if queue != "bucket-keyset-scan":
+            row['args'] = j.args[2:]
+        if state in ('running', 'failed', 'finished'):
+            row['started'] = j.started_at
+        if state in ('finished', 'failed'):
+            row['ended'] = j.ended_at
+        return row
 
-    registry_class = FinishedJobRegistry
     if state == 'running':
         registry_class = StartedJobRegistry
+    elif state == 'pending':
+        registry_class = Queue
+    elif state == 'failed':
+        registry_class = Failed
+    elif state == 'finished':
+        registry_class = FinishedJobRegistry
+    else:
+        raise ValueError("invalid state: %s" % state)
 
-    registry = registry_class(queue, conn)
-
+    registry = registry_class(queue, connection=conn)
+    records = []
     for jid in registry.get_job_ids():
         j = Job.fetch(jid, conn)
-        click.echo("%s" % _repr(j))
+        if bucket:
+            if j.args[1]['name'] != bucket:
+                continue
+        records.append(job_row(j))
+        if len(records) == limit:
+            break
+    if records:
+        click.echo(
+            tabulate.tabulate(
+                records,
+                "keys",
+                tablefmt='simple'))
+    else:
+        click.echo("no queue items found")
 
 
 @cli.command()
