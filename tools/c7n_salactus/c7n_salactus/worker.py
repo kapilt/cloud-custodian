@@ -646,17 +646,28 @@ def process_bucket_iterator(account_info, bucket,
     paginator = s3.get_paginator(contents_method).paginate(**params)
     with bucket_ops(account_info, bucket['name'], 'page'):
         ptime = time.time()
+        pcounter = 0
         for page in paginator:
             page = page_strip(page, bucket)
+            pcounter += 1
             if page.get(contents_key):
                 invoke(process_keyset, account_info, bucket, page)
 
+            if pcounter % 10 == 0:
+                with connection.pipeline() as p:
+                    nptime = time.time()
+                    p.hincrby('bucket-pages', bid, 1)
+                    p.hincrby('bucket-pages-time', bid, int((nptime-ptime)*1000))
+                    ptime = nptime
+                    p.execute()
+
+        if pcount % 10:
             with connection.pipeline() as p:
                 nptime = time.time()
                 p.hincrby('bucket-pages', bid, 1)
-                p.hincrby('bucket-pages-time', bid, int(nptime-ptime))
-                ptime = nptime
+                p.hincrby('bucket-pages-time', bid, int((nptime-ptime)*1000))
                 p.execute()
+
 
 @job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection)
 def process_keyset(account_info, bucket, key_set):
