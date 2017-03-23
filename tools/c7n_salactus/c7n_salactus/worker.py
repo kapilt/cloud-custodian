@@ -314,8 +314,7 @@ def process_bucket_set(account_info, buckets):
             try:
                 info['keycount'] = bucket_key_count(cw, info)
             except:
-                if location is not None:
-                    raise
+                raise
             else:
                 connection.hset('bucket-size', bid, info['keycount'])
 
