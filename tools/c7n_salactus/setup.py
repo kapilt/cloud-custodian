@@ -16,7 +16,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="c7n_salactus",
-    version='0.1.7',
+    version='0.1.8',
     description="Cloud Custodian - Salactus S3",
     classifiers=[
       "Topic :: System :: Systems Administration",
