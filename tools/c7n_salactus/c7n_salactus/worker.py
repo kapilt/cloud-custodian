@@ -142,6 +142,13 @@ def bulk_invoke(func, args, nargs):
 
     Uses internal implementation details of rq.
     """
+    # simplest thing that works
+    #for i in nargs:
+    #    argv = list(args)
+    #    argv.append(i)
+    #    func.delay(*argv)
+
+    # some variances between cpy and pypy, sniff detect
     for closure in func.delay.func_closure:
         if getattr(closure.cell_contents, 'queue', None):
             ctx = closure.cell_contents
@@ -152,7 +159,7 @@ def bulk_invoke(func, args, nargs):
     job = Job.create(
         func, args=argv, connection=connection,
         description="bucket-%s" % func.func_name,
-        origin=q.name, status=JobStatus.QUEUED, timeout=None,
+        origin=q.name, status=JobStatus.QUEUED, timeout=ctx.timeout,
         result_ttl=500, ttl=ctx.ttl)
 
     for n in chunks(nargs, 100):
@@ -164,6 +171,7 @@ def bulk_invoke(func, args, nargs):
                 job.args = argv
                 q.enqueue_job(job, pipeline=pipe)
             pipe.execute()
+
 
 @contextmanager
 def bucket_ops(account_info, bucket_name, api=""):
@@ -614,8 +622,9 @@ def process_bucket_iterator(account_info, bucket,
                             prefix="", delimiter="", **continuation):
     """Bucket pagination
     """
+    bid = bucket_id(account_info, bucket['name'])
     log.info("Iterating keys bucket %s prefix %s delimiter %s",
-             bucket_id(account_info, bucket['name']), prefix, delimiter)
+             bid, prefix, delimiter)
     session = get_session(account_info)
     s3 = session.client('s3', region_name=bucket['region'], config=s3config)
 
