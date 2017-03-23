@@ -43,6 +43,7 @@ import logging
 import itertools
 import math
 import os
+import random
 import string
 import threading
 import time
@@ -519,6 +520,9 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
     prefixes = NGramPartition(
         charset, limit=limit).initialize_prefixes(prefixes)
 
+    #
+    random.shuffle(prefixes)
+
     # Pregen on ngram means we have many potentially useless prefixes
     # todo carry charset forward as param, and go incremental on prefix
     # ngram expansion
@@ -641,28 +645,38 @@ def process_bucket_iterator(account_info, bucket,
         params.update({k[4:]: v for k, v in continuation.items()})
     paginator = s3.get_paginator(contents_method).paginate(**params)
     with bucket_ops(account_info, bucket['name'], 'page'):
+        ptime = time.time()
         for page in paginator:
             page = page_strip(page, bucket)
             if page.get(contents_key):
                 invoke(process_keyset, account_info, bucket, page)
 
+            with connection.pipeline() as p:
+                nptime = time.time()
+                p.hincrby('bucket-pages', bid, 1)
+                p.hincrby('bucket-pages-time', bid, int(nptime-ptime))
+                ptime = nptime
+                p.execute()
 
 @job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection)
 def process_keyset(account_info, bucket, key_set):
     session = get_session(account_info)
     s3 = session.client('s3', region_name=bucket['region'], config=s3config)
+    bid = bucket_id(account_info, bucket['name'])
     processor = EncryptExtantKeys(keyconfig)
-    remediation_count = 0
-    denied_count = 0
+    missing_count = throttle_count = denied_count = remediation_count = 0
+
+
     contents_key, _, _ = BUCKET_OBJ_DESC[bucket['versioned']]
+    key_count = len(key_set.get(contents_key, []))
     processor = (bucket['versioned'] and processor.process_version
                  or processor.process_key)
-    connection.hincrby(
-        'keys-scanned', bucket_id(account_info, bucket['name']),
-        len(key_set.get(contents_key, [])))
+
     log.info("processing page size: %d on %s",
              len(key_set.get(contents_key, ())),
              bucket_id(account_info, bucket['name']))
+
+    start_time = time.time()
 
     with bucket_ops(account_info, bucket, 'key'):
         for k in key_set.get(contents_key, []):
@@ -675,24 +689,33 @@ def process_keyset(account_info, bucket, key_set):
                 code = e.response['Error']['Code']
                 if code == '403':  # Permission Denied
                     denied_count += 1
-                    continue
                 elif code == '404':  # Not Found
-                    continue
-                elif code in ('503', '400'):  # Slow Down, or token err
-                    # TODO, consider backoff alg usage, and re-queue of keys
+                    missing_count += 1
+                elif code in ('503', '500'): # Slow down, or throttle
                     time.sleep(3)
-                    continue
-                raise
+                    #to continue, or re-key that is the question.
+                    #key_set[contents_key].append(k)
+                    throttle_count += 1
+                elif code in ('400',):  # Slow Down, or token err
+                    time.sleep(3)
+                    key_set[contents_key].append(k)
+                else:
+                    raise
+                continue
             if result is False:
                 continue
             remediation_count += 1
-        if remediation_count:
-            connection.hincrby(
-                'keys-matched',
-                bucket_id(account_info, bucket['name']),
-                remediation_count)
-        if denied_count:
-            connection.hincrby(
-                'keys-denied',
-                bucket_id(account_info, bucket['name']),
-                denied_count)
+        with connection.pipeline() as p:
+            if remediation_count:
+                p.hincrby('keys-matched', bid, remediation_count)
+            if denied_count:
+                p.hincrby('keys-denied', bid, denied_count)
+            if missing_count:
+                p.hincrby('keys-missing', bid, missing_count)
+            if throttle_count:
+                p.hincrby('keys-throttled', bid, throtttle_count)
+            p.hincrby('keys-scanned', bid, key_count)
+            # track count again as we reset metrics period
+            p.hincrby('keys-count', bid, key_count)
+            p.hincrby('keys-time', bid, int(time.time()-start_time))
+            p.execute()

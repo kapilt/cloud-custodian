@@ -29,11 +29,17 @@ class Database(object):
             return [
                 Bucket(k, self.data) for k in self.data['bucket-size'].keys()
                 if k.split(":")[0] in accounts]
-        return [Bucket(k, self.data) for k in self.data['bucket-size'].keys()]
+        return [Bucket(k, self.data) for k in self.data['keys-scanned'].keys()]
 
     def save(self, path):
         with open(os.path.expanduser(path), 'w') as fh:
             json.dump(self.data, fh, indent=2)
+
+    def reset_stats(self):
+        conn.delete('keys-time')
+        conn.delete('keys-count')
+        conn.delete('bucket-pages')
+        conn.delete('bucket-pages-time')
 
 
 def db(dbpath=None):
@@ -143,6 +149,18 @@ class Bucket(object):
     def error_count(self):
         return len(self.data['buckets-error'].get(self.bucket_id, ()))
 
+    @property
+    def lrate(self):
+        return int(
+            float(self.data['bucket-pages'].get(self.bucket_id, 0)) /
+            float(self.data['bucket-pages-time'].get(self.bucket_id, 1)))
+
+    @property
+    def krate(self):
+        return int(
+            float(self.data['keys-count'].get(self.bucket_id, 0)) /
+            float(self.data['keys-time'].get(self.bucket_id, 1)))
+
 
 def get_data():
     data = {}
@@ -152,7 +170,6 @@ def get_data():
     data['buckets-complete'] = list(
         conn.smembers('buckets-complete'))
     data['buckets-start'] = conn.hgetall('buckets-start')
-    data['buckets-end'] = conn.hgetall('buckets-end')
     data['bucket-partitions'] = {
         k: int(v) for k, v in conn.hgetall('bucket-partition').items()}
     data['buckets-error'] = conn.hgetall(
@@ -165,6 +182,22 @@ def get_data():
         k: float(v) for k, v in conn.hgetall('keys-matched').items()}
     data['keys-denied'] = {
         k: float(v) for k, v in conn.hgetall('keys-denied').items()}
+    data['keys-throttled'] = {
+        k: float(v) for k, v in conn.hgetall('keys-throttled').items()}
+    data['keys-missing'] = {
+        k: float(v) for k, v in conn.hgetall('keys-missing').items()}
+
+    # metric/rate stats per period
+    data['keys-count'] = {
+        k: float(v) for k, v in conn.hgetall('keys-count').items()}
+    data['keys-time'] = {
+        k: float(v) for k, v in conn.hgetall('keys-time').items()}
+
+    data['bucket-pages'] = {
+        k: float(v) for k, v in conn.hgetall('bucket-pages').items()}
+    data['bucket-pages-time'] = {
+        k: float(v) for k, v in conn.hgetall('bucket-pages-time').items()}
+
     return data
 
 

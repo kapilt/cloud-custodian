@@ -152,7 +152,7 @@ def format_plain(buckets, fh):
     def _repr(b):
         return (
             "account:%s name:%s percent:%0.2f matched:%d "
-            "scanned:%d size:%d kdenied:%d errors:%d partitions:%d") % (
+            "scan:%d size:%d kdenied:%d err:%d partitions:%d lr:%d kr:%d") % (
                 b.account,
                 b.name,
                 b.percent_scanned,
@@ -161,7 +161,10 @@ def format_plain(buckets, fh):
                 b.size,
                 b.keys_denied,
                 b.error_count,
-                b.partitions)
+                b.partitions,
+                b.lrate,
+                b.krate)
+
     for b in buckets:
         print(_repr(b), file=fh)
 
@@ -218,8 +221,6 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
     buckets = []
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
-        if b.percent_scanned > 70 and b.size < 100000:
-            continue
         if bucket and b.name not in bucket:
             continue
         if matched and not b.matched:
@@ -237,6 +238,12 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
     formatter = format == 'csv' and format_csv or format_plain
     formatter(buckets, output)
 
+
+@cli.command(name='reset-stats')
+def reset_stats():
+    """reset stats"""
+    d = db.db()
+    d.reset_stats()
 
 @cli.command(name='inspect-queue')
 @click.option('--queue', required=True)
