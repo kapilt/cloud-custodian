@@ -657,15 +657,15 @@ def process_bucket_iterator(account_info, bucket,
                 with connection.pipeline() as p:
                     nptime = time.time()
                     p.hincrby('bucket-pages', bid, 1)
-                    p.hincrby('bucket-pages-time', bid, int((nptime-ptime)*1000))
+                    p.hincrby('bucket-pages-time', bid, int(nptime-ptime))
                     ptime = nptime
                     p.execute()
 
-        if pcount % 10:
+        if pcounter % 10:
             with connection.pipeline() as p:
                 nptime = time.time()
                 p.hincrby('bucket-pages', bid, 1)
-                p.hincrby('bucket-pages-time', bid, int((nptime-ptime)*1000))
+                p.hincrby('bucket-pages-time', bid, int(nptime-ptime))
                 p.execute()
 
 
