@@ -63,17 +63,16 @@ from c7n.credentials import assumed_session
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks
 
-from botocore.vendored import requests
-
-
+#from botocore.vendored import requests
+#
 # Pick a preferred cipher suite, needs some benchmarking.
 # https://goo.gl/groHHe
-requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
-try:
-    requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
-except AttributeError:
-    # no pyopenssl support used / needed / available
-    pass
+#requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
+#try:
+#    requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
+#except AttributeError:
+#    # no pyopenssl support used / needed / available
+#    pass
 
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
