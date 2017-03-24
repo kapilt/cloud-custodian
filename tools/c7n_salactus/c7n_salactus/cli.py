@@ -32,6 +32,10 @@ import tabulate
 
 from c7n_salactus import worker, db
 
+# side-effect serialization patches...
+from c7n_salactus import rqworker
+
+
 
 def debug(f):
     def _f(*args, **kw):
