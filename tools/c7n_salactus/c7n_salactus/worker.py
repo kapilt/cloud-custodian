@@ -531,7 +531,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
         process_bucket_iterator, [account_info, bucket], prefixes)
 
 
-@job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL, connection=connection)
+@job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
 def process_bucket_partitions(
         account_info, bucket, prefix_set=('',), partition='/',
         strategy=None, limit=4):
@@ -621,7 +621,7 @@ def process_bucket_partitions(
         invoke(process_keyset, account_info, bucket, {contents_key: keyset})
 
 
-@job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection)
+@job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
 def process_bucket_iterator(account_info, bucket,
                             prefix="", delimiter="", **continuation):
     """Bucket pagination
@@ -669,7 +669,7 @@ def process_bucket_iterator(account_info, bucket,
                 p.execute()
 
 
-@job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection)
+@job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
 def process_keyset(account_info, bucket, key_set):
     session = get_session(account_info)
     s3 = session.client('s3', region_name=bucket['region'], config=s3config)
