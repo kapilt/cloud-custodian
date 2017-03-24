@@ -151,22 +151,21 @@ def accounts(dbpath, account):
 def format_plain(buckets, fh):
     def _repr(b):
         return (
-            "account:%s name:%s percent:%0.2f matched:%d "
-            "scan:%d size:%d kdenied:%d err:%d partitions:%d lr:%d kr:%d") % (
-                b.account,
-                b.name,
-                b.percent_scanned,
-                b.matched,
-                b.scanned,
-                b.size,
-                b.keys_denied,
-                b.error_count,
-                b.partitions,
-                b.lrate,
-                b.krate)
-
-    for b in buckets:
-        print(_repr(b), file=fh)
+            b.account,
+            b.name,
+            b.percent_scanned,
+            b.matched,
+            b.scanned,
+            b.size,
+            b.keys_denied,
+            b.error_count,
+            b.partitions)
+    click.echo(
+        tabulate.tabulate(
+            map(_repr, buckets),
+            headers=['account', 'name', 'percent_scanned', 'matched',
+                     'scanned', 'size', 'keys_denied', 'error_count', 'partitions'],
+            tablefmt='plain'))
 
 
 def format_csv(buckets, fh):
@@ -212,9 +211,11 @@ def format_csv(buckets, fh):
               help="filter to buckets with errors")
 @click.option('--size', type=int,
               help="filter to buckets with at least size")
+@click.option('--incomplete', type=int,
+              help="filter to buckets not scanned fully")
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
-            format=None, output=None):
+            format=None, incomplete=False, output=None):
     """Report on stats by bucket"""
     d = db.db(dbpath)
 
@@ -232,6 +233,8 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
         if size and b.size < size:
             continue
         if denied and not b.denied:
+            continue
+        if incomplete and b.percent_scanned >= incomplete:
             continue
         buckets.append(b)
 
@@ -265,8 +268,8 @@ def inspect_queue(queue, state, limit, bucket):
             'ttl': j.ttl,
             'enqueued': j.enqueued_at,
             'timeout': j.timeout}
-        if 1:
-        #if queue != "bucket-keyset-scan":
+
+        if queue != "bucket-keyset-scan":
             row['args'] = j.args[2:]
         if state in ('running', 'failed', 'finished'):
             row['started'] = j.started_at
@@ -330,10 +333,12 @@ def queues():
 def failures():
     """Show any unexpected failures"""
     q = Queue('failed', connection=worker.connection)
-    for i in q.get_jobs():
-        click.echo("%s on %s" % (i.func_name, i.origin))
-        click.echo("params %s %s" % (i._args, i._kwargs))
-        click.echo(i.exc_info)
+    for i in q.get_job_ids():
+        j = q.job_class.fetch(i, connection=q.connection)
+        click.echo("%s on %s" % (j.func_name, j.origin))
+        if not j.func_name.endswith('process_keyset'):
+            click.echo("params %s %s" % (j._args, j._kwargs))
+        click.echo(j.exc_info)
 
 
 if __name__ == '__main__':

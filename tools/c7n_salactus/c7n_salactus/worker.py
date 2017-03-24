@@ -320,6 +320,8 @@ def process_bucket_set(account_info, buckets):
             if error:
                 raise error
 
+            connection.hset('bucket-region', bid, location)
+
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
                 versioning and versioning.get('Status', '')
@@ -722,7 +724,7 @@ def process_keyset(account_info, bucket, key_set):
             if missing_count:
                 p.hincrby('keys-missing', bid, missing_count)
             if throttle_count:
-                p.hincrby('keys-throttled', bid, throtttle_count)
+                p.hincrby('keys-throttled', bid, throttle_count)
             p.hincrby('keys-scanned', bid, key_count)
             # track count again as we reset metrics period
             p.hincrby('keys-count', bid, key_count)

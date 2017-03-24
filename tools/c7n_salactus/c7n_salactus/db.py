@@ -174,8 +174,12 @@ def get_data():
         k: int(v) for k, v in conn.hgetall('bucket-partition').items()}
     data['buckets-error'] = conn.hgetall(
         'buckets-unknown-errors')
+
     data['bucket-size'] = {
         k: float(v) for k, v in conn.hgetall('bucket-size').items()}
+    data['bucket-region'] = {
+        k: float(v) for k, v in conn.hgetall('bucket-region').items()}
+
     data['keys-scanned'] = {
         k: float(v) for k, v in conn.hgetall('keys-scanned').items()}
     data['keys-matched'] = {
