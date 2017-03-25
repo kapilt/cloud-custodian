@@ -39,8 +39,9 @@ monitor:
 """
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-import logging
 import itertools
+import json
+import logging
 import math
 import os
 import random
@@ -160,7 +161,7 @@ def bulk_invoke(func, args, nargs):
         func, args=argv, connection=connection,
         description="bucket-%s" % func.func_name,
         origin=q.name, status=JobStatus.QUEUED, timeout=ctx.timeout,
-        result_ttl=500, ttl=ctx.ttl)
+        result_ttl=0, ttl=ctx.ttl)
 
     for n in chunks(nargs, 100):
         job.created_at = datetime.utcnow()
@@ -174,41 +175,40 @@ def bulk_invoke(func, args, nargs):
 
 
 @contextmanager
-def bucket_ops(account_info, bucket_name, api=""):
+def bucket_ops(bid, api=""):
     """Context manager for dealing with s3 errors in one place
+
+    bid: bucket_id in form of account_name:bucket_name
     """
     try:
         yield 42
     except ClientError as e:
         code = e.response['Error']['Code']
         log.info(
-            "bucket error account:%s bucket:%s error:%s",
-            account_info['name'],
-            bucket_name,
+            "bucket error bucket:%s error:%s",
+            bid,
             e.response['Error']['Code'])
         if code == "NoSuchBucket":
             pass
         elif code == 'AccessDenied':
-            connection.sadd(
-                'buckets-denied',
-                bucket_id(account_info, bucket_name))
+            connection.sadd('buckets-denied', bid)
         else:
             connection.hset(
                 'buckets-unknown-errors',
-                bucket_id(account_info, bucket_name),
+                bid,
                 "%s:%s" % (api, e.response['Error']['Code']))
     except:
         # Let the error queue catch it
         raise
 
 
-def page_strip(page, bucket):
+def page_strip(page, versioned):
     """Remove bits in content results to minimize memory utilization.
 
     TODO: evolve this to a key filter on metadata.
     """
     page.pop('ResponseMetadata', None)
-    contents_key = bucket['versioned'] and 'Versions' or 'Contents'
+    contents_key = versioned and 'Versions' or 'Contents'
     contents = page.get(contents_key, ())
     if not contents:
         return page
@@ -251,6 +251,10 @@ def process_account(account_info):
     session = get_session(account_info)
     client = session.client('s3', config=s3config)
     buckets = client.list_buckets()['Buckets']
+
+    connection.hset(
+        'bucket-accounts', account_info['name'], json.dumps(account_info))
+
     for b in buckets:
         connection.hset(
             'bucket-age', bucket_id(account_info, b['Name']),
@@ -281,7 +285,7 @@ def process_bucket_set(account_info, buckets):
 
     for b in buckets:
         bid = bucket_id(account_info, b)
-        with bucket_ops(account_info, b):
+        with bucket_ops(bid):
             info = {'name': b}
             error = None
 
@@ -320,20 +324,21 @@ def process_bucket_set(account_info, buckets):
             if error:
                 raise error
 
-            connection.hset('bucket-region', bid, location)
+            connection.hset('bucket-regions', bid, location)
 
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
                 versioning and versioning.get('Status', '')
                 in ('Enabled', 'Suspended') or False)
+            connection.hset('bucket-versions', bid, int(info['versioned']))
+
             log.info("processing bucket %s", info)
-            connection.hset(
-                'buckets-start',
-                bucket_id(account_info, info['name']), time.time())
+            connection.hset('buckets-start', bid, time.time())
+
             if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
-                invoke(process_bucket_partitions, account_info, info)
+                invoke(process_bucket_partitions, bid)
             else:
-                invoke(process_bucket_iterator, account_info, info)
+                invoke(process_bucket_iterator, bid)
 
 
 class CharSet(object):
@@ -346,8 +351,6 @@ class CharSet(object):
     ascii_letters = set(string.ascii_letters)
     ascii_lower_digits = set(string.ascii_lowercase + string.digits)
     ascii_alphanum = set(string.ascii_letters + string.digits)
-
-
     punctuation = set(string.punctuation)
 
     @classmethod
@@ -421,7 +424,7 @@ class CommonPrefixPartition(Strategy):
         return prefix.count(self.partition) > self.limit
 
 
-def get_partition_strategy(account_info, bucket, strategy=None):
+def get_partition_strategy(strategy):
     if strategy == 'p':
         return CommonPrefixPartition()
     elif strategy == 'n':
@@ -471,26 +474,28 @@ def get_keys_charset(keys, bid):
     return charset
 
 
-def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefix=''):
+def detect_partition_strategy(bid, delimiters=('/', '-'), prefix=''):
     """Try to detect the best partitioning strategy for a large bucket
 
     Consider nested buckets with common prefixes, and flat buckets.
     """
-
-    bid = bucket_id(account_info, bucket['name'])
-    session = get_session(account_info)
-    s3 = session.client('s3', region_name=bucket['region'], config=s3config)
+    account, bucket = bid.split(":", 1)
+    region = connection.hget('bucket-regions', bid)
+    versioned = bool(int(connection.hget('bucket-versions', bid)))
+    size = int(float(connection.hget('bucket-size', bid)))
+    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    s3 = session.client('s3', region_name=region, config=s3config)
 
     (contents_key,
      contents_method,
-     continue_tokens) = BUCKET_OBJ_DESC[bucket['versioned']]
+     continue_tokens) = BUCKET_OBJ_DESC[versioned]
 
-    with bucket_ops(account_info, bucket['name'], 'detect'):
+    with bucket_ops(bid, 'detect'):
         keys = set()
         for delimiter in delimiters:
             method = getattr(s3, contents_method, None)
             results = method(
-                Bucket=bucket['name'], Prefix=prefix, Delimiter=delimiter)
+                Bucket=bucket, Prefix=prefix, Delimiter=delimiter)
             prefixes = [p['Prefix'] for p in results.get('CommonPrefixes', [])]
             contents = results.get(contents_key, [])
             keys.update([k['Key'] for k in contents])
@@ -502,7 +507,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
                          bid, delimiter, len(contents), len(prefixes))
                 limit = prefix and 2 or 4
                 return process_bucket_partitions(
-                    account_info, bucket, partition=delimiter,
+                    bid, partition=delimiter,
                     strategy='p', prefix_set=prefixes, limit=limit)
 
     # Detect character sets
@@ -510,7 +515,7 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
     log.info("Detected charset %s for %s", charset, bid)
 
     # Determine the depth we need to keep total api calls below threshold
-    scan_count = bucket['keycount'] / 1000.0
+    scan_count = size / 1000.0
     for limit in range(1, 4):
         if math.pow(len(charset), limit) * 1000 > scan_count:
             break
@@ -528,56 +533,58 @@ def detect_partition_strategy(account_info, bucket, delimiters=('/', '-'), prefi
     # ngram expansion
     connection.hincrby('bucket-partition', bid, len(prefixes))
     return bulk_invoke(
-        process_bucket_iterator, [account_info, bucket], prefixes)
+        process_bucket_iterator, [bid], prefixes)
 
 
 @job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
-def process_bucket_partitions(
-        account_info, bucket, prefix_set=('',), partition='/',
-        strategy=None, limit=4):
+def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=None, limit=4):
     """Split up a bucket keyspace into smaller sets for parallel iteration.
     """
-
     if strategy is None:
-        return detect_partition_strategy(account_info, bucket)
-    strategy = get_partition_strategy(account_info, bucket, strategy)
+        return detect_partition_strategy(bid)
+
+    account, bucket = bid.split(':', 1)
+    region = connection.hget('bucket-regions', bid)
+    versioned = bool(int(connection.hget('bucket-versions', bid)))
+    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    size = int(float((connection.hget('bucket-size', bid))))
+    s3 = session.client('s3', region_name=region, config=s3config)
+
+    strategy = get_partition_strategy(strategy)
     strategy.limit = limit
     strategy.partition = partition
     (contents_key,
      contents_method,
-     continue_tokens) = BUCKET_OBJ_DESC[bucket['versioned']]
+     continue_tokens) = BUCKET_OBJ_DESC[versioned]
     prefix_queue = strategy.initialize_prefixes(prefix_set)
 
     keyset = []
-    bid = bucket_id(account_info, bucket['name'])
     log.info("Process partition bid:%s strategy:%s delimiter:%s queue:%d limit:%d",
              bid, strategy.__class__.__name__[0], partition, len(prefix_queue), limit)
-    session = get_session(account_info)
-    s3 = session.client('s3', region_name=bucket['region'], config=s3config)
 
     def statm(prefix):
         return "keyset:%d queue:%d prefix:%s bucket:%s size:%d" % (
-            len(keyset), len(prefix_queue), prefix, bid, bucket['keycount'])
+            len(keyset), len(prefix_queue), prefix, bid, size)
 
     while prefix_queue:
         connection.hincrby('bucket-partition', bid, 1)
         prefix = prefix_queue.pop()
         if strategy.is_depth_exceeded(prefix):
             log.info("Partition max depth reached, %s", statm(prefix))
-            invoke(process_bucket_iterator, account_info, bucket, prefix)
+            invoke(process_bucket_iterator, bid, prefix)
             continue
         method = getattr(s3, contents_method, None)
         results = page_strip(method(
-            Bucket=bucket['name'], Prefix=prefix, Delimiter=partition),
-            bucket)
+            Bucket=bucket, Prefix=prefix, Delimiter=partition),
+            versioned)
         keyset.extend(results.get(contents_key, ()))
 
         # As we probe we find keys, process any found
         if len(keyset) > PARTITION_KEYSET_THRESHOLD:
             log.info("Partition, processing keyset %s", statm(prefix))
             invoke(
-                process_keyset, account_info, bucket,
-                page_strip({contents_key: keyset}, bucket))
+                process_keyset, bid,
+                page_strip({contents_key: keyset}, versioned))
             keyset = []
 
         strategy.find_partitions(prefix_queue, results)
@@ -590,10 +597,9 @@ def process_bucket_partitions(
             log.info("Partition has 1k keys, %s %s", statm(prefix), bp)
             if not prefix_queue and bp < 5:
                 log.info("Recursive detection")
-                return detect_partition_strategy(account_info, bucket, prefix=prefix)
+                return detect_partition_strategy(bid, prefix=prefix)
 
-            invoke(process_bucket_iterator,
-                   account_info, bucket, prefix, delimiter=partition,
+            invoke(process_bucket_iterator, bid, prefix, delimiter=partition,
                    **continuation_params)
 
         # If the queue get too deep, then go parallel
@@ -605,38 +611,37 @@ def process_bucket_partitions(
 
                 for s in list(s_prefix_set):
                     if strategy.is_depth_exceeded(prefix):
-                        invoke(process_bucket_iterator,
-                               account_info, bucket, s)
+                        invoke(process_bucket_iterator, bid, s)
                         s_prefix_set.remove(s)
 
                 if not s_prefix_set:
                     continue
                 invoke(process_bucket_partitions,
-                       account_info, bucket,
+                       bid,
                        prefix_set=s_prefix_set, partition=partition,
                        strategy=strategy, limit=limit)
             prefix_queue = prefix_queue[:PARTITION_QUEUE_THRESHOLD-1]
 
     if keyset:
-        invoke(process_keyset, account_info, bucket, {contents_key: keyset})
+        invoke(process_keyset, bid, {contents_key: keyset})
 
 
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
-def process_bucket_iterator(account_info, bucket,
-                            prefix="", delimiter="", **continuation):
+def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
     """Bucket pagination
     """
-    bid = bucket_id(account_info, bucket['name'])
     log.info("Iterating keys bucket %s prefix %s delimiter %s",
              bid, prefix, delimiter)
-    session = get_session(account_info)
-    s3 = session.client('s3', region_name=bucket['region'], config=s3config)
 
-    (contents_key,
-     contents_method,
-     _) = BUCKET_OBJ_DESC[bucket['versioned']]
+    account, bucket = bid.split(':', 1)
+    region = connection.hget('bucket-regions', bid)
+    versioned = bool(int(connection.hget('bucket-versions', bid)))
+    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    s3 = session.client('s3', region_name=region, config=s3config)
 
-    params = dict(Bucket=bucket['name'])
+    (contents_key, contents_method, _) = BUCKET_OBJ_DESC[versioned]
+
+    params = dict(Bucket=bucket)
     if prefix:
         params['Prefix'] = prefix
     if delimiter:
@@ -644,14 +649,14 @@ def process_bucket_iterator(account_info, bucket,
     if continuation:
         params.update({k[4:]: v for k, v in continuation.items()})
     paginator = s3.get_paginator(contents_method).paginate(**params)
-    with bucket_ops(account_info, bucket['name'], 'page'):
+    with bucket_ops(bid, 'page'):
         ptime = time.time()
         pcounter = 0
         for page in paginator:
-            page = page_strip(page, bucket)
+            page = page_strip(page, versioned)
             pcounter += 1
             if page.get(contents_key):
-                invoke(process_keyset, account_info, bucket, page)
+                invoke(process_keyset, bid, page)
 
             if pcounter % 10 == 0:
                 with connection.pipeline() as p:
@@ -669,30 +674,32 @@ def process_bucket_iterator(account_info, bucket,
                 p.execute()
 
 
-@job('bucket-keyset-scan', timeout=3600*12, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
-def process_keyset(account_info, bucket, key_set):
-    session = get_session(account_info)
-    s3 = session.client('s3', region_name=bucket['region'], config=s3config)
-    bid = bucket_id(account_info, bucket['name'])
+@job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
+def process_keyset(bid, key_set):
+    account, bucket = bid.split(':', 1)
+
+    region = connection.hget('bucket-regions', bid)
+    versioned = bool(int(connection.hget('bucket-versions', bid)))
+    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+
+    s3 = session.client('s3', region_name=region, config=s3config)
     processor = EncryptExtantKeys(keyconfig)
     missing_count = throttle_count = denied_count = remediation_count = 0
 
-
-    contents_key, _, _ = BUCKET_OBJ_DESC[bucket['versioned']]
+    contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
     key_count = len(key_set.get(contents_key, []))
-    processor = (bucket['versioned'] and processor.process_version
+    processor = (versioned and processor.process_version
                  or processor.process_key)
 
-    log.info("processing page size: %d on %s",
-             len(key_set.get(contents_key, ())),
-             bucket_id(account_info, bucket['name']))
+    #log.info("processing page size: %d on %s",
+    #         len(key_set.get(contents_key, ())), bid)
 
     start_time = time.time()
 
-    with bucket_ops(account_info, bucket, 'key'):
+    with bucket_ops(bid, 'key'):
         for k in key_set.get(contents_key, []):
             try:
-                result = processor(s3, bucket_name=bucket['name'], key=k)
+                result = processor(s3, bucket_name=bucket, key=k)
             except ConnectionError:
                 continue
             except ClientError as e:
@@ -702,12 +709,12 @@ def process_keyset(account_info, bucket, key_set):
                     denied_count += 1
                 elif code == '404':  # Not Found
                     missing_count += 1
-                elif code in ('503', '500'): # Slow down, or throttle
+                elif code in ('503', '500'):  # Slow down, or throttle
                     time.sleep(3)
                     #to continue, or re-key that is the question.
                     #key_set[contents_key].append(k)
                     throttle_count += 1
-                elif code in ('400',):  # Slow Down, or token err
+                elif code in ('400',):  # token err, typically
                     time.sleep(3)
                     key_set[contents_key].append(k)
                 else:

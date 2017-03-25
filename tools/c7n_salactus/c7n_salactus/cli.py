@@ -271,6 +271,7 @@ def inspect_queue(queue, state, limit, bucket):
             'size': j.args[1]['keycount'],
             'ttl': j.ttl,
             'enqueued': j.enqueued_at,
+            'rtt': j.result_ttl,
             'timeout': j.timeout}
 
         if queue != "bucket-keyset-scan":
@@ -346,4 +347,9 @@ def failures():
 
 
 if __name__ == '__main__':
-    cli()
+    try:
+        cli()
+    except:
+        import traceback, sys, pdb
+        traceback.print_exc()
+        pdb.post_mortem(sys.exc_info()[-1])

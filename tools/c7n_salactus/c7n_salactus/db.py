@@ -102,6 +102,10 @@ class Bucket(object):
         return self.bucket_id.split(":")[1]
 
     @property
+    def region(self):
+        return self.data['region']
+
+    @property
     def size(self):
         return int(self.data['bucket-size'].get(self.bucket_id, 0.0))
 
@@ -177,8 +181,9 @@ def get_data():
 
     data['bucket-size'] = {
         k: float(v) for k, v in conn.hgetall('bucket-size').items()}
-    data['bucket-region'] = {
-        k: float(v) for k, v in conn.hgetall('bucket-region').items()}
+    data['bucket-region'] = conn.hgetall('bucket-regions')
+    data['bucket-versions'] = {
+        k: bool(int(v)) for k, v in conn.hgetall('bucket-versions')}
 
     data['keys-scanned'] = {
         k: float(v) for k, v in conn.hgetall('keys-scanned').items()}
