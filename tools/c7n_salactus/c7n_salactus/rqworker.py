@@ -14,6 +14,9 @@ from rq import job
 PackDate_ExtType = 42
 PackObj_ExtType = 43
 
+job_default_load = job.loads
+
+
 def decode_ext(code, data):
     if code == PackDate_ExtType:
         values = msgpack.unpackb(data)
@@ -40,7 +43,12 @@ def dumps(o):
 
 
 def loads(s):
-    return msgpack.unpackb(decompress(s), ext_hook=decode_ext, encoding='utf-8')
+    try:
+        return msgpack.unpackb(decompress(s), ext_hook=decode_ext, encoding='utf-8')
+    except:
+        # we queue work occassionally from lambdas or other systems not using
+        # the worker class
+        return job_default_load(s)
 
 
 job.dumps = dumps
