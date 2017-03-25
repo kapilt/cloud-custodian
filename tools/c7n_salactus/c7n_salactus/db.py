@@ -27,9 +27,9 @@ class Database(object):
     def buckets(self, accounts=()):
         if accounts:
             return [
-                Bucket(k, self.data) for k in self.data['bucket-size'].keys()
+                Bucket(k, self.data) for k in self.data['bucket-age'].keys()
                 if k.split(":")[0] in accounts]
-        return [Bucket(k, self.data) for k in self.data['keys-scanned'].keys()]
+        return [Bucket(k, self.data) for k in self.data['bucket-age'].keys()]
 
     def save(self, path):
         with open(os.path.expanduser(path), 'w') as fh:
@@ -168,22 +168,22 @@ class Bucket(object):
 
 def get_data():
     data = {}
-    data['bucket-age'] = conn.hgetall('bucket-age')
+    data['bucket-age'] = conn.hgetall('bucket-ages')
     data['buckets-denied'] = list(
         conn.smembers('buckets-denied'))
     data['buckets-complete'] = list(
         conn.smembers('buckets-complete'))
-    data['buckets-start'] = conn.hgetall('buckets-start')
+    data['buckets-start'] = conn.hgetall('buckets-starts')
     data['bucket-partitions'] = {
         k: int(v) for k, v in conn.hgetall('bucket-partition').items()}
     data['buckets-error'] = conn.hgetall(
         'buckets-unknown-errors')
 
     data['bucket-size'] = {
-        k: float(v) for k, v in conn.hgetall('bucket-size').items()}
+        k: float(v) for k, v in conn.hgetall('bucket-sizes').items()}
     data['bucket-region'] = conn.hgetall('bucket-regions')
     data['bucket-versions'] = {
-        k: bool(int(v)) for k, v in conn.hgetall('bucket-versions')}
+        k: bool(int(v)) for k, v in conn.hgetall('bucket-versions').items()}
 
     data['keys-scanned'] = {
         k: float(v) for k, v in conn.hgetall('keys-scanned').items()}

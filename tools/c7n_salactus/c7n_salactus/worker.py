@@ -257,7 +257,7 @@ def process_account(account_info):
 
     for b in buckets:
         connection.hset(
-            'bucket-age', bucket_id(account_info, b['Name']),
+            'bucket-ages', bucket_id(account_info, b['Name']),
             b['CreationDate'].isoformat())
 
     account_buckets = account_info.pop('buckets', None)
@@ -319,12 +319,12 @@ def process_bucket_set(account_info, buckets):
             except:
                 raise
             else:
-                connection.hset('bucket-size', bid, info['keycount'])
+                connection.hset('bucket-sizes', bid, info['keycount'])
 
             if error:
                 raise error
 
-            connection.hset('bucket-regions', bid, location)
+            connection.hset('bucket-regions', bid, region)
 
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
@@ -333,7 +333,7 @@ def process_bucket_set(account_info, buckets):
             connection.hset('bucket-versions', bid, int(info['versioned']))
 
             log.info("processing bucket %s", info)
-            connection.hset('buckets-start', bid, time.time())
+            connection.hset('bucket-starts', bid, time.time())
 
             if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
                 invoke(process_bucket_partitions, bid)
@@ -482,7 +482,7 @@ def detect_partition_strategy(bid, delimiters=('/', '-'), prefix=''):
     account, bucket = bid.split(":", 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
-    size = int(float(connection.hget('bucket-size', bid)))
+    size = int(float(connection.hget('bucket-sizes', bid)))
     session = get_session(json.loads(connection.hget('bucket-accounts', account)))
     s3 = session.client('s3', region_name=region, config=s3config)
 
@@ -547,7 +547,7 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = get_session(json.loads(connection.hget('bucket-accounts', account)))
-    size = int(float((connection.hget('bucket-size', bid))))
+    size = int(float(connection.hget('bucket-sizes', bid)))
     s3 = session.client('s3', region_name=region, config=s3config)
 
     strategy = get_partition_strategy(strategy)

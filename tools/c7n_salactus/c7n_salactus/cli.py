@@ -91,6 +91,7 @@ def run(config, tag, bucket, account, debug=False):
                 continue
             if bucket:
                 account_info['buckets'] = bucket
+
             worker.invoke(worker.process_account, account_info)
 
 
@@ -222,10 +223,10 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             format=None, incomplete=False, output=None):
     """Report on stats by bucket"""
     d = db.db(dbpath)
-
     buckets = []
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
+
         if bucket and b.name not in bucket:
             continue
         if matched and not b.matched:
