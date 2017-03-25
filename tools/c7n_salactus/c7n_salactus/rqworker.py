@@ -14,7 +14,7 @@ from rq import job
 PackDate_ExtType = 42
 PackObj_ExtType = 43
 
-#job_default_load = job.loads
+job_default_load = job.loads
 
 
 def decode_ext(code, data):
