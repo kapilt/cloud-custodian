@@ -265,11 +265,12 @@ def inspect_queue(queue, state, limit, bucket):
     conn = worker.connection
 
     def job_row(j):
+        account, bucket = j.args[0].split(':', 1)
         row = {
-            'account': j.args[0]['name'],
-            'bucket': j.args[1]['name'],
-            'region': j.args[1]['region'],
-            'size': j.args[1]['keycount'],
+            'account': account,
+            'bucket': bucket,
+            #'region': j.args[1]['region'],
+            #'size': j.args[1]['keycount'],
             'ttl': j.ttl,
             'enqueued': j.enqueued_at,
             'rtt': j.result_ttl,

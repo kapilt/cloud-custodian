@@ -58,7 +58,9 @@ from rq.job import JobStatus, Job
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError, ConnectionError
+from botocore.exceptions import ClientError, ConnectionError, EndpointConnectionError
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from c7n.credentials import assumed_session
 from c7n.resources.s3 import EncryptExtantKeys
@@ -205,7 +207,7 @@ def bucket_ops(bid, api=""):
 def page_strip(page, versioned):
     """Remove bits in content results to minimize memory utilization.
 
-    TODO: evolve this to a key filter on metadata.
+    TODO: evolve this to a key filter on metadata, like date
     """
     page.pop('ResponseMetadata', None)
     contents_key = versioned and 'Versions' or 'Contents'
@@ -674,17 +676,18 @@ def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
                 p.execute()
 
 
+
+
 @job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
 def process_keyset(bid, key_set):
     account, bucket = bid.split(':', 1)
-
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = get_session(json.loads(connection.hget('bucket-accounts', account)))
 
-    s3 = session.client('s3', region_name=region, config=s3config)
+    #s3 = session.client('s3', region_name=region, config=s3config)
     processor = EncryptExtantKeys(keyconfig)
-    missing_count = throttle_count = denied_count = remediation_count = 0
+    error_count = sesserr = connerr = enderr = missing_count = throttle_count = denied_count = remediation_count = 0
 
     contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
     key_count = len(key_set.get(contents_key, []))
@@ -697,32 +700,31 @@ def process_keyset(bid, key_set):
     start_time = time.time()
 
     with bucket_ops(bid, 'key'):
-        for k in key_set.get(contents_key, []):
-            try:
-                result = processor(s3, bucket_name=bucket, key=k)
-            except ConnectionError:
-                continue
-            except ClientError as e:
-                #  https://goo.gl/HZLv9b
-                code = e.response['Error']['Code']
-                if code == '403':  # Permission Denied
+
+        creds = session.get_credentials().get_frozen_credentials()
+        with ThreadPoolExecutor(max_workers=5) as w:
+            futures = {}
+            for k in key_set.get(contents_key, []):
+                futures[w.submit(process_key, creds, region, bucket, k, processor)] = k
+
+            for f in as_completed(futures):
+                if f.exception():
+                    error_count += 1
+                    print f.exception()
+                    continue
+                stats = f.result()
+                if 'remediated' in stats:
+                    remediation_count += 1
+                    continue
+                if 'denied' in stats:
                     denied_count += 1
-                elif code == '404':  # Not Found
+                if 'missing' in stats:
                     missing_count += 1
-                elif code in ('503', '500'):  # Slow down, or throttle
-                    time.sleep(3)
-                    #to continue, or re-key that is the question.
-                    #key_set[contents_key].append(k)
+                if 'throttle' in stats:
                     throttle_count += 1
-                elif code in ('400',):  # token err, typically
-                    time.sleep(3)
-                    key_set[contents_key].append(k)
-                else:
-                    raise
-                continue
-            if result is False:
-                continue
-            remediation_count += 1
+                if 'session' in stats:
+                    sesserr += 1
+
         with connection.pipeline() as p:
             if remediation_count:
                 p.hincrby('keys-matched', bid, remediation_count)
@@ -732,8 +734,52 @@ def process_keyset(bid, key_set):
                 p.hincrby('keys-missing', bid, missing_count)
             if throttle_count:
                 p.hincrby('keys-throttled', bid, throttle_count)
+            if sesserr:
+                p.hincrby('keys-sesserr', bid, sesserr)
+            if connerr:
+                p.hincrby('keys-connerr', bid, connerr)
+            if enderr:
+                p.hincrby('keys-enderr', bid, enderr)
+            if error_count:
+                p.hincrby('keys-error', bid, error_count)
+
             p.hincrby('keys-scanned', bid, key_count)
             # track count again as we reset metrics period
             p.hincrby('keys-count', bid, key_count)
             p.hincrby('keys-time', bid, int(time.time()-start_time))
             p.execute()
+
+
+def process_key(creds, region, bucket, k, processor):
+    s = boto3.Session(aws_access_key_id=creds.access_key,
+                      aws_secret_access_key=creds.secret_key,
+                      aws_session_token=creds.token)
+    s3 = s.client('s3', region_name=region, config=s3config)
+    stats = {}
+
+    try:
+        result = processor(s3, bucket_name=bucket, key=k)
+    except EndpointConnectionError:
+        stats['endpoint'] = 1
+    except ConnectionError:
+        stats['connection'] = 1
+    except ClientError as e:
+        #  https://goo.gl/HZLv9b
+        code = e.response['Error']['Code']
+        if code == '403':  # Permission Denied
+            stats['denied'] = 1
+        elif code == '404':  # Not Found
+            stats['missing'] = 1
+        elif code in ('503', '500'):  # Slow down, or throttle
+            time.sleep(3)
+            stats['throttle'] = 1
+        elif code in ('400',):  # token err, typically
+            time.sleep(3)
+            stats['session'] = 1
+        else:
+            raise
+    else:
+        if result:
+            stats['remediated'] = 1
+    return stats
+
