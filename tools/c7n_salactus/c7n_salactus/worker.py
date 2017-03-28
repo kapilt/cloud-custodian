@@ -40,6 +40,7 @@ monitor:
 import collections
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import gc
 import itertools
 import json
 import logging
@@ -47,6 +48,7 @@ import math
 import os
 import random
 import string
+import sys
 import threading
 import time
 from uuid import uuid4
@@ -722,6 +724,11 @@ def process_keyset(bid, key_set):
                 sesserr += stats['session']
                 connerr += stats['connection']
 
+        # https://bitbucket.org/pypy/pypy/issues/1124/memory-usage-parsing-json
+        # note the json here is the sdk files, s3 is xml.
+        if getattr(sys, 'pypy_version_info', None):
+            gc.collect()
+
         with connection.pipeline() as p:
             if remediation_count:
                 p.hincrby('keys-matched', bid, remediation_count)
@@ -752,7 +759,7 @@ def process_key_chunk(creds, region, bucket, kchunk, processor):
                       aws_secret_access_key=creds.secret_key,
                       aws_session_token=creds.token)
     s3 = s.client('s3', region_name=region, config=s3config)
-    stats = collections.defaultdict(lambda x: 0)
+    stats = collections.defaultdict(lambda : 0)
 
     for k in kchunk:
         try:
