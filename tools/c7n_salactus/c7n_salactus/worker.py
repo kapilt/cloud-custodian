@@ -69,16 +69,17 @@ from c7n.credentials import assumed_session
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks
 
-#from botocore.vendored import requests
-#
-# Pick a preferred cipher suite, needs some benchmarking.
-# https://goo.gl/groHHe
-#requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
-#try:
-#    requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
-#except AttributeError:
-#    # no pyopenssl support used / needed / available
-#    pass
+
+def patch_ssl():
+    from botocore.vendored import requests
+    # Pick a preferred cipher suite, needs some benchmarking.
+    # https://goo.gl/groHHe
+    requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
+    try:
+        requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
+    except AttributeError:
+        # no pyopenssl support used / needed / available
+        pass
 
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
@@ -628,7 +629,7 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
             prefix_queue = prefix_queue[:PARTITION_QUEUE_THRESHOLD-1]
 
     if keyset:
-        invoke(process_keyset, bid, {contents_key: keyset})
+        invoke(process_keyset, bid, page_strip({contents_key: keyset}, versioned))
 
 
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
@@ -688,8 +689,10 @@ def process_keyset(bid, key_set):
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = get_session(json.loads(connection.hget('bucket-accounts', account)))
 
-    #s3 = session.client('s3', region_name=region, config=s3config)
+    patch_ssl()
+    s3 = session.client('s3', region_name=region, config=s3config)
     processor = EncryptExtantKeys(keyconfig)
+
     error_count = sesserr = connerr = enderr = missing_count = 0
     throttle_count = denied_count = remediation_count = 0
 
@@ -704,13 +707,11 @@ def process_keyset(bid, key_set):
     start_time = time.time()
 
     with bucket_ops(bid, 'key'):
-        creds = session.get_credentials().get_frozen_credentials()
-        with ThreadPoolExecutor(max_workers=5) as w:
+        with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
             for kchunk in chunks(key_set.get(contents_key, []), 100):
                 futures[w.submit(
-                    process_key_chunk,
-                    creds, region, bucket, kchunk, processor)] = kchunk
+                    process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
 
             for f in as_completed(futures):
                 if f.exception():
@@ -723,11 +724,6 @@ def process_keyset(bid, key_set):
                 throttle_count += stats['missing']
                 sesserr += stats['session']
                 connerr += stats['connection']
-
-        # https://bitbucket.org/pypy/pypy/issues/1124/memory-usage-parsing-json
-        # note the json here is the sdk files, s3 is xml.
-        if getattr(sys, 'pypy_version_info', None):
-            gc.collect()
 
         with connection.pipeline() as p:
             if remediation_count:
@@ -753,14 +749,13 @@ def process_keyset(bid, key_set):
             p.hincrby('keys-time', bid, int(time.time()-start_time))
             p.execute()
 
+    # trigger some mem collection
+    if getattr(sys, 'pypy_version_info', None):
+        gc.collect()
 
-def process_key_chunk(creds, region, bucket, kchunk, processor):
-    s = boto3.Session(aws_access_key_id=creds.access_key,
-                      aws_secret_access_key=creds.secret_key,
-                      aws_session_token=creds.token)
-    s3 = s.client('s3', region_name=region, config=s3config)
+
+def process_key_chunk(s3, bucket, kchunk, processor):
     stats = collections.defaultdict(lambda : 0)
-
     for k in kchunk:
         try:
             result = processor(s3, bucket_name=bucket, key=k)

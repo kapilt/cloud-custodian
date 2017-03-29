@@ -154,16 +154,20 @@ class Bucket(object):
         return len(self.data['buckets-error'].get(self.bucket_id, ()))
 
     @property
+    def gkrate(self):
+        return int(self.data['gkrate'].get(self.bucket_id, 0))
+
+    @property
     def lrate(self):
         return int(
             float(self.data['bucket-pages'].get(self.bucket_id, 0)) /
-            float(self.data['bucket-pages-time'].get(self.bucket_id, 1)))
+            (float(self.data['bucket-pages-time'].get(self.bucket_id, 1)) or 1))
 
     @property
     def krate(self):
         return int(
             float(self.data['keys-count'].get(self.bucket_id, 0)) /
-            float(self.data['keys-time'].get(self.bucket_id, 1)))
+            (float(self.data['keys-time'].get(self.bucket_id, 1)) or 1))
 
 
 def get_data():

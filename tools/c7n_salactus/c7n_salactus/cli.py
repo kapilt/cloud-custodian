@@ -21,6 +21,7 @@ import functools
 import json
 import logging
 import operator
+import time
 
 import click
 
@@ -30,6 +31,7 @@ from rq.queue import Queue, FailedQueue
 from rq.worker import Worker
 import tabulate
 
+from c7n import utils
 from c7n_salactus import worker, db
 
 # side-effect serialization patches...
@@ -153,23 +155,19 @@ def accounts(dbpath, account):
         click.echo(_repr(a))
 
 
-def format_plain(buckets, fh):
+def format_plain(buckets, fh, keys=None):
+
+    if keys is None:
+        keys = ['account', 'name', 'percent_scanned', 'matched',
+                'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
+
     def _repr(b):
-        return (
-            b.account,
-            b.name,
-            b.percent_scanned,
-            b.matched,
-            b.scanned,
-            b.size,
-            b.keys_denied,
-            b.error_count,
-            b.partitions)
+        return [getattr(b, k) for k in keys]
+
     click.echo(
         tabulate.tabulate(
             map(_repr, buckets),
-            headers=['account', 'name', 'percent_scanned', 'matched',
-                     'scanned', 'size', 'keys_denied', 'error_count', 'partitions'],
+            headers=keys,
             tablefmt='plain'))
 
 
@@ -247,11 +245,63 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
     formatter(buckets, output)
 
 
+@cli.command(name="watch")
+@click.option('--limit', default=50)
+def watch(limit):
+    """watch scan rates across the cluster"""
+    period = 5.0
+    prev = db.db()
+    prev_totals = None
+
+    while True:
+        click.clear()
+        time.sleep(period)
+        cur = db.db()
+        cur.data['gkrate'] = {}
+        progress = []
+        prev_buckets = {b.bucket_id: b for b in prev.buckets()}
+        totals = {'scanned': 0, 'krate': 0, 'lrate': 0, 'bucket_id': 'totals'}
+
+        for b in cur.buckets():
+            if not b.scanned:
+                continue
+
+            totals['scanned'] += b.scanned
+            totals['krate'] += b.krate
+            totals['lrate'] += b.lrate
+
+            if b.bucket_id not in prev_buckets:
+                b.data['gkrate'][b.bucket_id] = b.scanned / period
+            elif b.scanned == prev_buckets[b.bucket_id].scanned:
+                continue
+            else:
+                b.data['gkrate'][b.bucket_id] =  (
+                    b.scanned - prev_buckets[b.bucket_id].scanned) / period
+            progress.append(b)
+
+        if prev_totals is None:
+            totals['gkrate'] = '...'
+        else:
+            totals['gkrate'] = (totals['scanned'] - prev_totals['scanned']) / period
+        prev = cur
+        prev_totals = totals
+
+        sorted(progress, key=lambda x: x.gkrate)
+
+        if limit:
+            progress = progress[:limit]
+
+        progress.insert(0, utils.Bag(totals))
+        format_plain(progress, None,
+                     keys=['bucket_id', 'scanned', 'gkrate', 'lrate', 'krate'])
+
+
 @cli.command(name='reset-stats')
 def reset_stats():
     """reset stats"""
     d = db.db()
     d.reset_stats()
+
 
 @cli.command(name='inspect-queue')
 @click.option('--queue', required=True)
