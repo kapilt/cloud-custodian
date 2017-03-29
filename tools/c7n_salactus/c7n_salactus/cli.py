@@ -216,9 +216,11 @@ def format_csv(buckets, fh):
               help="filter to buckets with at least size")
 @click.option('--incomplete', type=int,
               help="filter to buckets not scanned fully")
+@click.option('--region',
+              help="filter to buckets in region")
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
-            format=None, incomplete=False, output=None):
+            format=None, incomplete=False, region=None, output=None):
     """Report on stats by bucket"""
     d = db.db(dbpath)
     buckets = []
@@ -238,6 +240,8 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
         if denied and not b.denied:
             continue
         if incomplete and b.percent_scanned >= incomplete:
+            continue
+        if region and b.region != region:
             continue
         buckets.append(b)
 
@@ -286,7 +290,7 @@ def watch(limit):
         prev = cur
         prev_totals = totals
 
-        sorted(progress, key=lambda x: x.gkrate)
+        progress = sorted(progress, key=lambda x: x.gkrate, reverse=True)
 
         if limit:
             progress = progress[:limit]
@@ -301,6 +305,39 @@ def reset_stats():
     """reset stats"""
     d = db.db()
     d.reset_stats()
+
+
+@cli.command(name='inspect-bucket')
+@click.option('-b', '--bucket', required=True)
+def inspect_bucket(bucket):
+
+    state = db.db()
+    found = None
+    for b in state.buckets():
+        if b.name == bucket:
+            found = b
+    if not found:
+        click.echo("no bucket named: %s" % bucket)
+
+    click.echo("Bucket: %s" % found.name)
+    click.echo("Account: %s" % found.account)
+    click.echo("Region: %s" % found.region)
+    click.echo("Created: %s" % found.created)
+    click.echo("Size: %s" % found.size)
+    click.echo("Partitions: %s" % found.partitions)
+    click.echo("Scanned: %0.2f%%" % found.percent_scanned)
+    click.echo("")
+    click.echo("Errors")
+
+    click.echo("Denied: %s" % found.keys_denied)
+    click.echo("BErrors: %s" % found.error_count)
+    click.echo("KErrors: %s" % found.data['keys-error'].get(found.bucket_id, 0))
+    click.echo("Throttle: %s" % found.data['keys-throttled'].get(found.bucket_id, 0))
+    click.echo("Missing: %s" % found.data['keys-missing'].get(found.bucket_id, 0))
+    click.echo("Session: %s" % found.data['keys-sesserr'].get(found.bucket_id, 0))
+    click.echo("Connection: %s" % found.data['keys-connerr'].get(found.bucket_id, 0))
+    click.echo("Endpoint: %s" % found.data['keys-enderr'].get(found.bucket_id, 0))
+
 
 
 @cli.command(name='inspect-queue')

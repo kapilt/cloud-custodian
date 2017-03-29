@@ -103,7 +103,7 @@ class Bucket(object):
 
     @property
     def region(self):
-        return self.data['region']
+        return self.data['bucket-region'].get(self.bucket_id, 'unknown')
 
     @property
     def size(self):
@@ -151,7 +151,15 @@ class Bucket(object):
 
     @property
     def error_count(self):
-        return len(self.data['buckets-error'].get(self.bucket_id, ()))
+        return sum((
+            len(self.data['buckets-error'].get(self.bucket_id, ())),
+            int(self.data['keys-throttled'].get(self.bucket_id, 0)),
+            int(self.data['keys-connerr'].get(self.bucket_id, 0)),
+            int(self.data['keys-enderr'].get(self.bucket_id, 0)),
+            int(self.data['keys-sesserr'].get(self.bucket_id, 0)),
+            int(self.data['keys-error'].get(self.bucket_id, 0)),
+            int(self.data['keys-missing'].get(self.bucket_id, 0))
+            ))
 
     @property
     def gkrate(self):
@@ -168,6 +176,7 @@ class Bucket(object):
         return int(
             float(self.data['keys-count'].get(self.bucket_id, 0)) /
             (float(self.data['keys-time'].get(self.bucket_id, 1)) or 1))
+
 
 
 def get_data():
@@ -189,16 +198,12 @@ def get_data():
     data['bucket-versions'] = {
         k: bool(int(v)) for k, v in conn.hgetall('bucket-versions').items()}
 
-    data['keys-scanned'] = {
-        k: float(v) for k, v in conn.hgetall('keys-scanned').items()}
-    data['keys-matched'] = {
-        k: float(v) for k, v in conn.hgetall('keys-matched').items()}
-    data['keys-denied'] = {
-        k: float(v) for k, v in conn.hgetall('keys-denied').items()}
-    data['keys-throttled'] = {
-        k: float(v) for k, v in conn.hgetall('keys-throttled').items()}
-    data['keys-missing'] = {
-        k: float(v) for k, v in conn.hgetall('keys-missing').items()}
+    # key stats
+    for k in ('keys-scanned', 'keys-matched',
+              'keys-denied', 'keys-missing', 'keys-throttled',
+              'keys-sesserr', 'keys-connerr', 'keys-enderr', 'keys-error'):
+        data[k] = {
+            k: float(v) for k, v in conn.hgetall(k).items()}
 
     # metric/rate stats per period
     data['keys-count'] = {
