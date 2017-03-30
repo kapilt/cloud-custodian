@@ -37,8 +37,10 @@ monitor:
  - buckets-denied:set
 
 """
+import collections
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import gc
 import itertools
 import json
 import logging
@@ -46,6 +48,7 @@ import math
 import os
 import random
 import string
+import sys
 import threading
 import time
 from uuid import uuid4
@@ -66,16 +69,17 @@ from c7n.credentials import assumed_session
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks
 
-#from botocore.vendored import requests
-#
-# Pick a preferred cipher suite, needs some benchmarking.
-# https://goo.gl/groHHe
-#requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
-#try:
-#    requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
-#except AttributeError:
-#    # no pyopenssl support used / needed / available
-#    pass
+
+def patch_ssl():
+    from botocore.vendored import requests
+    # Pick a preferred cipher suite, needs some benchmarking.
+    # https://goo.gl/groHHe
+    requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
+    try:
+        requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
+    except AttributeError:
+        # no pyopenssl support used / needed / available
+        pass
 
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
@@ -625,7 +629,7 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
             prefix_queue = prefix_queue[:PARTITION_QUEUE_THRESHOLD-1]
 
     if keyset:
-        invoke(process_keyset, bid, {contents_key: keyset})
+        invoke(process_keyset, bid, page_strip({contents_key: keyset}, versioned))
 
 
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
@@ -685,9 +689,12 @@ def process_keyset(bid, key_set):
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = get_session(json.loads(connection.hget('bucket-accounts', account)))
 
-    #s3 = session.client('s3', region_name=region, config=s3config)
+    patch_ssl()
+    s3 = session.client('s3', region_name=region, config=s3config)
     processor = EncryptExtantKeys(keyconfig)
-    error_count = sesserr = connerr = enderr = missing_count = throttle_count = denied_count = remediation_count = 0
+
+    error_count = sesserr = connerr = enderr = missing_count = 0
+    throttle_count = denied_count = remediation_count = 0
 
     contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
     key_count = len(key_set.get(contents_key, []))
@@ -700,30 +707,23 @@ def process_keyset(bid, key_set):
     start_time = time.time()
 
     with bucket_ops(bid, 'key'):
-
-        creds = session.get_credentials().get_frozen_credentials()
-        with ThreadPoolExecutor(max_workers=5) as w:
+        with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
-            for k in key_set.get(contents_key, []):
-                futures[w.submit(process_key, creds, region, bucket, k, processor)] = k
+            for kchunk in chunks(key_set.get(contents_key, []), 100):
+                futures[w.submit(
+                    process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
 
             for f in as_completed(futures):
                 if f.exception():
                     error_count += 1
-                    print f.exception()
                     continue
                 stats = f.result()
-                if 'remediated' in stats:
-                    remediation_count += 1
-                    continue
-                if 'denied' in stats:
-                    denied_count += 1
-                if 'missing' in stats:
-                    missing_count += 1
-                if 'throttle' in stats:
-                    throttle_count += 1
-                if 'session' in stats:
-                    sesserr += 1
+                remediation_count += stats['remediated']
+                denied_count += stats['denied']
+                missing_count += stats['missing']
+                throttle_count += stats['missing']
+                sesserr += stats['session']
+                connerr += stats['connection']
 
         with connection.pipeline() as p:
             if remediation_count:
@@ -749,37 +749,36 @@ def process_keyset(bid, key_set):
             p.hincrby('keys-time', bid, int(time.time()-start_time))
             p.execute()
 
+    # trigger some mem collection
+    if getattr(sys, 'pypy_version_info', None):
+        gc.collect()
 
-def process_key(creds, region, bucket, k, processor):
-    s = boto3.Session(aws_access_key_id=creds.access_key,
-                      aws_secret_access_key=creds.secret_key,
-                      aws_session_token=creds.token)
-    s3 = s.client('s3', region_name=region, config=s3config)
-    stats = {}
 
-    try:
-        result = processor(s3, bucket_name=bucket, key=k)
-    except EndpointConnectionError:
-        stats['endpoint'] = 1
-    except ConnectionError:
-        stats['connection'] = 1
-    except ClientError as e:
-        #  https://goo.gl/HZLv9b
-        code = e.response['Error']['Code']
-        if code == '403':  # Permission Denied
-            stats['denied'] = 1
-        elif code == '404':  # Not Found
-            stats['missing'] = 1
-        elif code in ('503', '500'):  # Slow down, or throttle
-            time.sleep(3)
-            stats['throttle'] = 1
-        elif code in ('400',):  # token err, typically
-            time.sleep(3)
-            stats['session'] = 1
+def process_key_chunk(s3, bucket, kchunk, processor):
+    stats = collections.defaultdict(lambda : 0)
+    for k in kchunk:
+        try:
+            result = processor(s3, bucket_name=bucket, key=k)
+        except EndpointConnectionError:
+            stats['endpoint'] += 1
+        except ConnectionError:
+            stats['connection'] += 1
+        except ClientError as e:
+            #  https://goo.gl/HZLv9b
+            code = e.response['Error']['Code']
+            if code == '403':  # Permission Denied
+                stats['denied'] += 1
+            elif code == '404':  # Not Found
+                stats['missing'] += 1
+            elif code in ('503', '500'):  # Slow down, or throttle
+                time.sleep(3)
+                stats['throttle'] += 1
+            elif code in ('400',):  # token err, typically
+                time.sleep(3)
+                stats['session'] += 1
+            else:
+                raise
         else:
-            raise
-    else:
-        if result:
-            stats['remediated'] = 1
+            if result:
+                stats['remediated'] += 1
     return stats
-
