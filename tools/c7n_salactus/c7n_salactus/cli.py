@@ -132,14 +132,29 @@ def workers():
     pprint.pprint(dict(counter))
 
 
-@cli.command()
-@click.option('--dbpath', '-f', help='json stats db')
-@click.option('--account', '-a',
-              help="stats on a particular account", multiple=True)
-def accounts(dbpath, account):
-    """Report on stats by account"""
-    d = db.db(dbpath)
+def format_accounts_csv(accounts, fh):
+    field_names = ['name', 'matched', 'percent_scanned', 'scanned',
+                   'size', 'bucket_count']
 
+    totals = Counter()
+    skip = set(('name', 'percent_scanned'))
+    for a in accounts:
+        for n in field_names:
+            if n in skip:
+                continue
+            totals[n] += getattr(a, n)
+    totals['name'] = 'Total'
+
+    writer = csv.DictWriter(fh, fieldnames=field_names, extrasaction='ignore')
+    writer.writerow(dict(zip(field_names, field_names)))
+    writer.writerow(totals)
+
+    for a in accounts:
+        ad = {n: getattr(a, n) for n in field_names}
+        writer.writerow(ad)
+
+
+def format_accounts_plain(accounts, fh):
     def _repr(a):
         return "name:%s, matched:%d percent:%0.2f scanned:%d size:%d buckets:%d" % (
             a.name,
@@ -149,8 +164,55 @@ def accounts(dbpath, account):
             a.size,
             len(a.buckets))
 
-    for a in sorted(d.accounts(), key=operator.attrgetter('name')):
+    for a in accounts:
         click.echo(_repr(a))
+
+
+@cli.command()
+@click.option('--dbpath', '-f', help='json stats db')
+@click.option('--output', '-o', type=click.File('wb'), default='-',
+              help="file to to output to (default stdout)")
+@click.option('--format', help="format for output",
+              type=click.Choice(['plain', 'csv']), default='plain')
+@click.option('--account', '-a',
+              help="stats on a particular account", multiple=True)
+@click.option('--config', '-c',
+              help="config file for accounts")
+@click.option('--tag', help="filter tags by account")
+@click.option('--tagprefix', help="group accounts by tag prefix")
+def accounts(dbpath, output, format, account, config=None, tag=None, tagprefix=None):
+    """Report on stats by account"""
+    d = db.db(dbpath)
+    accounts = d.accounts()
+    formatter = (format == 'csv' and format_accounts_csv
+                 or format_accounts_plain)
+
+    if config and tagprefix:
+        account_map = {account.name: account for account in accounts}
+
+        with open(config) as fh:
+            account_data = json.load(fh)
+        tag_groups = {}
+        for a in account_data:
+            if tag is not None and tag not in a['tags']:
+                continue
+
+            for t in a['tags']:
+                if t.startswith(tagprefix):
+                    tvalue = t[len(tagprefix):]
+                    if not tvalue:
+                        continue
+                    if tvalue not in tag_groups:
+                        tag_groups[tvalue] = db.Account(tvalue, [])
+                    account_results = account_map.get(a['name'])
+                    if not account_results:
+                        print("missing %s" % a['name'])
+                        continue
+                    tag_groups[tvalue].buckets.extend(
+                        account_map[a['name']].buckets)
+        accounts = tag_groups.values()
+
+    formatter(accounts, output)
 
 
 def format_plain(buckets, fh):
@@ -169,7 +231,8 @@ def format_plain(buckets, fh):
         tabulate.tabulate(
             map(_repr, buckets),
             headers=['account', 'name', 'percent_scanned', 'matched',
-                     'scanned', 'size', 'keys_denied', 'error_count', 'partitions'],
+                     'scanned', 'size', 'keys_denied', 'error_count',
+                     'partitions'],
             tablefmt='plain'))
 
 
@@ -222,11 +285,11 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
             format=None, incomplete=False, output=None):
     """Report on stats by bucket"""
+
     d = db.db(dbpath)
     buckets = []
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
-
         if bucket and b.name not in bucket:
             continue
         if matched and not b.matched:
@@ -289,7 +352,7 @@ def inspect_queue(queue, state, limit, bucket):
     elif state == 'pending':
         registry_class = Queue
     elif state == 'failed':
-        registry_class = Failed
+        registry_class = FailedQueue
     elif state == 'finished':
         registry_class = FinishedJobRegistry
     else:

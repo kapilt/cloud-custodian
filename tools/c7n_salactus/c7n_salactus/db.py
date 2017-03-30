@@ -27,9 +27,9 @@ class Database(object):
     def buckets(self, accounts=()):
         if accounts:
             return [
-                Bucket(k, self.data) for k in self.data['bucket-age'].keys()
+                Bucket(k, self.data) for k in self.data['bucket-size'].keys()
                 if k.split(":")[0] in accounts]
-        return [Bucket(k, self.data) for k in self.data['bucket-age'].keys()]
+        return [Bucket(k, self.data) for k in self.data['bucket-size'].keys()]
 
     def save(self, path):
         with open(os.path.expanduser(path), 'w') as fh:
@@ -70,6 +70,10 @@ class Account(object):
     def scanned(self):
         return sum([b.scanned for b in self.buckets])
 
+    @property
+    def bucket_count(self):
+        return len(self.buckets)
+        
     @property
     def percent_scanned(self):
         if self.size == 0:
