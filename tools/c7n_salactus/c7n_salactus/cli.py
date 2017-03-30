@@ -158,7 +158,7 @@ def accounts(dbpath, account):
 def format_plain(buckets, fh, keys=None):
 
     if keys is None:
-        keys = ['account', 'name', 'percent_scanned', 'matched',
+        keys = ['account', 'name', 'region', 'percent_scanned', 'matched',
                 'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
 
     def _repr(b):
@@ -338,6 +338,49 @@ def inspect_bucket(bucket):
     click.echo("Connection: %s" % found.data['keys-connerr'].get(found.bucket_id, 0))
     click.echo("Endpoint: %s" % found.data['keys-enderr'].get(found.bucket_id, 0))
 
+
+
+@cli.command(name="inspect-scan")
+def inspect_queue(limit=500):
+    """Show contents of a queue."""
+    conn = worker.connection
+
+    def job_row(j):
+        account, bucket = j.args[0].split(':', 1)
+        keys = j.args[1].get('Contents', [])
+        if not keys:
+            keys = j.args[1].get('Versions', [])
+
+        row = {
+            'account': account,
+            'bucket': bucket,
+            'page_size': len(keys),
+            'ttl': j.ttl,
+            'enqueued': j.enqueued_at,
+            'rtt': j.result_ttl,
+            'timeout': j.timeout,
+        }
+        row['started'] = j.started_at
+        return row
+
+    queue = "bucket-keyset-scan"
+    registry_class = StartedJobRegistry
+    registry = registry_class(queue, connection=conn)
+    records = []
+
+    for jid in registry.get_job_ids():
+        j = Job.fetch(jid, conn)
+        records.append(job_row(j))
+        if len(records) == limit:
+            break
+    if records:
+        click.echo(
+            tabulate.tabulate(
+                records,
+                "keys",
+                tablefmt='simple'))
+    else:
+        click.echo("no queue items found")
 
 
 @cli.command(name='inspect-queue')
