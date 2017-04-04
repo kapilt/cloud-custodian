@@ -203,7 +203,11 @@ def bucket_ops(bid, api=""):
                 'buckets-unknown-errors',
                 bid,
                 "%s:%s" % (api, e.response['Error']['Code']))
-    except:
+    except Exception as e:
+        connection.hset(
+            'buckets-unknown-errors',
+            bid,
+            "%s:%s" % (api, str(e)))
         # Let the error queue catch it
         raise
 
@@ -212,12 +216,29 @@ def page_strip(page, versioned):
     """Remove bits in content results to minimize memory utilization.
 
     TODO: evolve this to a key filter on metadata, like date
+
     """
+    # page strip filtering should be conditional
     page.pop('ResponseMetadata', None)
     contents_key = versioned and 'Versions' or 'Contents'
     contents = page.get(contents_key, ())
+
+    # aggressive size
+    if versioned:
+        keys = []
+        for k in contents:
+            if k['IsLatest']:
+                keys.append((k['Key'], k['VersionId'], True))
+            else:
+                keys.append((k['Key'], k['VersionId']))
+        return keys
+    else:
+        return [k['Key'] for k in contents]
+
+
     if not contents:
         return page
+
     # Depending on use case we may want these
     for k in contents:
         k.pop('Owner', None)
@@ -225,6 +246,7 @@ def page_strip(page, versioned):
         k.pop('ETag', None)
         k.pop('StorageClass', None)
         k.pop('Size', None)
+
     return page
 
 
@@ -309,6 +331,9 @@ def process_bucket_set(account_info, buckets):
             else:
                 region = location
 
+            if region not in account_info.get('regions', ()):
+                continue
+
             info['region'] = region
             if region not in region_clients:
                 region_clients.setdefault(region, {})
@@ -331,6 +356,7 @@ def process_bucket_set(account_info, buckets):
                 raise error
 
             connection.hset('bucket-regions', bid, region)
+
 
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
@@ -580,17 +606,15 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
             invoke(process_bucket_iterator, bid, prefix)
             continue
         method = getattr(s3, contents_method, None)
-        results = page_strip(method(
-            Bucket=bucket, Prefix=prefix, Delimiter=partition),
-            versioned)
+        results = method(Bucket=bucket, Prefix=prefix, Delimiter=partition)
         keyset.extend(results.get(contents_key, ()))
 
         # As we probe we find keys, process any found
         if len(keyset) > PARTITION_KEYSET_THRESHOLD:
             log.info("Partition, processing keyset %s", statm(prefix))
-            invoke(
-                process_keyset, bid,
-                page_strip({contents_key: keyset}, versioned))
+            page = page_strip({contents_key: keyset}, versioned)
+            if page:
+                invoke(process_keyset, bid, page)
             keyset = []
 
         strategy.find_partitions(prefix_queue, results)
@@ -629,7 +653,9 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
             prefix_queue = prefix_queue[:PARTITION_QUEUE_THRESHOLD-1]
 
     if keyset:
-        invoke(process_keyset, bid, page_strip({contents_key: keyset}, versioned))
+        page = page_strip({contents_key: keyset}, versioned)
+        if page:
+            invoke(process_keyset, bid, page)
 
 
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
@@ -661,7 +687,7 @@ def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
         for page in paginator:
             page = page_strip(page, versioned)
             pcounter += 1
-            if page.get(contents_key):
+            if page:
                 invoke(process_keyset, bid, page)
 
             if pcounter % 10 == 0:
@@ -696,8 +722,9 @@ def process_keyset(bid, key_set):
     error_count = sesserr = connerr = enderr = missing_count = 0
     throttle_count = denied_count = remediation_count = 0
 
-    contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
-    key_count = len(key_set.get(contents_key, []))
+    #contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
+    #key_count = len(key_set.get(contents_key, []))
+    key_count = len(key_set)
     processor = (versioned and processor.process_version
                  or processor.process_key)
 
@@ -709,12 +736,13 @@ def process_keyset(bid, key_set):
     with bucket_ops(bid, 'key'):
         with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
-            for kchunk in chunks(key_set.get(contents_key, []), 100):
+            for kchunk in chunks(key_set, 100):
                 futures[w.submit(
                     process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
 
             for f in as_completed(futures):
                 if f.exception():
+                    log.warning("key error: %s", f.exception())
                     error_count += 1
                     continue
                 stats = f.result()
@@ -757,6 +785,12 @@ def process_keyset(bid, key_set):
 def process_key_chunk(s3, bucket, kchunk, processor):
     stats = collections.defaultdict(lambda : 0)
     for k in kchunk:
+        if isinstance(k, str):
+            k = {'Key': k}
+        elif isinstance(k, list) and len(k) == 2:
+            k = {'Key': k[0], 'VersionId': k[1], 'IsLatest': False}
+        else:
+            k = {'Key': k[0], 'VersionId': k[1], 'IsLatest': True}
         try:
             result = processor(s3, bucket_name=bucket, key=k)
         except EndpointConnectionError:

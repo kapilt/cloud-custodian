@@ -65,9 +65,11 @@ def cli():
               help='scan only the given accounts', multiple=True)
 @click.option('--bucket', '-b',
               help='scan only the given buckets', multiple=True)
-@click.option('--debug', is_flag=True,
+@click.option('--debug', is_flag=True, default=False,
               help='synchronous scanning, no workers')
-def run(config, tag, bucket, account, debug=False):
+@click.option('--region', multiple=True,
+              help='limit scanning to specified regions')
+def run(config, tag, bucket, account, debug, region):
     """Run across a set of accounts and buckets."""
     logging.basicConfig(
         level=logging.INFO,
@@ -93,7 +95,8 @@ def run(config, tag, bucket, account, debug=False):
                 continue
             if bucket:
                 account_info['buckets'] = bucket
-
+            if region:
+                account_info['regions'] = region
             worker.invoke(worker.process_account, account_info)
 
 
@@ -182,12 +185,29 @@ def format_accounts_plain(accounts, fh):
               help="config file for accounts")
 @click.option('--tag', help="filter tags by account")
 @click.option('--tagprefix', help="group accounts by tag prefix")
-def accounts(dbpath, output, format, account, config=None, tag=None, tagprefix=None):
+@click.option('--region', '-r',
+              help="only consider buckets from the given region",
+              multiple=True)
+@click.option('--not-region',
+              help="only consider buckets not from the given region",
+              multiple=True)
+def accounts(dbpath, output, format, account,
+             config=None, tag=None, tagprefix=None, region=(), not_region=()):
     """Report on stats by account"""
     d = db.db(dbpath)
     accounts = d.accounts()
     formatter = (format == 'csv' and format_accounts_csv
                  or format_accounts_plain)
+
+    if region:
+        for a in accounts:
+            a.buckets = [b for b in a.buckets if b if b.region in region]
+        accounts = [a for a in accounts if a.bucket_count]
+
+    if not_region:
+        for a in accounts:
+            a.buckets = [b for b in a.buckets if b if b.region not in not_region]
+        accounts = [a for a in accounts if a.bucket_count]
 
     if config and tagprefix:
         account_map = {account.name: account for account in accounts}
@@ -218,7 +238,6 @@ def accounts(dbpath, output, format, account, config=None, tag=None, tagprefix=N
 
 
 def format_plain(buckets, fh, keys=None):
-
     if keys is None:
         keys = ['account', 'name', 'region', 'percent_scanned', 'matched',
                 'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
@@ -234,11 +253,11 @@ def format_plain(buckets, fh, keys=None):
 
 
 def format_csv(buckets, fh):
-    field_names = ['account', 'name', 'created', 'matched', 'scanned',
+    field_names = ['account', 'name', 'region', 'created', 'matched', 'scanned',
                    'size', 'keys_denied', 'error_count', 'partitions']
 
     totals = Counter()
-    skip = set(('account', 'name', 'percent', 'created'))
+    skip = set(('account', 'name', 'region', 'percent', 'created'))
     for b in buckets:
         for n in field_names:
             if n in skip:
@@ -279,10 +298,13 @@ def format_csv(buckets, fh):
 @click.option('--incomplete', type=int,
               help="filter to buckets not scanned fully")
 @click.option('--region',
-              help="filter to buckets in region")
+              help="filter to buckets in region", multiple=True)
+@click.option('--not-region',
+              help="filter to buckets in region", multiple=True)
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
-            format=None, incomplete=False, region=None, output=None):
+            format=None, incomplete=False, region=(),
+            not_region=(), output=None):
     """Report on stats by bucket"""
 
     d = db.db(dbpath)
@@ -303,7 +325,9 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             continue
         if incomplete and b.percent_scanned >= incomplete:
             continue
-        if region and b.region != region:
+        if region and b.region not in region:
+            continue
+        if not_region and b.region in not_region:
             continue
         buckets.append(b)
 

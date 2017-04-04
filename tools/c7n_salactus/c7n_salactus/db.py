@@ -79,7 +79,7 @@ class Account(object):
         if self.size == 0:
             return 100.0
         size = self.size - sum([b.size for b in self.buckets if b.denied])
-        return min(float(self.scanned) / size * 100.0, 100.0)
+        return min(float(self.scanned) / (size or 1) * 100.0, 100.0)
 
 
 class Bucket(object):
