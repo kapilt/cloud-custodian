@@ -1,6 +1,6 @@
 bottle
 # using custom branch rollup in dist
-#c7n
+c7n
 ipaddress
 raven
 contextlib2

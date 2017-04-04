@@ -25,7 +25,7 @@ package:
 	cp -Rf .venv/lib/python2.7/site-packages/pkg_resources stage
 	.venv/bin/python c7n_sphere11/admin.py format_json --config=config.yml > stage/config.json
 	# using custom branch build
-	.venv/bin/pip install -f dist -i dist --no-deps -t stage c7n
+	#.venv/bin/pip install -f dist -i dist --no-deps -t stage c7n
 	.venv/bin/pip install -r requirements-gw.txt -t stage --no-deps
 	find stage -name \*.pyc -delete
 
@@ -61,6 +61,9 @@ error-logs:
 	awslogs get /aws/lambda/$(shell aws cloudformation describe-stacks --stack-name $(stack_name) --query "Stacks[0].Outputs[?OutputKey==\`Function\`].OutputValue | [0]") \
 	-s$(period) -f Traceback
 
+
+
+# App Specific Stuff
 
 delta:
 	SPHERE11_API=$(shell aws cloudformation describe-stacks --stack-name $(stack_name) --query "Stacks[0].Outputs[?OutputKey==\`Url\`].OutputValue | [0]") \
