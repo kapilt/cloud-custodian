@@ -331,7 +331,8 @@ def process_bucket_set(account_info, buckets):
             else:
                 region = location
 
-            if region not in account_info.get('regions', ()):
+            if (account_info.get('regions', ()) and
+                region in account_info.get('regions', ())):
                 continue
 
             info['region'] = region

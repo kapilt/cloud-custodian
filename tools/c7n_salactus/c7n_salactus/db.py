@@ -156,13 +156,13 @@ class Bucket(object):
     @property
     def error_count(self):
         return sum((
-            len(self.data['buckets-error'].get(self.bucket_id, ())),
-            int(self.data['keys-throttled'].get(self.bucket_id, 0)),
-            int(self.data['keys-connerr'].get(self.bucket_id, 0)),
-            int(self.data['keys-enderr'].get(self.bucket_id, 0)),
-            int(self.data['keys-sesserr'].get(self.bucket_id, 0)),
-            int(self.data['keys-error'].get(self.bucket_id, 0)),
-            int(self.data['keys-missing'].get(self.bucket_id, 0))
+            len(self.data.get('buckets-error', {}).get(self.bucket_id, ())),
+            int(self.data.get('keys-throttled', {}).get(self.bucket_id, 0)),
+            int(self.data.get('keys-connerr', {}).get(self.bucket_id, 0)),
+            int(self.data.get('keys-enderr', {}).get(self.bucket_id, 0)),
+            int(self.data.get('keys-sesserr', {}).get(self.bucket_id, 0)),
+            int(self.data.get('keys-error', {}).get(self.bucket_id, 0)),
+            int(self.data.get('keys-missing', {}).get(self.bucket_id, 0))
             ))
 
     @property
