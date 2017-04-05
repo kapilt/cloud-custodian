@@ -35,7 +35,13 @@ from c7n import utils
 from c7n_salactus import worker, db
 
 # side-effect serialization patches...
-from c7n_salactus import rqworker
+try:
+    from c7n_salactus import rqworker
+    HAVE_BIN_LIBS = True
+except ImportError:
+    # we want the cli to work in lambda and we might not package up
+    # the relevant binaries libs (lz4, msgpack) there.
+    HAVE_BIN_LIBS = False
 
 
 
@@ -478,6 +484,10 @@ def inspect_queue(limit=500):
 @click.option('--bucket', default=None)
 def inspect_queue(queue, state, limit, bucket):
     """Show contents of a queue."""
+    if not HAVE_BIN_LIBS:
+        click.echo("missing required binary libs (lz4, msgpack)")
+        return
+
     conn = worker.connection
 
     def job_row(j):
@@ -555,6 +565,10 @@ def queues():
 @cli.command()
 def failures():
     """Show any unexpected failures"""
+    if not HAVE_BIN_LIBS:
+        click.echo("missing required binary libs (lz4, msgpack)")
+        return
+
     q = Queue('failed', connection=worker.connection)
     for i in q.get_job_ids():
         j = q.job_class.fetch(i, connection=q.connection)
