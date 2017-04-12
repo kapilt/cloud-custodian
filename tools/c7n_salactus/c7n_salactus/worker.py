@@ -71,6 +71,8 @@ from c7n.utils import chunks
 
 
 def patch_ssl():
+    if getattr(CONN_CACHE, 'patched', None):
+        return
     from botocore.vendored import requests
     # Pick a preferred cipher suite, needs some benchmarking.
     # https://goo.gl/groHHe
@@ -80,6 +82,7 @@ def patch_ssl():
     except AttributeError:
         # no pyopenssl support used / needed / available
         pass
+    setattr(CONN_CACHE, 'patched', True)
 
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
@@ -332,7 +335,7 @@ def process_bucket_set(account_info, buckets):
                 region = location
 
             if (account_info.get('regions', ()) and
-                region in account_info.get('regions', ())):
+                region not in account_info.get('regions', ())):
                 continue
 
             info['region'] = region

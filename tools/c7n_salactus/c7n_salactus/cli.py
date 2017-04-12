@@ -438,7 +438,6 @@ def inspect_queue(limit=500):
     conn = worker.connection
 
     def job_row(j):
-        account, bucket = j.args[0].split(':', 1)
         keys = j.args[1].get('Contents', [])
         if not keys:
             keys = j.args[1].get('Versions', [])
