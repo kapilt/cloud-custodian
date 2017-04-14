@@ -433,7 +433,7 @@ def inspect_bucket(bucket):
 
 
 @cli.command(name="inspect-scan")
-def inspect_queue(limit=500):
+def inspect_scan(limit=500):
     """Show contents of a queue."""
     conn = worker.connection
 
@@ -490,7 +490,11 @@ def inspect_queue(queue, state, limit, bucket):
     conn = worker.connection
 
     def job_row(j):
-        account, bucket = j.args[0].split(':', 1)
+        if isinstance(j.args[0], basestring):
+            account, bucket = j.args[0].split(':', 1)
+        elif isinstance(j.args[0], dict):
+            account, bucket = j.args[0]['name'], "set %d" % len(j.args[1])
+
         row = {
             'account': account,
             'bucket': bucket,

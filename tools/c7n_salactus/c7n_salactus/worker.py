@@ -392,8 +392,8 @@ class CharSet(object):
     @classmethod
     def charsets(cls):
         return [
-            cls.hex_lower,
             cls.hex,
+            cls.hex_lower,
             cls.digits,
             cls.ascii_lower,
             cls.ascii_letters,
