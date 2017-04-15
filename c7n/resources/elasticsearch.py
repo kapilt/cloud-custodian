@@ -40,7 +40,7 @@ class ElasticSearchDomain(QueryResourceManager):
 
         with self.executor_factory(max_workers=2) as w:
             return list(itertools.chain(
-                *w.map(_augment, chunks(resources, 20))))
+                *w.map(_augment, chunks(resources, 5))))
 
     def get_resources(self, resource_ids):
         client = local_session(self.session_factory).client('es')
