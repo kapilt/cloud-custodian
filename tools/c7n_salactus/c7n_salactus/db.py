@@ -21,8 +21,8 @@ class Database(object):
         for k in self.data['bucket-size'].keys():
             a, b = k.split(':')
             accounts.setdefault(a, []).append(k)
-        return [Account(a, [Bucket(b, self.data) for b in buckets])
-                for a, buckets in accounts.items()]
+        return [Account(acct, [Bucket(bkt, self.data) for bkt in buckets])
+                for acct, buckets in accounts.items()]
 
     def buckets(self, accounts=()):
         if accounts:
@@ -93,7 +93,8 @@ class Bucket(object):
                 "partitions:%d psize:%d denied:%s error:%d>") % (
                     self.bucket_id, self.size, self.percent_scanned,
                     self.scanned, self.matched, self.partitions,
-                    self.partition_size, str(self.denied).lower(), self.error_count)
+                    self.partition_size, str(self.denied).lower(),
+                    self.error_count)
 
     @property
     def account(self):
@@ -114,7 +115,8 @@ class Bucket(object):
     @property
     def created(self):
         if 'bucket-age' in self.data:
-            return parse(self.data['bucket-age'][self.bucket_id]).strftime("%Y-%m-%d")
+            return parse(
+                self.data['bucket-age'][self.bucket_id]).strftime("%Y-%m-%d")
         return ''
 
     @property
@@ -171,14 +173,14 @@ class Bucket(object):
     def lrate(self):
         return int(
             float(self.data['bucket-pages'].get(self.bucket_id, 0)) /
-            (float(self.data['bucket-pages-time'].get(self.bucket_id, 1)) or 1))
+            (float(
+                self.data['bucket-pages-time'].get(self.bucket_id, 1)) or 1))
 
     @property
     def krate(self):
         return int(
             float(self.data['keys-count'].get(self.bucket_id, 0)) /
             (float(self.data['keys-time'].get(self.bucket_id, 1)) or 1))
-
 
 
 def get_data():

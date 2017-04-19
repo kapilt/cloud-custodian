@@ -44,8 +44,9 @@ def dumps(o):
 
 def loads(s):
     try:
-        return msgpack.unpackb(decompress(s), ext_hook=decode_ext, encoding='utf-8')
-    except Exception as e:
+        return msgpack.unpackb(
+            decompress(s), ext_hook=decode_ext, encoding='utf-8')
+    except Exception:
         # we queue work occassionally from lambdas or other systems not using
         # the worker class
         return job_default_load(s)

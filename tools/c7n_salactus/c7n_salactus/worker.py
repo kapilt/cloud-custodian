@@ -61,7 +61,8 @@ from rq.job import JobStatus, Job
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError, ConnectionError, EndpointConnectionError
+from botocore.exceptions import (
+    ClientError, ConnectionError, EndpointConnectionError)
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -78,7 +79,9 @@ def patch_ssl():
     # https://goo.gl/groHHe
     requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = ':AES128-GCM-SHA256'
     try:
-        requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST = ':AES128-GCM-SHA256'
+        setattr(requests.packages.urllib3.contrib.pyopenssl,
+                'DEFAULT_SSL_CIPHER_LIST',
+                ':AES128-GCM-SHA256')
     except AttributeError:
         # no pyopenssl support used / needed / available
         pass
@@ -92,7 +95,6 @@ REDIS_HOST = os.environ["SALACTUS_REDIS"]
 
 # Minimum size of the bucket before partitioning
 PARTITION_BUCKET_SIZE_THRESHOLD = 100000
-#PARTITION_BUCKET_SIZE_THRESHOLD = 20000
 
 # Page size for keys found during partition
 PARTITION_KEYSET_THRESHOLD = 500
@@ -152,8 +154,8 @@ def bulk_invoke(func, args, nargs):
 
     Uses internal implementation details of rq.
     """
-    # simplest thing that works
-    #for i in nargs:
+    # for comparison, simplest thing that works
+    # for i in nargs:
     #    argv = list(args)
     #    argv.append(i)
     #    func.delay(*argv)
@@ -237,7 +239,6 @@ def page_strip(page, versioned):
         return keys
     else:
         return [k['Key'] for k in contents]
-
 
     if not contents:
         return page
@@ -335,7 +336,7 @@ def process_bucket_set(account_info, buckets):
                 region = location
 
             if (account_info.get('regions', ()) and
-                region not in account_info.get('regions', ())):
+                    region not in account_info.get('regions', ())):
                 continue
 
             info['region'] = region
@@ -360,7 +361,6 @@ def process_bucket_set(account_info, buckets):
                 raise error
 
             connection.hset('bucket-regions', bid, region)
-
 
             versioning = s3.get_bucket_versioning(Bucket=b)
             info['versioned'] = (
@@ -454,7 +454,8 @@ class CommonPrefixPartition(Strategy):
         return prefix_queue
 
     def find_partitions(self, prefix_queue, results):
-        prefix_queue.extend([p['Prefix'] for p in results.get('CommonPrefixes', [])])
+        prefix_queue.extend(
+            [p['Prefix'] for p in results.get('CommonPrefixes', [])])
 
     def is_depth_exceeded(self, prefix):
         return prefix.count(self.partition) > self.limit
@@ -519,7 +520,8 @@ def detect_partition_strategy(bid, delimiters=('/', '-'), prefix=''):
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     size = int(float(connection.hget('bucket-sizes', bid)))
-    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    session = get_session(
+        json.loads(connection.hget('bucket-accounts', account)))
     s3 = session.client('s3', region_name=region, config=s3config)
 
     (contents_key,
@@ -539,8 +541,9 @@ def detect_partition_strategy(bid, delimiters=('/', '-'), prefix=''):
             if (len(prefixes) > 0 and
                 len(prefixes) < 1000 and
                     len(contents) < 1000):
-                log.info("%s detected common prefix delimiter:%s contents:%d common:%d",
-                         bid, delimiter, len(contents), len(prefixes))
+                log.info(
+                    "%s detected prefix delimiter:%s contents:%d prefixes:%d",
+                    bid, delimiter, len(contents), len(prefixes))
                 limit = prefix and 2 or 4
                 return process_bucket_partitions(
                     bid, partition=delimiter,
@@ -572,8 +575,10 @@ def detect_partition_strategy(bid, delimiters=('/', '-'), prefix=''):
         process_bucket_iterator, [bid], prefixes)
 
 
-@job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
-def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=None, limit=4):
+@job('bucket-partition', timeout=3600*4, ttl=DEFAULT_TTL,
+     connection=connection, result_ttl=0)
+def process_bucket_partitions(
+        bid, prefix_set=('',), partition='/', strategy=None, limit=4):
     """Split up a bucket keyspace into smaller sets for parallel iteration.
     """
     if strategy is None:
@@ -582,7 +587,8 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
     account, bucket = bid.split(':', 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
-    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    session = get_session(
+        json.loads(connection.hget('bucket-accounts', account)))
     size = int(float(connection.hget('bucket-sizes', bid)))
     s3 = session.client('s3', region_name=region, config=s3config)
 
@@ -595,8 +601,10 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
     prefix_queue = strategy.initialize_prefixes(prefix_set)
 
     keyset = []
-    log.info("Process partition bid:%s strategy:%s delimiter:%s queue:%d limit:%d",
-             bid, strategy.__class__.__name__[0], partition, len(prefix_queue), limit)
+    log.info(
+        "Process partition bid:%s strategy:%s delimiter:%s queue:%d limit:%d",
+        bid, strategy.__class__.__name__[0], partition,
+        len(prefix_queue), limit)
 
     def statm(prefix):
         return "keyset:%d queue:%d prefix:%s bucket:%s size:%d" % (
@@ -662,7 +670,8 @@ def process_bucket_partitions(bid, prefix_set=('',), partition='/', strategy=Non
             invoke(process_keyset, bid, page)
 
 
-@job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
+@job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
+     connection=connection, result_ttl=0)
 def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
     """Bucket pagination
     """
@@ -672,7 +681,8 @@ def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
     account, bucket = bid.split(':', 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
-    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    session = get_session(
+        json.loads(connection.hget('bucket-accounts', account)))
     s3 = session.client('s3', region_name=region, config=s3config)
 
     (contents_key, contents_method, _) = BUCKET_OBJ_DESC[versioned]
@@ -710,14 +720,14 @@ def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
                 p.execute()
 
 
-
-
-@job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL, connection=connection, result_ttl=0)
+@job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
+     connection=connection, result_ttl=0)
 def process_keyset(bid, key_set):
     account, bucket = bid.split(':', 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
-    session = get_session(json.loads(connection.hget('bucket-accounts', account)))
+    session = get_session(
+        json.loads(connection.hget('bucket-accounts', account)))
 
     patch_ssl()
     s3 = session.client('s3', region_name=region, config=s3config)
@@ -726,13 +736,13 @@ def process_keyset(bid, key_set):
     error_count = sesserr = connerr = enderr = missing_count = 0
     throttle_count = denied_count = remediation_count = 0
 
-    #contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
-    #key_count = len(key_set.get(contents_key, []))
+    # contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
+    # key_count = len(key_set.get(contents_key, []))
     key_count = len(key_set)
     processor = (versioned and processor.process_version
                  or processor.process_key)
 
-    #log.info("processing page size: %d on %s",
+    # log.info("processing page size: %d on %s",
     #         len(key_set.get(contents_key, ())), bid)
 
     start_time = time.time()
@@ -787,7 +797,7 @@ def process_keyset(bid, key_set):
 
 
 def process_key_chunk(s3, bucket, kchunk, processor):
-    stats = collections.defaultdict(lambda : 0)
+    stats = collections.defaultdict(lambda: 0)
     for k in kchunk:
         if isinstance(k, str):
             k = {'Key': k}
