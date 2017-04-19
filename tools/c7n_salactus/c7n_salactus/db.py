@@ -84,8 +84,6 @@ class Account(object):
 
 class Bucket(object):
 
-    __slots__ = ('bucket_id', 'data')
-
     def __init__(self, bucket_id, data):
         self.bucket_id = bucket_id
         self.data = data

@@ -243,13 +243,16 @@ def accounts(dbpath, output, format, account,
     formatter(accounts, output)
 
 
-def format_plain(buckets, fh, keys=None):
-    if keys is None:
-        keys = ['account', 'name', 'region', 'percent_scanned', 'matched',
-                'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
+def format_plain(buckets, fh, keys=()):
+    field_names = [
+        'account', 'name', 'region', 'percent_scanned', 'matched',
+        'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
+
+    for k in keys:
+        field_names.insert(0, k)
 
     def _repr(b):
-        return [getattr(b, k) for k in keys]
+        return [getattr(b, k) for k in field_names]
 
     click.echo(
         tabulate.tabulate(
@@ -258,12 +261,16 @@ def format_plain(buckets, fh, keys=None):
             tablefmt='plain'))
 
 
-def format_csv(buckets, fh):
+def format_csv(buckets, fh, keys=()):
     field_names = ['account', 'name', 'region', 'created', 'matched', 'scanned',
                    'size', 'keys_denied', 'error_count', 'partitions']
+    for k in keys:
+        field_names.insert(0, k)
 
     totals = Counter()
     skip = set(('account', 'name', 'region', 'percent', 'created'))
+    skip.update(keys)
+
     for b in buckets:
         for n in field_names:
             if n in skip:
@@ -307,13 +314,31 @@ def format_csv(buckets, fh):
               help="filter to buckets in region", multiple=True)
 @click.option('--not-region',
               help="filter to buckets in region", multiple=True)
+@click.option('--config', type=click.Path(),
+              help="config file for accounts")
+@click.option('--tagprefix',
+              help="include account tag value by prefix")
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
             format=None, incomplete=False, region=(),
-            not_region=(), output=None):
+            not_region=(), output=None, config=None, tagprefix=None):
     """Report on stats by bucket"""
 
     d = db.db(dbpath)
+
+    if tagprefix and not config:
+        raise ValueError(
+            "account tag value inclusion requires account config file")
+
+    if config and tagprefix:
+        with open(config) as fh:
+            data = json.load(fh)
+            account_data = {}
+            for a in data:
+                for t in a['tags']:
+                    if t.startswith(tagprefix):
+                        account_data[a['name']] = t[len(tagprefix):]
+
     buckets = []
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
@@ -335,10 +360,13 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             continue
         if not_region and b.region in not_region:
             continue
+        if tagprefix:
+            setattr(b, tagprefix[:-1], account_data[b.account])
         buckets.append(b)
 
     formatter = format == 'csv' and format_csv or format_plain
-    formatter(buckets, output)
+    keys = tagprefix and (tagprefix[:-1],) or ()
+    formatter(buckets, output, keys=keys)
 
 
 @cli.command(name="watch")
@@ -430,48 +458,6 @@ def inspect_bucket(bucket):
     click.echo("Connection: %s" % found.data['keys-connerr'].get(found.bucket_id, 0))
     click.echo("Endpoint: %s" % found.data['keys-enderr'].get(found.bucket_id, 0))
 
-
-
-@cli.command(name="inspect-scan")
-def inspect_scan(limit=500):
-    """Show contents of a queue."""
-    conn = worker.connection
-
-    def job_row(j):
-        keys = j.args[1].get('Contents', [])
-        if not keys:
-            keys = j.args[1].get('Versions', [])
-
-        row = {
-            'account': account,
-            'bucket': bucket,
-            'page_size': len(keys),
-            'ttl': j.ttl,
-            'enqueued': j.enqueued_at,
-            'rtt': j.result_ttl,
-            'timeout': j.timeout,
-        }
-        row['started'] = j.started_at
-        return row
-
-    queue = "bucket-keyset-scan"
-    registry_class = StartedJobRegistry
-    registry = registry_class(queue, connection=conn)
-    records = []
-
-    for jid in registry.get_job_ids():
-        j = Job.fetch(jid, conn)
-        records.append(job_row(j))
-        if len(records) == limit:
-            break
-    if records:
-        click.echo(
-            tabulate.tabulate(
-                records,
-                "keys",
-                tablefmt='simple'))
-    else:
-        click.echo("no queue items found")
 
 
 @cli.command(name='inspect-queue')
