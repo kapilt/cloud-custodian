@@ -309,6 +309,7 @@ def format_csv(buckets, fh, keys=()):
               help="filter to buckets with at least size")
 @click.option('--incomplete', type=int,
               help="filter to buckets not scanned fully")
+@click.option('--oversize', is_flag=True, help="scan count > size")
 @click.option('--region',
               help="filter to buckets in region", multiple=True)
 @click.option('--not-region',
@@ -319,7 +320,7 @@ def format_csv(buckets, fh, keys=()):
               help="include account tag value by prefix")
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
-            format=None, incomplete=False, region=(),
+            format=None, incomplete=False, oversize=False, region=(),
             not_region=(), output=None, config=None, tagprefix=None):
     """Report on stats by bucket"""
 
@@ -352,6 +353,8 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
         if size and b.size < size:
             continue
         if denied and not b.denied:
+            continue
+        if oversize and b.scanned <= b.size:
             continue
         if incomplete and b.percent_scanned >= incomplete:
             continue
