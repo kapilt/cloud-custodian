@@ -6,7 +6,7 @@ import time
 
 import boto3
 import click
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dateutil.parser import parse as parse_date
 from elasticsearch import Elasticsearch, helpers
 import jsonschema
@@ -19,10 +19,10 @@ from c7n.credentials import assumed_session
 from c7n.registry import PluginRegistry
 from c7n.utils import chunks, dumps, get_retry, local_session
 
-from c7n.executor import MainThreadExecutor
-#ThreadPoolExecutor = MainThreadExecutor
-#ProcessPoolExecutor = MainThreadExecutor
-MainThreadExecutor.async = False
+# from c7n.executor import MainThreadExecutor
+# ThreadPoolExecutor = MainThreadExecutor
+# ProcessPoolExecutor = MainThreadExecutor
+# MainThreadExecutor.async = False
 
 MAX_POINTS = 1440.0
 NAMESPACE = 'CloudMaid'
@@ -73,16 +73,16 @@ class ElasticSearchIndexer(Indexer):
     def __init__(self, config):
         self.config = config
         self.client = Elasticsearch()
-        
+
     def index(self, points):
         for p in points:
-            p['_index'] = idx_name
+            p['_index'] = self.config['indexer']['idx_name']
             p['_type'] = 'policy-metric'
-        results = helpers.streaming_bulk(es, points)
+        results = helpers.streaming_bulk(self.client, points)
         for status, r in results:
             if not status:
                 log.debug("index err result %s", r)
-    
+
 
 @indexers.register('s3')
 class S3Archiver(Indexer):
@@ -112,7 +112,6 @@ class InfluxIndexer(Indexer):
             database=config['indexer']['db'],
             host=config['indexer'].get('host'))
 
-    
     def index(self, points):
         measurements = []
         for p in points:
@@ -121,8 +120,7 @@ class InfluxIndexer(Indexer):
                 'time': p['Timestamp'],
                 'fields': {
                     'rcount': p['Sum'],
-                    'runit': p['Unit']
-                    },
+                    'runit': p['Unit']},
                 'tags': {
                     'region': p['Region'],
                     'account': p['Account'],
@@ -131,12 +129,8 @@ class InfluxIndexer(Indexer):
                     'division': p['Division'],
                     'resource': p.get('ResType', ''),
                     'metric': p['MetricName'],
-                    'namespace': p['Namespace'],
-                    }
-                })
+                    'namespace': p['Namespace']}})
         self.client.write_points(measurements)
-
-
 
 
 def index_metric_set(indexer, account, region, metric_set, start, end, period):
@@ -145,13 +139,11 @@ def index_metric_set(indexer, account, region, metric_set, start, end, period):
     client = session.client('cloudwatch', region_name=region)
 
     t = time.time()
-    
     account_info = dict(account['tags'])
     account_info['Account'] = account['name']
     account_info['AccountId'] = account['id']
     account_info['Region'] = region
     point_count = 0
-    
     for m in metric_set:
         params = dict(
             Namespace=m['Namespace'],
@@ -167,7 +159,6 @@ def index_metric_set(indexer, account, region, metric_set, start, end, period):
             log.error(
                 "error account:%s region:%s start:%s end:%s error:%s",
                 account['name'], region, start, end, e)
-                       
         if not points:
             continue
         dims = {d['Name']: d['Value'] for d in m.pop('Dimensions', ())}
@@ -177,12 +168,11 @@ def index_metric_set(indexer, account, region, metric_set, start, end, period):
             p.update(dims)
             p.update(m)
             p.update(account_info)
-        point_count += len(points)    
+        point_count += len(points)
         log.debug("account:%s region:%s metric:%s points:%d policy:%s",
                   account['name'], region, m['MetricName'], len(points),
                   dims.get('Policy', 'unknown'))
         indexer.index(points)
- 
     return time.time() - t, point_count
 
 
@@ -194,15 +184,16 @@ def index_account(config, idx_name, region, account, start, end, period):
     policies = set()
     account_metrics = []
 
-    pager = client.get_paginator('list_metrics')        
+    pager = client.get_paginator('list_metrics')
     for p in pager.paginate(Namespace=NAMESPACE):
         metrics = p.get('Metrics')
         for metric in metrics:
             if 'Dimensions' not in metric:
                 log.warning("account:%s region:%s metric with no dims: %s",
-                             account['name'], region, metric)
+                            account['name'], region, metric)
                 continue
-            dims = {d['Name']: d['Value'] for d in metric.get('Dimensions', ())}
+            dims = {d['Name']: d['Value'] for d in metric.get(
+                'Dimensions', ())}
             if dims['Policy'] not in policies:
                 log.debug("Processing account:%s region:%s policy: %s",
                           account['name'], region, dims['Policy'])
@@ -212,11 +203,12 @@ def index_account(config, idx_name, region, account, start, end, period):
     for p in pager.paginate(Namespace='AWS/Lambda'):
         metrics = p.get('Metrics')
         for metric in metrics:
-            dims = {d['Name']: d['Value'] for d in metric.get('Dimensions', ())}
+            dims = {d['Name']: d['Value'] for d
+                    in metric.get('Dimensions', ())}
             if not dims.get('FunctionName', '').startswith('custodian-'):
                 continue
             account_metrics.append(metric)
-            
+
     log.debug("account:%s region:%s processing metrics:%d start:%s end:%s",
               account['name'], region, len(account_metrics),
               start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d"))
@@ -230,7 +222,8 @@ def index_account(config, idx_name, region, account, start, end, period):
             indexer, account, region, metric_set, start, end, period)
         region_time += mt
         region_points += mp
-    log.info("indexed account:%s region:%s metrics:%d points:%d start:%s end:%s time:%0.2f",
+    log.info(("indexed account:%s region:%s metrics:%d"
+              " points:%d start:%s end:%s time:%0.2f"),
              account['name'], region, len(account_metrics), region_points,
              start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d"), region_time)
     return region_time, region_points
@@ -249,7 +242,8 @@ def get_periods(start, end, period):
     n_start = start
 
     for idx in range(1, int(num_periods) + 1):
-        period = (n_start, min((end, n_start + datetime.timedelta(delta_unit))))
+        period = (n_start,
+                  min((end, n_start + datetime.timedelta(delta_unit))))
         yield period
         n_start = period[1]
 
@@ -267,15 +261,13 @@ def get_date_range(start, end):
     elif start and not end:
         end = now
     if not end and not start:
-        raise ValueError("Missing start and end") 
+        raise ValueError("Missing start and end")
     return start, end
 
-        
 
 @click.group()
 def cli():
     """Custodian Indexing"""
-
 
 
 @cli.command(name='index-metrics')
@@ -283,7 +275,7 @@ def cli():
 @click.option('--start', required=True, help="Start date")
 @click.option('--end', required=False, help="End Date")
 @click.option('--incremental/--no-incremental', default=False,
-                                help="Sync from last indexed timestamp")
+              help="Sync from last indexed timestamp")
 @click.option('--concurrency', default=5)
 @click.option('-a', '--accounts', multiple=True)
 @click.option('-p', '--period', default=3600)
@@ -298,9 +290,9 @@ def index_metrics(
     logging.getLogger('botocore').setLevel(logging.WARNING)
     logging.getLogger('elasticsearch').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('requests').setLevel(logging.WARNING)        
+    logging.getLogger('requests').setLevel(logging.WARNING)
     logging.getLogger('c7n.worker').setLevel(logging.INFO)
-    
+
     with open(config) as fh:
         config = yaml.safe_load(fh.read())
     jsonschema.validate(config, CONFIG_SCHEMA)
@@ -310,8 +302,8 @@ def index_metrics(
     p_accounts = set()
     p_account_stats = {}
     i_time = i_points = 0
-    t =  time.time()
-    
+    t = time.time()
+
     with ProcessPoolExecutor(max_workers=concurrency) as w:
         futures = {}
         jobs = []
@@ -331,7 +323,7 @@ def index_metrics(
             for region in account.get('regions'):
                 for (p_start, p_end) in get_periods(start, end, period):
                     p = (config, index, region, account, p_start, p_end, period)
-                    jobs.append(p)                    
+                    jobs.append(p)
 
         # by default we'll be effectively processing in order, but thats bumps
         # our concurrency into rate limits on metrics retrieval in a given account
@@ -342,7 +334,7 @@ def index_metrics(
 
         for j in jobs:
             log.debug("submit account:%s region:%s start:%s end:%s" % (
-                     j[3]['name'], j[2], j[4], j[5]))
+                j[3]['name'], j[2], j[4], j[5]))
             futures[w.submit(index_account, *j)] = j
 
         # Process completed
@@ -356,15 +348,15 @@ def index_metrics(
             rstat = p_account_stats.setdefault(
                 account['name'], {}).setdefault(region, {'points': 0})
             rstat['points'] += rpoints
-            
-            #log.info("complete account:%s, region:%s points:%s time:%0.2f",
+
+            # log.info("complete account:%s, region:%s points:%s time:%0.2f",
             #         account['name'], region, rpoints, rtime)
-                     
+
             i_time += rtime
             i_points += rpoints
 
         log.info("complete accounts:%d points:%d itime:%0.2f time:%0.2f",
-                 len(p_accounts), i_points, i_time, time.time()-t)
+                 len(p_accounts), i_points, i_time, time.time() - t)
 
 
 @cli.command(name='index-resources')
@@ -372,17 +364,15 @@ def index_metrics(
 @click.option('--start', required=True, help="Start date")
 @click.option('--end', required=False, help="End Date")
 @click.option('--incremental/--no-incremental', default=False,
-                                help="Sync from last indexed timestamp")
+              help="Sync from last indexed timestamp")
 @click.option('--concurrency', default=5)
 @click.option('-a', '--accounts', multiple=True)
 @click.option('--verbose/--no-verbose', default=False)
 def index_resources(
         config, start, end, incremental=False, concurrency=5, accounts=None,
         verbose=False):
-    """index policy resources"""    
+    """index policy resources"""
 
-
-    
 
 if __name__ == '__main__':
     try:
