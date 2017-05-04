@@ -1425,6 +1425,69 @@ class RemoveBucketTag(RemoveTag):
             self.manager.session_factory, resource_set, remove_tags=tags)
 
 
+@filters.register('inventory')
+class InventoryFilter(Filter):
+
+    schema = type_schema('inventory')
+
+
+@actions.register('enable-inventory')
+class EnableInventory(BucketActionBase):
+    """Enable bucket inventories
+    """
+
+    schema = type_schema(
+        'enable-inventory',
+        name={'type': 'string', 'description': 'Name of inventory'},
+        destination={'type': 'string', 'description': 'Name of destination bucket'},
+        prefix={'type': 'string', 'description': 'Destination prefix'},
+        versions={'enum': ['All', 'Current']},
+        schedule={'enum': ['Daily', 'Weekly']},
+        fields={'type': 'array', 'items': {'enum': [
+            'Size', 'LastModifiedDate', 'StorageClass', 'ETag',
+            'IsMultipartUploaded', 'ReplicationStatus']}}
+        )
+
+    def process_bucket(self, b):
+        inventory_name = self.data.get('name')
+        destination = self.data.get('destination')
+        prefix = self.data.get('prefix')
+        schedule = self.data.get('schedule')
+        
+        if prefix is None:
+            prefix = "Inventories/%s" % (self.manager.config.account_id)
+
+        session = local_session(self.manager.session_factory)
+        client = session.client('s3')
+        inventories = client.list_bucket_inventory_configurations(Bucket=b['Name'])
+
+        inventory = {
+            'Destination': {
+                'S3BucketConfiguration': {
+                    'Bucket': destination,
+                    'Prefix': prefix,
+                    'Format': 'CSV'}
+                },
+            'IsEnabled': True,
+            'Id': inventory_name,
+            'OptionalFields': [fields],
+            'IncludeObjectVersions': versions,
+            'Schedule': {
+                'Frequency': schedule
+            }
+        }
+
+        for i in inventories.get('InventoryConfigurationList', []):
+            for k, v in inventory.items():
+                if i[k] != v:
+                    continue
+            return
+
+        client.put_bucket_inventory_configuration(
+            Bucket=b['Name'], Id=name, InventoryConfiguration=inventory)
+            
+                
+
 @actions.register('delete')
 class DeleteBucket(ScanBucket):
     """Action deletes a S3 bucket
