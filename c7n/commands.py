@@ -43,12 +43,12 @@ def policy_command(f):
     def _load_policies(options):
         load_resources()
 
+        errors = 0        
         all_policies = PolicyCollection({}, options)
-    
-        errors = 0
+
         # for a default region for policy loading, we'll expand regions later.
         options.region = options.regions[0]
-    
+
         for fp in options.configs:
             try:
                 collection = policy_load(options, fp)
@@ -81,7 +81,7 @@ def policy_command(f):
         # expand by region, this results in a separate policy instance per region of execution.
         if getattr(options, 'regions', None):
             policies = policies.expand_regions(options.regions)
-        
+
         if len(policies) == 0:
             _print_no_policies_warning(options, all_policies)
             # If we filtered out all the policies we want to exit with a
