@@ -112,7 +112,7 @@ class PolicyCollection(object):
         policies = []
         for p in self.policies:
             available_regions = service_region_map.get(
-                resource_service_map[p.resource_type], ())
+                resource_service_map.get(p.resource_type), ())
 
             # its a global service/endpoint, use user provided region or us-east-1.
             if not available_regions and regions:

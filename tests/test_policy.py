@@ -140,9 +140,16 @@ class PolicyPermissions(BaseTest):
 
 class TestPolicyCollection(BaseTest):
 
-    def xtest_policy_expand_region_filtering(self):
-        pass
+    def test_policy_account_expand(self):
+        original = policy.PolicyCollection(
+            {'policies': [
+                {'name': 'foo',
+                 'resource': 'account'}]},
+            Config.empty(regions=['us-east-1', 'us-west-2']))
 
+        collection = original.expand_regions(['all'])
+        self.assertEqual(len(collection), 1)
+        
     def test_policy_region_expand_global(self):
         original = policy.PolicyCollection(
             {'policies': [
@@ -164,8 +171,8 @@ class TestPolicyCollection(BaseTest):
         self.assertEqual(len(iam), 1)
         self.assertEqual(iam[0].options.region, 'eu-west-1')
         self.assertEqual(len(collection), 3)
-        
-    
+
+
 class TestPolicy(BaseTest):
 
     def test_load_policy_validation_error(self):
