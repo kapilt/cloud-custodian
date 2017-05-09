@@ -19,6 +19,7 @@ import logging
 import os
 import time
 
+import boto3
 from botocore.client import ClientError
 
 from c7n.actions import EventAction
@@ -63,73 +64,88 @@ def load(options, path, format='yaml', validate=True):
         if errors:
             raise Exception("Failed to validate on policy %s \n %s" % (errors[1], errors[0]))
 
-    return PolicyCollection(data, options)
+    collection = PolicyCollection(data, options)
+    if getattr(options, 'regions', None):
+        collection = collection.expand_regions(options.regions)
+    return collection
 
 
 class PolicyCollection(object):
 
     log = logging.getLogger('c7n.policies')
 
-    def __init__(self, data, options):
+    def __init__(self, data, options, policies=None):
         self.data = data
         self.options = options
 
-        # We store all the policies passed in so we can refilter later
-        self._all_policies = []
-        self.policies = []
-    
-        # Do an initial filtering
-        resource_type = getattr(self.options, 'resource_type', None)
-        policy_name = getattr(self.options, 'policy_filter', None)
-        self.policies = self.filter(policy_name, resource_type)
+        if policies:
+            self.policies = policies
+            return
+
+        # initialize with filtered policies
+        self.policies = [Policy(p, self.options, session_factory=self.test_session_factory())
+                         for p in self.data.get('policies', ())]
+        self.policies = self.filter(
+            getattr(self.options, 'policy_filter', None),
+            getattr(self.options, 'resource_type', None))
 
     def expand_regions(self, regions):
-        session = utils.get_profile_session(self.options)
-        resource_types = set([p['resource'] for p in self.data.get('policies', [])])
+        """Return a set of policies targetted to the given regions.
+
+        Supports symbolic regions like 'all'. This will automatically filter out policies
+        if their being targetted to a region that does not support the service. Global
+        services will target a single region (us-east-1 if only all specified, else
+        first region in the list).
+        """
+        # we're not interacting with the apis just using the sdk meta information.
+        session = boto3.Session(
+            region_name='us-east-1',
+            aws_access_key_id='never',
+            aws_secret_access_key='found')
         resource_service_map = {r: resources.get(r).resource_type.service
-                                for r in resource_types if r != 'account'}
+                                for r in self.resource_types if r != 'account'}
         service_region_map = {
             s: session.get_available_regions(s) for s in set(
                 itertools.chain(resource_service_map.values()))}
 
-        for p in self.data.get('policies', []):
+        policies = []
+        for p in self.policies:
             available_regions = service_region_map.get(
-                resource_service_map[p['resource']], ())
+                resource_service_map[p.resource_type], ())
 
-            if 'all' in self.options.regions:
-                if not available_regions:
-                    self.options.regions = ['us-east-1']
-                else:
-                    self.options.regions = available_regions
-            for region in self.options.regions:
-                if region not in available_regions:
-                    self.log.debug("policy:%s resources:%s not available in region:%s",
-                                   p['name'], p['resource'], region)
+            # its a global service/endpoint, use user provided region or us-east-1.
+            if not available_regions and regions:
+                candidates = [r for r in regions if r != 'all']
+                candidate = candidates and candidates[0] or 'us-east-1'
+                svc_regions = [candidate]
+            elif 'all' in regions:
+                svc_regions = available_regions
+            else:
+                svc_regions = regions
+
+            for region in svc_regions:
+                if available_regions and region not in available_regions:
+                    level = 'all' in self.options.regions and logging.DEBUG or logging.WARNING
+                    self.log(level, "policy:%s resources:%s not available in region:%s",
+                             p['name'], p['resource'], region)
                     continue
                 options_copy = copy.copy(self.options)
-                # TODO - why doesn't aws like unicode regions?
-                options_copy.region = str(region)
-                self._all_policies.append(
-                    Policy(p, options_copy, session_factory=self.test_session_factory()))
-
-    @property
-    def unfiltered_policies(self):
-        return self._all_policies
+                options_copy.region = str(region)                
+                policies.append(
+                    Policy(p.data, options_copy, session_factory=self.test_session_factory()))
+        return PolicyCollection(self.data, self.options, policies)
 
     def filter(self, policy_name=None, resource_type=None):
-        policies = []
-        for policy in self.unfiltered_policies:
+        results = []
+        for policy in self.policies:
             if resource_type:
                 if policy.resource_type != resource_type:
                     continue
-
             if policy_name:
                 if not fnmatch.fnmatch(policy.name, policy_name):
                     continue
-
-            policies.append(policy)
-
-        return policies
+            results.append(policy)
+        return results
 
     def __iter__(self):
         return iter(self.policies)
@@ -520,8 +536,8 @@ class Policy(object):
         self.resource_manager = self.get_resource_manager()
 
     def __repr__(self):
-        return "<Policy resource: %s name: %s>" % (
-            self.resource_type, self.name)
+        return "<Policy resource: %s name: %s region: %s>" % (
+            self.resource_type, self.name, self.options.region)
 
     @property
     def name(self):
