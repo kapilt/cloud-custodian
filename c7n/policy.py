@@ -65,8 +65,6 @@ def load(options, path, format='yaml', validate=True):
             raise Exception("Failed to validate on policy %s \n %s" % (errors[1], errors[0]))
 
     collection = PolicyCollection(data, options)
-    if getattr(options, 'regions', None):
-        collection = collection.expand_regions(options.regions)
     return collection
 
 
@@ -85,9 +83,12 @@ class PolicyCollection(object):
         # initialize with filtered policies
         self.policies = [Policy(p, self.options, session_factory=self.test_session_factory())
                          for p in self.data.get('policies', ())]
-        self.policies = self.filter(
-            getattr(self.options, 'policy_filter', None),
-            getattr(self.options, 'resource_type', None))
+
+    def __add__(self, other):
+        return PolicyCollection(
+            self.data,
+            self.options,
+            self.policies + other.policies)
 
     def expand_regions(self, regions):
         """Return a set of policies targetted to the given regions.
@@ -130,7 +131,7 @@ class PolicyCollection(object):
                              p['name'], p['resource'], region)
                     continue
                 options_copy = copy.copy(self.options)
-                options_copy.region = str(region)                
+                options_copy.region = str(region)
                 policies.append(
                     Policy(p.data, options_copy, session_factory=self.test_session_factory()))
         return PolicyCollection(self.data, self.options, policies)
@@ -145,7 +146,7 @@ class PolicyCollection(object):
                 if not fnmatch.fnmatch(policy.name, policy_name):
                     continue
             results.append(policy)
-        return results
+        return PolicyCollection(self.data, self.options, results)
 
     def __iter__(self):
         return iter(self.policies)
