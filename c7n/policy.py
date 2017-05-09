@@ -76,7 +76,15 @@ class PolicyCollection(object):
 
         # We store all the policies passed in so we can refilter later
         self._all_policies = []
-        session = utils.get_profile_session(options)
+        self.policies = []
+    
+        # Do an initial filtering
+        resource_type = getattr(self.options, 'resource_type', None)
+        policy_name = getattr(self.options, 'policy_filter', None)
+        self.policies = self.filter(policy_name, resource_type)
+
+    def expand_regions(self, regions):
+        session = utils.get_profile_session(self.options)
         resource_types = set([p['resource'] for p in self.data.get('policies', [])])
         resource_service_map = {r: resources.get(r).resource_type.service
                                 for r in resource_types if r != 'account'}
@@ -88,27 +96,21 @@ class PolicyCollection(object):
             available_regions = service_region_map.get(
                 resource_service_map[p['resource']], ())
 
-            if 'all' in options.regions:
+            if 'all' in self.options.regions:
                 if not available_regions:
-                    options.regions = ['us-east-1']
+                    self.options.regions = ['us-east-1']
                 else:
-                    options.regions = available_regions
-            for region in options.regions:
+                    self.options.regions = available_regions
+            for region in self.options.regions:
                 if region not in available_regions:
                     self.log.debug("policy:%s resources:%s not available in region:%s",
                                    p['name'], p['resource'], region)
                     continue
-                options_copy = copy.copy(options)
+                options_copy = copy.copy(self.options)
                 # TODO - why doesn't aws like unicode regions?
                 options_copy.region = str(region)
                 self._all_policies.append(
                     Policy(p, options_copy, session_factory=self.test_session_factory()))
-
-        # Do an initial filtering
-        self.policies = []
-        resource_type = getattr(self.options, 'resource_type', None)
-        policy_name = getattr(self.options, 'policy_filter', None)
-        self.policies = self.filter(policy_name, resource_type)
 
     @property
     def unfiltered_policies(self):
