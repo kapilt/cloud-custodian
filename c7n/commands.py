@@ -44,7 +44,7 @@ def policy_command(f):
         load_resources()
 
         errors = 0
-        all_policies = PolicyCollection({}, options)
+        all_policies = PolicyCollection.from_data({}, options)
 
         # for a default region for policy loading, we'll expand regions later.
         options.region = options.regions[0]

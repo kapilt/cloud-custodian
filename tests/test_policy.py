@@ -141,7 +141,7 @@ class PolicyPermissions(BaseTest):
 class TestPolicyCollection(BaseTest):
 
     def test_policy_account_expand(self):
-        original = policy.PolicyCollection(
+        original = policy.PolicyCollection.from_data(
             {'policies': [
                 {'name': 'foo',
                  'resource': 'account'}]},
@@ -151,7 +151,7 @@ class TestPolicyCollection(BaseTest):
         self.assertEqual(len(collection), 1)
         
     def test_policy_region_expand_global(self):
-        original = policy.PolicyCollection(
+        original = policy.PolicyCollection.from_data(
             {'policies': [
                 {'name': 'foo',
                  'resource': 's3'},

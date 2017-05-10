@@ -64,7 +64,7 @@ def load(options, path, format='yaml', validate=True):
         if errors:
             raise Exception("Failed to validate on policy %s \n %s" % (errors[1], errors[0]))
 
-    collection = PolicyCollection(data, options)
+    collection = PolicyCollection.from_data(data, options)
     return collection
 
 
@@ -72,23 +72,18 @@ class PolicyCollection(object):
 
     log = logging.getLogger('c7n.policies')
 
-    def __init__(self, data, options, policies=None):
-        self.data = data
+    def __init__(self, policies, options):
         self.options = options
+        self.policies = policies
 
-        if policies:
-            self.policies = policies
-            return
-
-        # initialize with filtered policies
-        self.policies = [Policy(p, self.options, session_factory=self.test_session_factory())
-                         for p in self.data.get('policies', ())]
+    @classmethod
+    def from_data(cls, data, options):
+        policies = [Policy(p, options, session_factory=cls.test_session_factory())
+                    for p in data.get('policies', ())]
+        return PolicyCollection(policies, options)
 
     def __add__(self, other):
-        return PolicyCollection(
-            self.data,
-            self.options,
-            self.policies + other.policies)
+        return PolicyCollection(self.policies + other.policies, self.options)
 
     def expand_regions(self, regions):
         """Return a set of policies targetted to the given regions.
@@ -134,7 +129,7 @@ class PolicyCollection(object):
                 options_copy.region = str(region)
                 policies.append(
                     Policy(p.data, options_copy, session_factory=self.test_session_factory()))
-        return PolicyCollection(self.data, self.options, policies)
+        return PolicyCollection(policies, self.options)
 
     def filter(self, policy_name=None, resource_type=None):
         results = []
@@ -146,7 +141,7 @@ class PolicyCollection(object):
                 if not fnmatch.fnmatch(policy.name, policy_name):
                     continue
             results.append(policy)
-        return PolicyCollection(self.data, self.options, results)
+        return PolicyCollection(results, self.options)
 
     def __iter__(self):
         return iter(self.policies)
@@ -168,6 +163,7 @@ class PolicyCollection(object):
             rtypes.add(p.resource_type)
         return rtypes
 
+    @classmethod
     def test_session_factory(self):
         """ For testing: patched by tests to use a custom session_factory """
         return None
