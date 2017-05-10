@@ -79,8 +79,7 @@ def policy_command(f):
             getattr(options, 'resource_type', None))
 
         # expand by region, this results in a separate policy instance per region of execution.
-        if getattr(options, 'regions', None):
-            policies = policies.expand_regions(options.regions)
+        policies = policies.expand_regions(options.regions)
 
         if len(policies) == 0:
             _print_no_policies_warning(options, all_policies)
