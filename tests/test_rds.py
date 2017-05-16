@@ -830,19 +830,19 @@ class TestRDSParameterGroupFilter(BaseTest):
         ({'key': 'autovacuum_multixact_freeze_max_age', 'op': 'eq', 'value': 7,
           'default': 7},
          lambda r: len(r) == 2,
-         "autovacuum_multixact_freeze_max_age should default to 7 for all instances"),
+         "autovacuum_multixact_freeze_max_age should default to 7"),
         ({'key': 'full_page_writes', 'op': 'eq', 'value': 1},
          lambda r: len(r) == 2,
          "full_page_writes ( a boolean ) should be on"),
     ]
 
-
     def _get_session_factory(self):
         if not hasattr(self, '_sess_factory'):
-            self._sess_factory = self.replay_flight_data( "_".join(['test', self.__class__.__name__]))
+            self._sess_factory = self.replay_flight_data(
+                "_".join(['test', self.__class__.__name__]))
         return self._sess_factory
 
-    def assert_policy(self,policy_struct, callback, err_msg):
+    def assert_policy(self, policy_struct, callback, err_msg):
         self.change_environment(AWS_DEFAULT_REGION=self.DEFAULT_REGION)
         session_factory = self._get_session_factory()
         policy = self.load_policy(policy_struct,
@@ -855,7 +855,7 @@ class TestRDSParameterGroupFilter(BaseTest):
             policy_struct = {
                 'name': 'RDS_PARAMETERGROUP_FILTER',
                 'resource': 'rds',
-                'filters': [dict(type='db-parameter', **testcase[0]),]
+                'filters': [dict(type='db-parameter', **testcase[0]), ]
             }
             assertion = testcase[1]
             error_message = testcase[2]
