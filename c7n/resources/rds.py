@@ -59,6 +59,7 @@ from c7n.filters import (
     CrossAccountAccessFilter, FilterRegistry, Filter, AgeFilter, OPERATORS,
     FilterValidationError)
 
+from c7n.filters.offhours import OffHour, OnHour
 from c7n.filters.health import HealthEventFilter
 import c7n.filters.vpc as net_filters
 from c7n.manager import resources
@@ -259,6 +260,11 @@ def _get_available_engine_upgrades(client, major=False):
                     results[v['Engine']].get(v['EngineVersion'], '0.0.0')):
                 results[v['Engine']][v['EngineVersion']] = t['EngineVersion']
     return results
+
+
+@filters.register('offhour')
+class RDSOffHour(OffHour):
+    pass
 
 
 @filters.register('default-vpc')
@@ -863,6 +869,11 @@ def _rds_snap_tags(
 
     with executor_factory(max_workers=1) as w:
         return filter(None, (w.map(process_tags, snaps)))
+
+
+@RDSSnapshot.filter_registry.register('onhour')
+class RDSOffHour(OffHour):
+    pass
 
 
 @RDSSnapshot.filter_registry.register('latest')

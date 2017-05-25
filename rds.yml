@@ -1,11 +1,35 @@
 policies:
+  - name: account-limit-manual
+    resource: account
+    filters:
+      - type: service-limit
+        services:
+          - RDS
+        limits: "DB snapshots per user"
+        threshold: 50
+    actions:
+      - type: notify
+        template: account-limit-rds-snapshot
+        subject: "[custodian] ({{ account }}) - RDS Manual snapshot"
+        from: cloudmaid@capitalone.com
+        to:
+          - tbd@example.com
+          - owner-contact
+          # todo sns arn for dba group
+          # - sns:
+
   - name: db-off
     resource: rds
     filters:
+      # databases must be running and available
+      - DBInstanceStatus: available
+
       # Not for read replicas
       - ReadReplicaSourceDBInstanceIdentifier: absent
+      # Not for aurora clusters
       - DBClusterIdentifer: absent
 
+      # Filter by offhours on the given opt-in tag
       - type: offhour
         tag: RDSOffhours
         offhour: 19
@@ -36,7 +60,8 @@ policies:
 
 # Code changes
 
-- wait synchronously snapshot (optionally)
-- copy parameters group to tags on snapshot
-
-- restore (use tag value from snapshot for option group)
+- [ x]  register off hours filter for use with rds
+- [ ] snapshot with additional tags
+- [ ] wait synchronously snapshot (optionally)
+- [ ] copy parameters group to tags on snapshot
+- [ ] restore (use tag value from snapshot for option group)
