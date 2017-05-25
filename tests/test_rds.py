@@ -251,20 +251,6 @@ class RDSTest(BaseTest):
         except ClientError:
             self.fail("DB Not found")
 
-    def test_patch(self):
-        session_factory = self.record_flight_data('test_rds_delete_copy_restore2')
-        client = session_factory().client('rds')
-        instance_id = 'mxtest'
-        p = self.load_policy(
-            {'name': 'rds-delete',
-             'resource': 'rds-snapshot',
-             'filters': [
-                 {'DBInstanceIdentifier': instance_id}],
-             },
-            config={'region': 'us-east-2'},
-            session_factory=session_factory)        
-        p.run()
-
     def test_rds_delete_copy(self):
         session_factory = self.replay_flight_data('test_rds_delete_copy_restore')
         client = session_factory().client('rds')

@@ -917,7 +917,7 @@ def _rds_snap_tags(
 
 
 @RDSSnapshot.filter_registry.register('onhour')
-class RDSOnHour(OffHour):
+class RDSOnHour(OnHour):
     pass
 
 
@@ -982,8 +982,7 @@ class RestoreInstance(BaseAction):
     schema = type_schema(
         'restore',
         restore_options={'type': 'object'},
-        modify_options={'type': 'object'}
-        )
+        modify_options={'type': 'object'})
 
     permissions = (
         'rds:AddTagsToResource',
