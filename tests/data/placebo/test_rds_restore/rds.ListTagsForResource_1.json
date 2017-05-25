@@ -4,11 +4,11 @@
         "ResponseMetadata": {
             "RetryAttempts": 0, 
             "HTTPStatusCode": 200, 
-            "RequestId": "bb15e16f-4172-11e7-9df5-8fbbb8ea9ccc", 
+            "RequestId": "fd029e2b-4191-11e7-94f6-2369bd255e2c", 
             "HTTPHeaders": {
-                "x-amzn-requestid": "bb15e16f-4172-11e7-9df5-8fbbb8ea9ccc", 
-                "date": "Thu, 25 May 2017 17:51:07 GMT", 
-                "content-length": "1135", 
+                "x-amzn-requestid": "fd029e2b-4191-11e7-94f6-2369bd255e2c", 
+                "date": "Thu, 25 May 2017 21:34:52 GMT", 
+                "content-length": "1134", 
                 "content-type": "text/xml"
             }
         }, 
@@ -18,7 +18,7 @@
                 "Key": "StorageType"
             }, 
             {
-                "Value": "default.postgres-9-5", 
+                "Value": "default.postgres9.5", 
                 "Key": "ParameterGroupName"
             }, 
             {

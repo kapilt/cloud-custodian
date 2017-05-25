@@ -223,6 +223,7 @@ class RDSTest(BaseTest):
         self.assertEqual(len(resources), 6)
 
     def test_rds_restore(self):
+        self.patch(rds.RestoreInstance, 'executor_factory', MainThreadExecutor)
         session_factory = self.replay_flight_data('test_rds_restore')
         client = session_factory().client('rds')
         instance_id = 'mxtest'
@@ -239,16 +240,30 @@ class RDSTest(BaseTest):
                 'latest'],
             'actions': [
                 {'type': 'restore',
-                 'restore_options': {'DBInstanceIdentifier': 'mxtest4'}}]
+                 'restore_options': {'DBInstanceIdentifier': instance_id}}]
                 }, session_factory=session_factory)
         resources = p.run()
 
         self.assertEqual(len(resources), 1)
         try:
-            instances = client.describe_db_instances(
-                DBInstanceIdentifier='mxtest3')
-        except:
+            client.describe_db_instances(
+                DBInstanceIdentifier=instance_id)
+        except ClientError:
             self.fail("DB Not found")
+
+    def test_patch(self):
+        session_factory = self.record_flight_data('test_rds_delete_copy_restore2')
+        client = session_factory().client('rds')
+        instance_id = 'mxtest'
+        p = self.load_policy(
+            {'name': 'rds-delete',
+             'resource': 'rds-snapshot',
+             'filters': [
+                 {'DBInstanceIdentifier': instance_id}],
+             },
+            config={'region': 'us-east-2'},
+            session_factory=session_factory)        
+        p.run()
 
     def test_rds_delete_copy(self):
         session_factory = self.replay_flight_data('test_rds_delete_copy_restore')
@@ -269,10 +284,10 @@ class RDSTest(BaseTest):
         resources = p.run()
         db_info = client.describe_db_instances(DBInstanceIdentifier=instance_id)
         self.assertTrue(db_info['DBInstances'][0]['CopyTagsToSnapshot'])
-        db_tags = client.list_tags_for_resource(
-            ResourceName=p.resource_manager.generate_arn(instance_id))
-        tag_keys = [t['Key'] for t in db_tags['TagList']]
-        self.assertIn('DBSubnetGroupName', tag_keys)
+        snaps = p.resource_manager.get_resource_manager(
+            'rds-snapshot').get_resources(('final-mxtest-2017-05-25',))
+        snap_keys = {t['Key'] for t in snaps[0]['Tags']}
+        self.assertTrue(snap_keys.issuperset(rds.RestoreInstance.restore_keys))
 
     def test_rds_delete(self):
         session_factory = self.replay_flight_data('test_rds_delete')

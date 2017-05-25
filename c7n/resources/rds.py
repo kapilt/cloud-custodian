@@ -917,7 +917,7 @@ def _rds_snap_tags(
 
 
 @RDSSnapshot.filter_registry.register('onhour')
-class RDSOffHour(OffHour):
+class RDSOnHour(OffHour):
     pass
 
 
@@ -971,7 +971,12 @@ class RestoreInstance(BaseAction):
     """Restore an rds instance from a snapshot.
 
     Note this requires the snapshot or db deletion be taken
-    with the `copy-restore-info` boolean flag set to true.
+    with the `copy-restore-info` boolean flag set to true, as
+    various instance metadata is stored on the snapshot as tags.
+
+    additional parameters to restore db instance api call be overriden
+    via `restore_options` settings. various modify db instance parameters
+    can be specified via `modify_options` settings.
     """
 
     schema = type_schema(
@@ -987,6 +992,12 @@ class RestoreInstance(BaseAction):
         'rds:ModifyOptionGroup',
         'rds:RestoreDBInstanceFromDBSnapshot')
 
+    poll_period = 60
+    restore_keys = set((
+        'VPCSecurityGroups', 'MultiAZ', 'DBSubnetGroupName',
+        'InstanceClass', 'StorageType', 'ParameterGroupName',
+        'OptionGroupName'))
+
     def validate(self):
         found = False
         for f in self.manager.filters:
@@ -994,25 +1005,50 @@ class RestoreInstance(BaseAction):
                 found = True
         if not found:
             # do we really need this...
-            raise FilterValidationError("must filter by latest")
+            raise FilterValidationError(
+                "must filter by latest to use restore action")
         return self
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('rds')
-        for r in resources:
-            params, post_modify = self.get_restore_from_tags(r)
+        # restore up to 10 in parallel, we have to wait on each.
+        with self.executor_factory(
+                max_workers=min(10, len(resources) or 1)) as w:
+            futures = {}
+            for r in resources:
+                tags = {t['Key']: t['Value'] for t in r['Tags']}
+                if not set(tags).issuperset(self.restore_keys):
+                    self.log.warning(
+                        "snapshot:%s missing restore tags",
+                        r['DBSnapshotIdentifier'])
+                    continue
+                futures[w.submit(self.process_instance, client, r)] = r
+            for f in as_completed(futures):
+                r = futures[f]
+                if f.exception():
+                    self.log.warning(
+                        "Error restoring db:%s from:%s error:\n%s",
+                        r['DBInstanceIdentifier'], r['DBSnapshotIdentifier'],
+                        f.exception())
+                    continue
 
-            result = client.restore_db_instance_from_db_snapshot(**params)
-            waiter = client.get_waiter('db_instance_available')
-            waiter.config.delay = 60
-            waiter.wait(DBInstanceIdentifier=params['DBInstanceIdentifier'])
-            client.modify_db_instance(
-                DBInstanceIdentifier=params['DBInstanceIdentifier'],
-                ApplyImmediately=True,
-                **post_modify)
-            client.reboot_db_instance(
-                DBInstanceIdentifier=params['DBInstanceIdentifier'],
-                ForceFailover=False)
+    def process_instance(self, client, r):
+        params, post_modify = self.get_restore_from_tags(r)
+        self.manager.retry(
+            client.restore_db_instance_from_db_snapshot, **params)
+        waiter = client.get_waiter('db_instance_available')
+        # wait up to 40m
+        waiter.config.delay = self.poll_period
+        waiter.wait(DBInstanceIdentifier=params['DBInstanceIdentifier'])
+        self.manager.retry(
+            client.modify_db_instance,
+            DBInstanceIdentifier=params['DBInstanceIdentifier'],
+            ApplyImmediately=True,
+            **post_modify)
+        self.manager.retry(
+            client.reboot_db_instance,
+            DBInstanceIdentifier=params['DBInstanceIdentifier'],
+            ForceFailover=False)
 
     def get_restore_from_tags(self, snapshot):
         params, post_modify = {}, {}
@@ -1020,7 +1056,7 @@ class RestoreInstance(BaseAction):
 
         params['DBInstanceIdentifier'] = snapshot['DBInstanceIdentifier']
         params['DBSnapshotIdentifier'] = snapshot['DBSnapshotIdentifier']
-        params['MultiAZ'] = tags['MultiAz'] == 'True' and True or False
+        params['MultiAZ'] = tags['MultiAZ'] == 'True' and True or False
         params['DBSubnetGroupName'] = tags['DBSubnetGroupName']
         params['DBInstanceClass'] = tags['InstanceClass']
         params['CopyTagsToSnapshot'] = True
@@ -1030,13 +1066,9 @@ class RestoreInstance(BaseAction):
         post_modify['DBParameterGroupName'] = tags['ParameterGroupName']
         post_modify['VpcSecurityGroupIds'] = tags['VPCSecurityGroups'].split(',')
 
-        restore_keys = set((
-            'VPCSecurityGroups', 'MultiAz', 'DBSubnetGroupName',
-            'InstanceClass', 'StorageType', 'ParameterGroupName',
-            'OptionGroupName'))
         params['Tags'] = [
             {'Key': k, 'Value': v} for k, v in tags.items()
-            if k not in restore_keys]
+            if k not in self.restore_keys]
 
         params.update(self.data.get('restore_options', {}))
         post_modify.update(self.data.get('modify_options', {}))

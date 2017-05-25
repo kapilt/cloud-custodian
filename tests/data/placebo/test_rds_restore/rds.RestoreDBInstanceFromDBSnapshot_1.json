@@ -71,7 +71,7 @@
             "EngineVersion": "9.5.4", 
             "DomainMemberships": [], 
             "StorageType": "gp2", 
-            "DbiResourceId": "db-7D6MBYZ42OHOPYYH7LTTGRCCLE", 
+            "DbiResourceId": "db-HJC7IKBO2ACTLNNZCM7EX66IHE", 
             "CACertificateIdentifier": "rds-ca-2015", 
             "KmsKeyId": "arn:aws:kms:us-east-2:644160558196:key/38343899-6a22-4365-8777-3224dc078cab", 
             "StorageEncrypted": true, 
@@ -82,13 +82,13 @@
         "ResponseMetadata": {
             "RetryAttempts": 0, 
             "HTTPStatusCode": 200, 
-            "RequestId": "bba0474c-4172-11e7-a106-f3916c46eff4", 
+            "RequestId": "fd1e3c83-4191-11e7-94f6-2369bd255e2c", 
             "HTTPHeaders": {
-                "x-amzn-requestid": "bba0474c-4172-11e7-a106-f3916c46eff4", 
+                "x-amzn-requestid": "fd1e3c83-4191-11e7-94f6-2369bd255e2c", 
                 "vary": "Accept-Encoding", 
                 "content-length": "3749", 
                 "content-type": "text/xml", 
-                "date": "Thu, 25 May 2017 17:51:09 GMT"
+                "date": "Thu, 25 May 2017 21:34:54 GMT"
             }
         }
     }
