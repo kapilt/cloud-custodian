@@ -1,0 +1,21 @@
+{
+    "status_code": 404, 
+    "data": {
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 404, 
+            "RequestId": "ba9e1a4d-4172-11e7-9df5-8fbbb8ea9ccc", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "ba9e1a4d-4172-11e7-9df5-8fbbb8ea9ccc", 
+                "date": "Thu, 25 May 2017 17:51:07 GMT", 
+                "content-length": "277", 
+                "content-type": "text/xml"
+            }
+        }, 
+        "Error": {
+            "Message": "DBInstance mxtest not found.", 
+            "Code": "DBInstanceNotFound", 
+            "Type": "Sender"
+        }
+    }
+}

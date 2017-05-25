@@ -1,0 +1,54 @@
+{
+    "status_code": 200, 
+    "data": {
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 200, 
+            "RequestId": "bb15e16f-4172-11e7-9df5-8fbbb8ea9ccc", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "bb15e16f-4172-11e7-9df5-8fbbb8ea9ccc", 
+                "date": "Thu, 25 May 2017 17:51:07 GMT", 
+                "content-length": "1135", 
+                "content-type": "text/xml"
+            }
+        }, 
+        "TagList": [
+            {
+                "Value": "gp2", 
+                "Key": "StorageType"
+            }, 
+            {
+                "Value": "default.postgres-9-5", 
+                "Key": "ParameterGroupName"
+            }, 
+            {
+                "Value": "sg-aa6c90c3", 
+                "Key": "VPCSecurityGroups"
+            }, 
+            {
+                "Value": "default:postgres-9-5", 
+                "Key": "OptionGroupName"
+            }, 
+            {
+                "Value": "db.m4.large", 
+                "Key": "InstanceClass"
+            }, 
+            {
+                "Value": "default", 
+                "Key": "DBSubnetGroupName"
+            }, 
+            {
+                "Value": "other", 
+                "Key": "workload-type"
+            }, 
+            {
+                "Value": "False", 
+                "Key": "MultiAz"
+            }, 
+            {
+                "Value": "Testing", 
+                "Key": "AppName"
+            }
+        ]
+    }
+}

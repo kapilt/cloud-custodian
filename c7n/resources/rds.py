@@ -577,18 +577,23 @@ class Delete(BaseAction):
                     skip-snapshot: true
     """
 
-    schema = {
-        'type': 'object',
-        'properties': {
-            'type': {'enum': ['delete'],
-                     'skip-snapshot': {'type': 'boolean'}}
-        }
-    }
+    schema = type_schema('delete', **{
+        'skip-snapshot': {'type': 'boolean'},
+        'copy-restore-info': {'type': 'boolean'}
+    })
 
-    permissions = ('rds:DeleteDBInstance',)
+    permissions = ('rds:DeleteDBInstance', 'rds:AddTagsToResource')
+
+    def validate(self):
+        if self.data.get('skip-snapshot', False) and self.data.get(
+                'copy-restore-info'):
+            raise FilterValidationError(
+                "skip-snapshot cannot be specified with copy-restore-info")
+        return self
 
     def process(self, dbs):
         skip = self.data.get('skip-snapshot', False)
+
         # Concurrency feels like overkill here.
         client = local_session(self.manager.session_factory).client('rds')
         for db in dbs:
@@ -599,17 +604,57 @@ class Delete(BaseAction):
             else:
                 params['FinalDBSnapshotIdentifier'] = snapshot_identifier(
                     'Final', db['DBInstanceIdentifier'])
+
+            if self.data.get('copy-restore-info', False):
+                self.copy_restore_info(client, db)
+                if not db['CopyTagsToSnapshot']:
+                    client.modify_db_instance(
+                        DBInstanceIdentifier=db['DBInstanceIdentifier'],
+                        CopyTagsToSnapshot=True)
             self.log.info(
                 "Deleting rds: %s snapshot: %s",
                 db['DBInstanceIdentifier'],
                 params.get('FinalDBSnapshotIdentifier', False))
+
             try:
                 client.delete_db_instance(**params)
             except ClientError as e:
                 if e.response['Error']['Code'] == "InvalidDBInstanceState":
                     continue
                 raise
+
         return dbs
+
+    def copy_restore_info(self, client, instance):
+        tags = []
+        tags.append({
+            'Key': 'VPCSecurityGroups',
+            'Value': ''.join([
+                g['VpcSecurityGroupId'] for g in instance['VpcSecurityGroups']
+            ])})
+        tags.append({
+            'Key': 'OptionGroupName',
+            'Value': instance['OptionGroupMemberships'][0]['OptionGroupName']})
+        tags.append({
+            'Key': 'ParameterGroupName',
+            'Value': instance['DBParameterGroups'][0]['DBParameterGroupName']})
+        tags.append({
+            'Key': 'InstanceClass',
+            'Value': instance['DBInstanceClass']})
+        tags.append({
+            'Key': 'StorageType',
+            'Value': instance['StorageType']})
+        tags.append({
+            # XXX normalize to AZ
+            'Key': 'MultiAZ',
+            'Value': str(instance['MultiAZ'])})
+        tags.append({
+            'Key': 'DBSubnetGroupName',
+            'Value': instance['DBSubnetGroup']['DBSubnetGroupName']})
+        client.add_tags_to_resource(
+            ResourceName=self.manager.generate_arn(
+                instance['DBInstanceIdentifier']),
+            Tags=tags)
 
 
 @actions.register('snapshot')
@@ -651,7 +696,7 @@ class Snapshot(BaseAction):
         c = local_session(self.manager.session_factory).client('rds')
         c.create_db_snapshot(
             DBSnapshotIdentifier=snapshot_identifier(
-                'Backup',
+                self.data.get('snapshot-prefix', 'Backup'),
                 resource['DBInstanceIdentifier']),
             DBInstanceIdentifier=resource['DBInstanceIdentifier'])
 
@@ -919,6 +964,83 @@ class RDSSnapshotAge(AgeFilter):
         op={'type': 'string', 'enum': OPERATORS.keys()})
 
     date_attribute = 'SnapshotCreateTime'
+
+
+@RDSSnapshot.action_registry.register('restore')
+class RestoreInstance(BaseAction):
+    """Restore an rds instance from a snapshot.
+
+    Note this requires the snapshot or db deletion be taken
+    with the `copy-restore-info` boolean flag set to true.
+    """
+
+    schema = type_schema(
+        'restore',
+        restore_options={'type': 'object'},
+        modify_options={'type': 'object'}
+        )
+
+    permissions = (
+        'rds:AddTagsToResource',
+        'rds:ModifyDBInstance',
+        'rds:ModifyDBParameterGroup',
+        'rds:ModifyOptionGroup',
+        'rds:RestoreDBInstanceFromDBSnapshot')
+
+    def validate(self):
+        found = False
+        for f in self.manager.filters:
+            if isinstance(f, LatestSnapshot):
+                found = True
+        if not found:
+            # do we really need this...
+            raise FilterValidationError("must filter by latest")
+        return self
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('rds')
+        for r in resources:
+            params, post_modify = self.get_restore_from_tags(r)
+
+            result = client.restore_db_instance_from_db_snapshot(**params)
+            waiter = client.get_waiter('db_instance_available')
+            waiter.config.delay = 60
+            waiter.wait(DBInstanceIdentifier=params['DBInstanceIdentifier'])
+            client.modify_db_instance(
+                DBInstanceIdentifier=params['DBInstanceIdentifier'],
+                ApplyImmediately=True,
+                **post_modify)
+            client.reboot_db_instance(
+                DBInstanceIdentifier=params['DBInstanceIdentifier'],
+                ForceFailover=False)
+
+    def get_restore_from_tags(self, snapshot):
+        params, post_modify = {}, {}
+        tags = {t['Key']: t['Value'] for t in snapshot['Tags']}
+
+        params['DBInstanceIdentifier'] = snapshot['DBInstanceIdentifier']
+        params['DBSnapshotIdentifier'] = snapshot['DBSnapshotIdentifier']
+        params['MultiAZ'] = tags['MultiAz'] == 'True' and True or False
+        params['DBSubnetGroupName'] = tags['DBSubnetGroupName']
+        params['DBInstanceClass'] = tags['InstanceClass']
+        params['CopyTagsToSnapshot'] = True
+        params['StorageType'] = tags['StorageType']
+        params['OptionGroupName'] = tags['OptionGroupName']
+
+        post_modify['DBParameterGroupName'] = tags['ParameterGroupName']
+        post_modify['VpcSecurityGroupIds'] = tags['VPCSecurityGroups'].split(',')
+
+        restore_keys = set((
+            'VPCSecurityGroups', 'MultiAz', 'DBSubnetGroupName',
+            'InstanceClass', 'StorageType', 'ParameterGroupName',
+            'OptionGroupName'))
+        params['Tags'] = [
+            {'Key': k, 'Value': v} for k, v in tags.items()
+            if k not in restore_keys]
+
+        params.update(self.data.get('restore_options', {}))
+        post_modify.update(self.data.get('modify_options', {}))
+        return params, post_modify
 
 
 @RDSSnapshot.action_registry.register('tag')

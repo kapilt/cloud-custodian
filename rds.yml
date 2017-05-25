@@ -10,7 +10,7 @@ policies:
     actions:
       - type: notify
         template: account-limit-rds-snapshot
-        subject: "[custodian] ({{ account }}) - RDS Manual snapshot"
+        subject: "[custodian] ({{ account }}) - RDS manual snapshot limit"
         from: cloudmaid@capitalone.com
         to:
           - tbd@example.com
@@ -31,25 +31,34 @@ policies:
 
       # Filter by offhours on the given opt-in tag
       - type: offhour
-        tag: RDSOffhours
+        tag: custodian_downtime
         offhour: 19
         default_tz: est
+
     actions:
-      - type: snapshot
       - type: delete
-        skip-snapshot: true
+        copy-restore-info: true
       - type: notify
+        template: account-limit-rds-snapshot
+        subject: "[custodian] ({{ account }}) - RDS Offhours - Instance Stopped"
+        from: cloudmaid@example.com
+        to:
+          - owner-contact
+          # todo sns arn for dba group
+          # - sns:
 
 
   - name: db-on
     resource: rds-snapshots
     filters:
+      - SnapshotType: manual
+      - latest
       - type: onhour
-        tag: RDSOffhours
+        tag: custodian_downtime
         onhour: 8
         default_tz: est
     actions:
-      - restore
+      - type: restore
       - type: notify
 
   - name: db-hibernate-trim-snapshots

@@ -1,0 +1,142 @@
+{
+    "status_code": 200, 
+    "data": {
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 200, 
+            "RequestId": "bae645e7-4172-11e7-9df5-8fbbb8ea9ccc", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "bae645e7-4172-11e7-9df5-8fbbb8ea9ccc", 
+                "vary": "Accept-Encoding", 
+                "content-length": "4045", 
+                "content-type": "text/xml", 
+                "date": "Thu, 25 May 2017 17:51:07 GMT"
+            }
+        }, 
+        "DBSnapshots": [
+            {
+                "Engine": "postgres", 
+                "SnapshotCreateTime": {
+                    "hour": 15, 
+                    "__class__": "datetime", 
+                    "month": 5, 
+                    "second": 18, 
+                    "microsecond": 478000, 
+                    "year": 2017, 
+                    "day": 25, 
+                    "minute": 52
+                }, 
+                "AvailabilityZone": "us-east-2b", 
+                "DBSnapshotArn": "arn:aws:rds:us-east-2:644160558196:snapshot:final-mxtest-2017-05-25", 
+                "PercentProgress": 100, 
+                "MasterUsername": "mxtester", 
+                "Encrypted": true, 
+                "LicenseModel": "postgresql-license", 
+                "StorageType": "gp2", 
+                "Status": "available", 
+                "VpcId": "vpc-5f6c9936", 
+                "DBSnapshotIdentifier": "final-mxtest-2017-05-25", 
+                "InstanceCreateTime": {
+                    "hour": 17, 
+                    "__class__": "datetime", 
+                    "month": 12, 
+                    "second": 52, 
+                    "microsecond": 162000, 
+                    "year": 2016, 
+                    "day": 22, 
+                    "minute": 14
+                }, 
+                "OptionGroupName": "default:postgres-9-5", 
+                "AllocatedStorage": 5, 
+                "EngineVersion": "9.5.4", 
+                "SnapshotType": "manual", 
+                "KmsKeyId": "arn:aws:kms:us-east-2:644160558196:key/38343899-6a22-4365-8777-3224dc078cab", 
+                "IAMDatabaseAuthenticationEnabled": false, 
+                "Port": 5432, 
+                "DBInstanceIdentifier": "mxtest"
+            }, 
+            {
+                "Engine": "postgres", 
+                "SnapshotCreateTime": {
+                    "hour": 17, 
+                    "__class__": "datetime", 
+                    "month": 5, 
+                    "second": 26, 
+                    "microsecond": 934000, 
+                    "year": 2017, 
+                    "day": 25, 
+                    "minute": 29
+                }, 
+                "AvailabilityZone": "us-east-2b", 
+                "DBSnapshotArn": "arn:aws:rds:us-east-2:644160558196:snapshot:rds:mxtest2-2017-05-25-17-29", 
+                "PercentProgress": 100, 
+                "MasterUsername": "mxtester", 
+                "Encrypted": true, 
+                "LicenseModel": "postgresql-license", 
+                "StorageType": "gp2", 
+                "Status": "available", 
+                "VpcId": "vpc-5f6c9936", 
+                "DBSnapshotIdentifier": "rds:mxtest2-2017-05-25-17-29", 
+                "InstanceCreateTime": {
+                    "hour": 17, 
+                    "__class__": "datetime", 
+                    "month": 5, 
+                    "second": 18, 
+                    "microsecond": 442000, 
+                    "year": 2017, 
+                    "day": 25, 
+                    "minute": 29
+                }, 
+                "OptionGroupName": "default:postgres-9-5", 
+                "AllocatedStorage": 5, 
+                "EngineVersion": "9.5.4", 
+                "SnapshotType": "automated", 
+                "KmsKeyId": "arn:aws:kms:us-east-2:644160558196:key/38343899-6a22-4365-8777-3224dc078cab", 
+                "IAMDatabaseAuthenticationEnabled": false, 
+                "Port": 5432, 
+                "DBInstanceIdentifier": "mxtest2"
+            }, 
+            {
+                "Engine": "postgres", 
+                "SnapshotCreateTime": {
+                    "hour": 17, 
+                    "__class__": "datetime", 
+                    "month": 5, 
+                    "second": 54, 
+                    "microsecond": 488000, 
+                    "year": 2017, 
+                    "day": 25, 
+                    "minute": 43
+                }, 
+                "AvailabilityZone": "us-east-2c", 
+                "DBSnapshotArn": "arn:aws:rds:us-east-2:644160558196:snapshot:rds:mxtest3-2017-05-25-17-42", 
+                "PercentProgress": 100, 
+                "MasterUsername": "mxtester", 
+                "Encrypted": true, 
+                "LicenseModel": "postgresql-license", 
+                "StorageType": "gp2", 
+                "Status": "available", 
+                "VpcId": "vpc-5f6c9936", 
+                "DBSnapshotIdentifier": "rds:mxtest3-2017-05-25-17-42", 
+                "InstanceCreateTime": {
+                    "hour": 17, 
+                    "__class__": "datetime", 
+                    "month": 5, 
+                    "second": 46, 
+                    "microsecond": 811000, 
+                    "year": 2017, 
+                    "day": 25, 
+                    "minute": 42
+                }, 
+                "OptionGroupName": "default:postgres-9-5", 
+                "AllocatedStorage": 5, 
+                "EngineVersion": "9.5.4", 
+                "SnapshotType": "automated", 
+                "KmsKeyId": "arn:aws:kms:us-east-2:644160558196:key/38343899-6a22-4365-8777-3224dc078cab", 
+                "IAMDatabaseAuthenticationEnabled": false, 
+                "Port": 5432, 
+                "DBInstanceIdentifier": "mxtest3"
+            }
+        ]
+    }
+}
