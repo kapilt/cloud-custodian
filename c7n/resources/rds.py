@@ -604,7 +604,6 @@ class Delete(BaseAction):
             else:
                 params['FinalDBSnapshotIdentifier'] = snapshot_identifier(
                     'Final', db['DBInstanceIdentifier'])
-
             if self.data.get('copy-restore-info', False):
                 self.copy_restore_info(client, db)
                 if not db['CopyTagsToSnapshot']:
@@ -645,7 +644,6 @@ class Delete(BaseAction):
             'Key': 'StorageType',
             'Value': instance['StorageType']})
         tags.append({
-            # XXX normalize to AZ
             'Key': 'MultiAZ',
             'Value': str(instance['MultiAZ'])})
         tags.append({
@@ -985,10 +983,10 @@ class RestoreInstance(BaseAction):
         modify_options={'type': 'object'})
 
     permissions = (
-        'rds:AddTagsToResource',
         'rds:ModifyDBInstance',
         'rds:ModifyDBParameterGroup',
         'rds:ModifyOptionGroup',
+        'rds:RebootDBInstance',
         'rds:RestoreDBInstanceFromDBSnapshot')
 
     poll_period = 60
