@@ -1,0 +1,42 @@
+policies:
+  - name: db-off
+    resource: rds
+    filters:
+      # Not for read replicas
+      - ReadReplicaSourceDBInstanceIdentifier: absent
+      - DBClusterIdentifer: absent
+
+      - type: offhour
+        tag: RDSOffhours
+        offhour: 19
+        default_tz: est
+    actions:
+      - type: snapshot
+      - type: delete
+        skip-snapshot: true
+      - type: notify
+
+
+  - name: db-on
+    resource: rds-snapshots
+    filters:
+      - type: onhour
+        tag: RDSOffhours
+        onhour: 8
+        default_tz: est
+    actions:
+      - restore
+      - type: notify
+
+  - name: db-hibernate-trim-snapshots
+    resource: rds-snapshots
+    filters:
+      - "tag:HiberateSnapshot": 3
+---
+
+# Code changes
+
+- wait synchronously snapshot (optionally)
+- copy parameters group to tags on snapshot
+
+- restore (use tag value from snapshot for option group)
