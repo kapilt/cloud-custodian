@@ -1607,14 +1607,14 @@ class InventoryFilter(Filter):
     schema = type_schema('inventory')
 
 
-@actions.register('enable-inventory')
+@actions.register('set-inventory')
 class EnableInventory(BucketActionBase):
-    """Enable bucket inventories
+    """Configure bucket inventories for an s3 bucket.
     """
-
     schema = type_schema(
-        'enable-inventory',
+        'set-inventory',
         required=['name', 'destination'],
+        state={'enum': ['enabled', 'disabled', 'absent']},
         name={'type': 'string', 'description': 'Name of inventory'},
         destination={'type': 'string', 'description': 'Name of destination bucket'},
         prefix={'type': 'string', 'description': 'Destination prefix'},
@@ -1625,46 +1625,76 @@ class EnableInventory(BucketActionBase):
             'IsMultipartUploaded', 'ReplicationStatus']}}
         )
 
+    def process(self, buckets):
+        for b in buckets:
+            self.process_bucket(b)
+    
     def process_bucket(self, b):
         inventory_name = self.data.get('name')
         destination = self.data.get('destination')
         prefix = self.data.get('prefix', '')
         schedule = self.data.get('schedule', 'Daily')
-        fields = self.data.get('fields', ['LastModifiedDate'])
+        fields = self.data.get('fields', ['LastModifiedDate', 'Size'])
         versions = self.data.get('versions', 'Current')
+        state = self.data.get('state', 'enabled')
 
-        if prefix is None:
+        if not prefix:
             prefix = "Inventories/%s" % (self.manager.config.account_id)
 
-        session = local_session(self.manager.session_factory)
-        client = session.client('s3')
-        inventories = client.list_bucket_inventory_configurations(Bucket=b['Name'])
+        client = bucket_client(local_session(self.manager.session_factory), b)
+        if state == 'absent':
+            try:
+                client.delete_bucket_inventory_configuration(
+                    Bucket=b['Name'], Id=inventory_name)
+            except ClientError as e:
+                if e.response['Error']['Code'] != 'NoSuchConfiguration':
+                    raise
+            return
 
         inventory = {
             'Destination': {
-                'S3BucketConfiguration': {
-                    'Bucket': destination,
-                    'Prefix': prefix,
+                'S3BucketDestination': {
+                    'Bucket': "arn:aws:s3:::%s" % destination,
                     'Format': 'CSV'}
-                },
-            'IsEnabled': True,
+            },
+            'IsEnabled': state == 'enabled' and True or False,
             'Id': inventory_name,
-            'OptionalFields': [fields],
-            'IncludeObjectVersions': versions,
+            'OptionalFields': fields,
+            'IncludedObjectVersions': versions,
             'Schedule': {
                 'Frequency': schedule
             }
         }
 
-        for i in inventories.get('InventoryConfigurationList', []):
-            for k, v in inventory.items():
-                if i[k] != v:
-                    continue
+        if prefix:
+            inventory['Destination']['S3BucketDestination']['Prefix'] = prefix
+            
+        found = self.get_inventory_delta(client, inventory, b)
+        if found:
             return
-
+        if found is False:
+            self.log.debug("updating bucket:%s inventory configuration id:%s",
+                           b['Name'], inventory_name)
         client.put_bucket_inventory_configuration(
             Bucket=b['Name'], Id=inventory_name, InventoryConfiguration=inventory)
 
+    def get_inventory_delta(self, client, inventory, b):
+        inventories = client.list_bucket_inventory_configurations(Bucket=b['Name'])            
+        found = None
+        for i in inventories.get('InventoryConfigurationList', []):
+            if i['Id'] != inventory['Id']:
+                continue
+            found = True
+            for k, v in inventory.items():
+                if k not in i:
+                    found = False
+                    continue
+                if isinstance(v, list):
+                    v.sort()
+                    i[k].sort()
+                if i[k] != v:
+                    found = False
+        return found
 
 @actions.register('delete')
 class DeleteBucket(ScanBucket):

@@ -1,0 +1,39 @@
+{
+    "status_code": 200, 
+    "data": {
+        "InventoryConfigurationList": [
+            {
+                "Schedule": {
+                    "Frequency": "Daily"
+                }, 
+                "IsEnabled": true, 
+                "Destination": {
+                    "S3BucketDestination": {
+                        "Prefix": "abcdef", 
+                        "Bucket": "arn:aws:s3:::custodian-inv", 
+                        "Format": "CSV"
+                    }
+                }, 
+                "OptionalFields": [
+                    "LastModifiedDate"
+                ], 
+                "IncludedObjectVersions": "All", 
+                "Id": "something"
+            }
+        ], 
+        "IsTruncated": false, 
+        "ResponseMetadata": {
+            "HTTPStatusCode": 200, 
+            "RetryAttempts": 0, 
+            "HostId": "beraOgrQuNK4l3VXrZDqmuBlUh33EWw59NxxHgk6crLOUXlnxBOBsm3D6msjCU/EE9VjEzJk1sM=", 
+            "RequestId": "410A7D64BECB2D3D", 
+            "HTTPHeaders": {
+                "x-amz-id-2": "beraOgrQuNK4l3VXrZDqmuBlUh33EWw59NxxHgk6crLOUXlnxBOBsm3D6msjCU/EE9VjEzJk1sM=", 
+                "date": "Fri, 26 May 2017 10:06:26 GMT", 
+                "content-length": "604", 
+                "x-amz-request-id": "410A7D64BECB2D3D", 
+                "server": "AmazonS3"
+            }
+        }
+    }
+}
