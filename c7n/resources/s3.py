@@ -1614,6 +1614,7 @@ class EnableInventory(BucketActionBase):
 
     schema = type_schema(
         'enable-inventory',
+        required=['name', 'destination'],
         name={'type': 'string', 'description': 'Name of inventory'},
         destination={'type': 'string', 'description': 'Name of destination bucket'},
         prefix={'type': 'string', 'description': 'Destination prefix'},
@@ -1627,9 +1628,11 @@ class EnableInventory(BucketActionBase):
     def process_bucket(self, b):
         inventory_name = self.data.get('name')
         destination = self.data.get('destination')
-        prefix = self.data.get('prefix')
-        schedule = self.data.get('schedule')
-        
+        prefix = self.data.get('prefix', '')
+        schedule = self.data.get('schedule', 'Daily')
+        fields = self.data.get('fields', ['LastModifiedDate'])
+        versions = self.data.get('versions', 'Current')
+
         if prefix is None:
             prefix = "Inventories/%s" % (self.manager.config.account_id)
 
@@ -1660,9 +1663,8 @@ class EnableInventory(BucketActionBase):
             return
 
         client.put_bucket_inventory_configuration(
-            Bucket=b['Name'], Id=name, InventoryConfiguration=inventory)
-            
-                
+            Bucket=b['Name'], Id=inventory_name, InventoryConfiguration=inventory)
+
 
 @actions.register('delete')
 class DeleteBucket(ScanBucket):
