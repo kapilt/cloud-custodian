@@ -18,6 +18,7 @@ import StringIO
 import shutil
 import tempfile
 import yaml
+import unittest
 
 from c7n import policy
 from c7n.schema import generate, validate as schema_validate
@@ -34,8 +35,18 @@ logging.getLogger('botocore').setLevel(logging.WARNING)
 
 load_resources()
 
+ACCOUNT_ID = '644160558196'
+
 C7N_VALIDATE = bool(os.environ.get('C7N_VALIDATE', ''))
 C7N_SCHEMA = generate()
+
+
+skip_if_not_validating = unittest.skipIf(
+    not C7N_VALIDATE, reason='We are not validating schemas.')
+
+# Set this so that if we run nose directly the tests will not fail
+if 'AWS_DEFAULT_REGION' not in os.environ:
+    os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
 
 class BaseTest(PillTest):
@@ -108,17 +119,18 @@ class BaseTest(PillTest):
         setattr(obj, attr, new)
         self.addCleanup(setattr, obj, attr, old)
 
-    def change_environment(self, **kw):
+    def change_environment(self, **kwargs):
         """Change the environment to the given set of variables.
 
+        To clear an environment variable set it to None.
         Existing environment restored after test.
         """
         # preserve key elements needed for testing
         for env in ["AWS_ACCESS_KEY_ID",
                     "AWS_SECRET_ACCESS_KEY",
                     "AWS_DEFAULT_REGION"]:
-            if env not in kw:
-                kw[env] = os.environ.get(env, "")
+            if env not in kwargs:
+                kwargs[env] = os.environ.get(env, "")
 
         original_environ = dict(os.environ)
 
@@ -128,7 +140,10 @@ class BaseTest(PillTest):
             os.environ.update(original_environ)
 
         os.environ.clear()
-        os.environ.update(kw)
+        for key, value in kwargs.items():
+            if value is None:
+                del(kwargs[key])
+        os.environ.update(kwargs)
 
     def capture_logging(
             self, name=None, level=logging.INFO,
@@ -149,6 +164,10 @@ class BaseTest(PillTest):
             logger.setLevel(old_logger_level)
 
         return log_file
+
+    @property
+    def account_id(self):
+        return ACCOUNT_ID
 
 
 def placebo_dir(name):
@@ -192,11 +211,14 @@ class Config(Bag):
 
     @classmethod
     def empty(cls, **kw):
+        region = os.environ.get('AWS_DEFAULT_REGION', "us-east-1")
         d = {}
         d.update({
-            'region': os.environ.get('AWS_DEFAULT_REGION', "us-east-1"),
+            'region': region,
+            'regions': [region],
             'cache': '',
             'profile': None,
+            'account_id': ACCOUNT_ID,
             'assume_role': None,
             'log_group': None,
             'metrics_enabled': False,
@@ -225,3 +247,10 @@ class Client(object):
         self.filters = filters
         return [Reservation(
             {'instances': [i for i in self.instances]})]
+
+
+try:
+    import pytest
+    functional = pytest.mark.functional
+except ImportError:
+    functional = lambda func: func  # noop

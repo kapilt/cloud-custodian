@@ -487,12 +487,13 @@ class InstanceAgeFilter(AgeFilter):
     schema = type_schema(
         'instance-age',
         op={'type': 'string', 'enum': OPERATORS.keys()},
-        days={'type': 'number'})
+        days={'type': 'number'},
+        hours={'type': 'number'},
+        minutes={'type': 'number'})
 
     def get_resource_date(self, i):
         # LaunchTime is basically how long has the instance
         # been on, use the oldest ebs vol attach time
-        found = False
         ebs_vols = [
             block['Ebs'] for block in i['BlockDeviceMappings']
             if 'Ebs' in block]
@@ -679,8 +680,7 @@ class Stop(BaseAction, StateTransitionFilter):
     """
     valid_origin_states = ('running',)
 
-    schema =  type_schema(
-        'stop', **{'terminate-ephemeral': {'type': 'boolean'}})
+    schema = type_schema('stop', **{'terminate-ephemeral': {'type': 'boolean'}})
 
     def get_permissions(self):
         perms = ('ec2:StopInstances',)
@@ -723,7 +723,7 @@ class Stop(BaseAction, StateTransitionFilter):
             except ClientError as e:
                 if e.response['Error']['Code'] == 'IncorrectInstanceState':
                     msg = e.response['Error']['Message']
-                    e_instance_id = msg[msg.find("'")+1:msg.rfind("'")]
+                    e_instance_id = msg[msg.find("'") + 1:msg.rfind("'")]
                     instance_ids.remove(e_instance_id)
                     if not instance_ids:
                         return

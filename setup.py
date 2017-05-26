@@ -8,12 +8,12 @@ def read(fname):
 
 setup(
     name="c7n",
-    version='0.8.23.2',
+    version='0.8.24.1',
     description="Cloud Custodian - Policy Rules Engine",
     long_description=read('README.rst'),
     classifiers=[
-      "Topic :: System :: Systems Administration",
-      "Topic :: System :: Distributed Computing"
+        "Topic :: System :: Systems Administration",
+        "Topic :: System :: Distributed Computing"
     ],
     url="https://github.com/capitalone/cloud-custodian",
     license="Apache-2.0",
@@ -30,4 +30,3 @@ setup(
         "tabulate",
     ],
 )
-

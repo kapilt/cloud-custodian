@@ -32,7 +32,8 @@ from c7n.resolver import ValuesFrom
 from c7n.utils import set_annotation, type_schema, parse_cidr
 
 
-class FilterValidationError(Exception): pass
+class FilterValidationError(Exception):
+    pass
 
 
 # Matching filters annotate their key onto objects
@@ -78,7 +79,8 @@ OPERATORS = {
     'regex': regex_match,
     'in': operator_in,
     'ni': operator_ni,
-    'not-in': operator_ni}
+    'not-in': operator_ni,
+    'contains': operator.contains}
 
 
 class FilterRegistry(PluginRegistry):
@@ -204,7 +206,7 @@ class And(Filter):
 
 
 class Not(Filter):
-    
+
     def __init__(self, data, registry, manager):
         super(Not, self).__init__(data)
         self.registry = registry
@@ -237,7 +239,7 @@ class Not(Filter):
         after = set([r[resource_type.id] for r in resources])
         results = before - after
         return [resource_map[r_id] for r_id in results]
-        
+
 
 class ValueFilter(Filter):
     """Generic value filter using jmespath
@@ -263,14 +265,15 @@ class ValueFilter(Filter):
                 {'type': 'array'},
                 {'type': 'string'},
                 {'type': 'boolean'},
-                {'type': 'number'}]},
+                {'type': 'number'},
+                {'type': 'null'}]},
             'op': {'enum': OPERATORS.keys()}}}
 
     annotate = True
 
     def _validate_resource_count(self):
         """ Specific validation for `resource_count` type
-        
+
         The `resource_count` type works a little differently because it operates
         on the entire set of resources.  It:
           - does not require `key`
@@ -297,12 +300,12 @@ class ValueFilter(Filter):
     def validate(self):
         if len(self.data) == 1:
             return self
-        
+
         # `resource_count` requires a slightly different schema than the rest of
         # the value filters because it operates on the full resource list
         if self.data.get('value_type') == 'resource_count':
             return self._validate_resource_count()
-        
+
         if 'key' not in self.data:
             raise FilterValidationError(
                 "Missing 'key' in value filter %s" % self.data)
@@ -430,7 +433,8 @@ class ValueFilter(Filter):
                 # EMR bug when testing ages in EMR. This is due to
                 # EMR not having more functionality.
                 try:
-                    value = parse(value)
+                    value = parse(value, default=datetime.now(tz=tzutc()))
+
                 except (AttributeError, TypeError):
                     value = 0
 
@@ -441,8 +445,7 @@ class ValueFilter(Filter):
         elif self.vtype == 'cidr':
             s = parse_cidr(sentinel)
             v = parse_cidr(value)
-            if (isinstance(s, ipaddress._BaseAddress)
-                    and isinstance(v, ipaddress._BaseNetwork)):
+            if (isinstance(s, ipaddress._BaseAddress) and isinstance(v, ipaddress._BaseNetwork)):
                 return v, s
             return s, v
         elif self.vtype == 'cidr_size':
@@ -458,7 +461,7 @@ class ValueFilter(Filter):
                 sentinel = datetime.now(tz=tzutc()) + timedelta(sentinel)
 
             if not isinstance(value, datetime):
-                value = parse(value)
+                value = parse(value, default=datetime.now(tz=tzutc()))
 
             return sentinel, value
         return sentinel, value
@@ -495,13 +498,16 @@ class AgeFilter(Filter):
         op = OPERATORS[self.data.get('op', 'greater-than')]
 
         if not self.threshold_date:
-            days = self.data.get('days', 60)
+
+            days = self.data.get('days', 0)
+            hours = self.data.get('hours', 0)
+            minutes = self.data.get('minutes', 0)
             # Work around placebo issues with tz
             if v.tzinfo:
                 n = datetime.now(tz=tzutc())
             else:
                 n = datetime.now()
-            self.threshold_date = n - timedelta(days)
+            self.threshold_date = n - timedelta(days=days, hours=hours, minutes=minutes)
 
         return op(self.threshold_date, v)
 
