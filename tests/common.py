@@ -18,6 +18,7 @@ import StringIO
 import shutil
 import tempfile
 import yaml
+import unittest
 
 from c7n import policy
 from c7n.schema import generate, validate as schema_validate
@@ -34,9 +35,18 @@ logging.getLogger('botocore').setLevel(logging.WARNING)
 
 load_resources()
 
+ACCOUNT_ID = '644160558196'
+
 C7N_VALIDATE = bool(os.environ.get('C7N_VALIDATE', ''))
-if C7N_VALIDATE:
-    C7N_SCHEMA = generate()
+C7N_SCHEMA = generate()
+
+
+skip_if_not_validating = unittest.skipIf(
+    not C7N_VALIDATE, reason='We are not validating schemas.')
+
+# Set this so that if we run nose directly the tests will not fail
+if 'AWS_DEFAULT_REGION' not in os.environ:
+    os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
 
 class BaseTest(PillTest):
@@ -45,10 +55,32 @@ class BaseTest(PillTest):
         # Clear out thread local session cache
         CONN_CACHE.session = None
 
+    def write_policy_file(self, policy, format='yaml'):
+        """ Write a policy file to disk in the specified format.
+
+        Input a dictionary and a format. Valid formats are `yaml` and `json`
+        Returns the file path.
+        """
+        suffix = "." + format
+        file = tempfile.NamedTemporaryFile(suffix=suffix)
+        if format == 'json':
+            json.dump(policy, file)
+        else:
+            file.write(yaml.dump(policy, Dumper=yaml.SafeDumper))
+
+        file.flush()
+        self.addCleanup(file.close)
+        return file.name
+
+    def get_temp_dir(self):
+        """ Return a temporary directory that will get cleaned up. """
+        temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, temp_dir)
+        return temp_dir
+
     def get_context(self, config=None, session_factory=None, policy=None):
         if config is None:
-            self.context_output_dir = tempfile.mkdtemp()
-            self.addCleanup(shutil.rmtree, self.context_output_dir)
+            self.context_output_dir = self.get_temp_dir()
             config = Config.empty(output_dir=self.context_output_dir)
         ctx = ExecutionContext(
             session_factory,
@@ -58,16 +90,16 @@ class BaseTest(PillTest):
 
     def load_policy(
             self, data, config=None, session_factory=None,
-            validate=C7N_VALIDATE, cache=False):
+            validate=C7N_VALIDATE, output_dir=None, cache=False):
         if validate:
             errors = schema_validate({'policies': [data]}, C7N_SCHEMA)
             if errors:
-                self.fail("Loaded policy is not valid %s" % errors[0])
+                raise errors[0]
 
         config = config or {}
-        temp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, temp_dir)
-        config['output_dir'] = temp_dir
+        if not output_dir:
+            temp_dir = self.get_temp_dir()
+            config['output_dir'] = temp_dir
         if cache:
             config['cache'] = os.path.join(temp_dir, 'c7n.cache')
             config['cache_period'] = 300
@@ -75,32 +107,30 @@ class BaseTest(PillTest):
         return policy.Policy(data, conf, session_factory)
 
     def load_policy_set(self, data, config=None):
-        t = tempfile.NamedTemporaryFile()
-        t.write(yaml.dump(data, Dumper=yaml.SafeDumper))
-        t.flush()
-        self.addCleanup(t.close)
+        filename = self.write_policy_file(data)
         if config:
             e = Config.empty(**config)
         else:
             e = Config.empty()
-        return policy.load(e, t.name)
+        return policy.load(e, filename)
 
     def patch(self, obj, attr, new):
         old = getattr(obj, attr, None)
         setattr(obj, attr, new)
         self.addCleanup(setattr, obj, attr, old)
 
-    def change_environment(self, **kw):
+    def change_environment(self, **kwargs):
         """Change the environment to the given set of variables.
 
+        To clear an environment variable set it to None.
         Existing environment restored after test.
         """
         # preserve key elements needed for testing
         for env in ["AWS_ACCESS_KEY_ID",
                     "AWS_SECRET_ACCESS_KEY",
                     "AWS_DEFAULT_REGION"]:
-            if env not in kw:
-                kw[env] = os.environ.get(env, "")
+            if env not in kwargs:
+                kwargs[env] = os.environ.get(env, "")
 
         original_environ = dict(os.environ)
 
@@ -110,7 +140,10 @@ class BaseTest(PillTest):
             os.environ.update(original_environ)
 
         os.environ.clear()
-        os.environ.update(kw)
+        for key, value in kwargs.items():
+            if value is None:
+                del(kwargs[key])
+        os.environ.update(kwargs)
 
     def capture_logging(
             self, name=None, level=logging.INFO,
@@ -131,6 +164,10 @@ class BaseTest(PillTest):
             logger.setLevel(old_logger_level)
 
         return log_file
+
+    @property
+    def account_id(self):
+        return ACCOUNT_ID
 
 
 def placebo_dir(name):
@@ -157,8 +194,8 @@ def load_data(file_name, state=None, **kw):
     return data
 
 
-def instance(state=None, **kw):
-    return load_data('ec2-instance.json', state, **kw)
+def instance(state=None, file='ec2-instance.json', **kw):
+    return load_data(file, state, **kw)
 
 
 class Bag(dict):
@@ -174,11 +211,14 @@ class Config(Bag):
 
     @classmethod
     def empty(cls, **kw):
+        region = os.environ.get('AWS_DEFAULT_REGION', "us-east-1")
         d = {}
         d.update({
-            'region': os.environ.get('AWS_DEFAULT_REGION', "us-east-1"),
+            'region': region,
+            'regions': [region],
             'cache': '',
             'profile': None,
+            'account_id': ACCOUNT_ID,
             'assume_role': None,
             'log_group': None,
             'metrics_enabled': False,
@@ -207,3 +247,10 @@ class Client(object):
         self.filters = filters
         return [Reservation(
             {'instances': [i for i in self.instances]})]
+
+
+try:
+    import pytest
+    functional = pytest.mark.functional
+except ImportError:
+    functional = lambda func: func  # noop
