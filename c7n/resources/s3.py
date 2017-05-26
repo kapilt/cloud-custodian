@@ -1601,14 +1601,8 @@ class RemoveBucketTag(RemoveTag):
             self.manager.session_factory, resource_set, remove_tags=tags)
 
 
-@filters.register('inventory')
-class InventoryFilter(Filter):
-
-    schema = type_schema('inventory')
-
-
 @actions.register('set-inventory')
-class EnableInventory(BucketActionBase):
+class SetInventory(BucketActionBase):
     """Configure bucket inventories for an s3 bucket.
     """
     schema = type_schema(
@@ -1623,6 +1617,8 @@ class EnableInventory(BucketActionBase):
         fields={'type': 'array', 'items': {'enum': [
             'Size', 'LastModifiedDate', 'StorageClass', 'ETag',
             'IsMultipartUploaded', 'ReplicationStatus']}})
+
+    permissions = ('s3:PutInventoryConfiguration', 's3:GetInventoryConfiguration')
 
     def process(self, buckets):
         with self.executor_factory(max_workers=2) as w:
