@@ -1622,13 +1622,12 @@ class EnableInventory(BucketActionBase):
         schedule={'enum': ['Daily', 'Weekly']},
         fields={'type': 'array', 'items': {'enum': [
             'Size', 'LastModifiedDate', 'StorageClass', 'ETag',
-            'IsMultipartUploaded', 'ReplicationStatus']}}
-        )
+            'IsMultipartUploaded', 'ReplicationStatus']}})
 
     def process(self, buckets):
-        for b in buckets:
-            self.process_bucket(b)
-    
+        with self.executor_factory(max_workers=2) as w:
+            list(w.map(self.process_bucket, buckets))
+
     def process_bucket(self, b):
         inventory_name = self.data.get('name')
         destination = self.data.get('destination')
@@ -1668,7 +1667,7 @@ class EnableInventory(BucketActionBase):
 
         if prefix:
             inventory['Destination']['S3BucketDestination']['Prefix'] = prefix
-            
+
         found = self.get_inventory_delta(client, inventory, b)
         if found:
             return
@@ -1679,7 +1678,7 @@ class EnableInventory(BucketActionBase):
             Bucket=b['Name'], Id=inventory_name, InventoryConfiguration=inventory)
 
     def get_inventory_delta(self, client, inventory, b):
-        inventories = client.list_bucket_inventory_configurations(Bucket=b['Name'])            
+        inventories = client.list_bucket_inventory_configurations(Bucket=b['Name'])
         found = None
         for i in inventories.get('InventoryConfigurationList', []):
             if i['Id'] != inventory['Id']:
@@ -1695,6 +1694,7 @@ class EnableInventory(BucketActionBase):
                 if i[k] != v:
                     found = False
         return found
+
 
 @actions.register('delete')
 class DeleteBucket(ScanBucket):
