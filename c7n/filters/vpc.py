@@ -65,6 +65,8 @@ class NetworkLocation(Filter):
     schema = type_schema(
         'network-location', key={'type': 'string'}, required=['key'])
 
+    permissions = ('ec2:DescribeSecurityGroups', 'ec2:DescribeSubnets')
+
     def validate(self):
         rfilters = self.manager.filter_registry.keys()
         if 'subnet' not in rfilters:
