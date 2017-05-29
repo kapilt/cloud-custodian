@@ -48,4 +48,3 @@ class HealthResource(BaseTest):
             self.assertTrue(
                 (r['eventTypeCategory'] == 'accountNotification'
              ) ^ ('AffectedEntities' in r))
-            

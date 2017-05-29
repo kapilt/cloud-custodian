@@ -13,12 +13,14 @@
 # limitations under the License.
 from botocore.exceptions import ClientError
 
+import boto3
 import copy
 from datetime import datetime
 import functools
 import json
 import itertools
 import logging
+import os
 import random
 import threading
 import time
@@ -44,6 +46,10 @@ else:
 from StringIO import StringIO
 
 
+class VarsSubstitutionError(Exception):
+    pass
+
+
 class Bag(dict):
 
     def __getattr__(self, k):
@@ -51,6 +57,32 @@ class Bag(dict):
             return self[k]
         except KeyError:
             raise AttributeError(k)
+
+
+def load_file(path, format=None, vars=None):
+    if format is None:
+        format = 'yaml'
+        _, ext = os.path.splitext(path)
+        if ext[1:] == 'json':
+            format = 'json'
+
+    with open(path) as fh:
+        contents = fh.read()
+
+        if vars:
+            try:
+                contents = contents.format(**vars)
+            except IndexError as e:
+                msg = 'Failed to substitute variable by positional argument.'
+                raise VarsSubstitutionError(msg)
+            except KeyError as e:
+                msg = 'Failed to substitute variables.  KeyError on "{}"'.format(e.message)
+                raise VarsSubstitutionError(msg)
+
+        if format == 'yaml':
+            return yaml_load(contents)
+        elif format == 'json':
+            return loads(contents)
 
 
 def yaml_load(value):
@@ -167,9 +199,9 @@ def camelResource(obj):
     return obj
 
 
-def get_account_id(session):
-    iam = session.client('iam')
-    return iam.list_roles(MaxItems=1)['Roles'][0]['Arn'].split(":")[4]
+def get_account_id_from_sts(session):
+    response = session.client('sts').get_caller_identity()
+    return response.get('Account')
 
 
 def query_instances(session, client=None, **query):
@@ -182,6 +214,7 @@ def query_instances(session, client=None, **query):
     return list(itertools.chain(
         *[r["Instances"] for r in itertools.chain(
             *[pp['Reservations'] for pp in results])]))
+
 
 CONN_CACHE = threading.local()
 
@@ -197,6 +230,11 @@ def local_session(factory):
     CONN_CACHE.session = s
     CONN_CACHE.time = n
     return s
+
+
+def reset_session_cache():
+    setattr(CONN_CACHE, 'session', None)
+    setattr(CONN_CACHE, 'time', 0)
 
 
 def annotation(i, k):
@@ -348,7 +386,7 @@ def worker(f):
     def _f(*args, **kw):
         try:
             return f(*args, **kw)
-        except Exception as e:
+        except:
             worker_log.exception(
                 'Error invoking %s',
                 "%s.%s" % (f.__module__, f.__name__))
@@ -364,9 +402,9 @@ def reformat_schema(model):
 
     if 'properties' not in model.schema:
         return "Schema in unexpected format."
-    
+
     ret = copy.deepcopy(model.schema['properties'])
-    
+
     if 'type' in ret:
         del(ret['type'])
 
@@ -375,3 +413,16 @@ def reformat_schema(model):
             ret[key]['required'] = True
 
     return ret
+
+
+_profile_session = None
+
+
+def get_profile_session(options):
+    global _profile_session
+    if _profile_session:
+        return _profile_session
+
+    profile = getattr(options, 'profile', None)
+    _profile_session = boto3.Session(profile_name=profile)
+    return _profile_session
