@@ -73,51 +73,74 @@ class NetworkLocation(Filter):
         if 'security-group' not in rfilters:
             raise FilterValidationError(
                 "network-location requires resource security-group filter")
+        return self
 
-    def process(self, resources):
-        sg = self.manager.filter_registry.get('security-group')
-        sg_model = sg.get_resource_manager().get_model()
-        related_sg = sg.get_related_resources(resources)
+    def process(self, resources, event=None):
+        sg_model = self.manager.get_resource_manager('security-group').get_model()
+        sg = self.manager.filter_registry.get('security-group')({}, self.manager)
+        related_sg = sg.get_related(resources)
 
-        subnet = self.manager.filter_registry.get('subnet')
-        subnet_model = subnet.get_resource_manager().get_model()
-        related_subnet = subnet.get_related_resources(subnet)
+        subnet_model = self.manager.get_resource_manager('subnet').get_model()
+        subnet = self.manager.filter_registry.get('subnet')({}, self.manager)
+        related_subnet = subnet.get_related(resources)
 
+        vf = self.manager.filter_registry.get('value')({}, self.manager)
         key = self.data.get('key')
         results = []
 
         for r in resources:
-            resource_sgs = [related_sg[sid] for sid in sg.get_related_ids(r)]
+            resource_sgs = [related_sg[sid] for sid in sg.get_related_ids([r])]
             resource_subnets = [
-                related_subnet[sid] for sid in subnet.get_related_ids(r)]
+                related_subnet[sid] for sid in subnet.get_related_ids([r])]
 
             subnet_values = {
                 rsub[subnet_model.id]: subnet.get_resource_value(key, rsub)
                 for rsub in resource_subnets}
+
+            if None in subnet_values.values():
+                r.setdefault('c7n:NetworkLocation', []).append({
+                    'reason': 'SubnetLocationAbsent',
+                    'subnets': subnet_values})
             subnet_space = set(filter(None, subnet_values.values()))
 
             if len(subnet_space) > 1:
-                r['c7n:NetworkLocation'] = {
+                r.setdefault('c7n:NetworkLocation', []).append({
                     'reason': 'SubnetLocationCardinality',
-                    'subnets': subnet_values}
-                results.append(r)
-                continue
+                    'subnets': subnet_values})
 
             sg_values = {
                 rsg[sg_model.id]: sg.get_resource_value(key, rsg)
                 for rsg in resource_sgs}
-
+            if None in sg_values.values():
+                r.setdefault('c7n:NetworkLocation', []).append({
+                    'reason': 'SecurityGroupLocationAbsent',
+                    'security-groups': sg_values})
+    
             sg_space = set(filter(None, sg_values.values()))
             if len(sg_space) > 1:
-                r['c7n:NetworkLocation'] = {
+                r.setdefault('c7n:NetworkLocation', []).append({
                     'reason': 'SecurityGroupLocationCardinality',
-                    'security-groups': sg_values}
-                results.append(r)
-                continue
+                    'security-groups': sg_values})
 
             if sg_space != subnet_space:
-                r['c7n:NetworkLocation'] = {
+                r.setdefault('c7n:NetworkLocation', []).append({
                     'reason': 'LocationMismatch',
                     'subnets': subnet_values,
-                    'security-groups': sg_values}
+                    'security-groups': sg_values})
+
+            r_value = vf.get_resource_value(key, r)
+            if r_value is None:
+                r.setdefault('c7n:NetworkLocation', []).append({
+                    'reason': 'ResourceLocationAbsent',
+                    'resource': r_value})
+            elif r_value not in sg_space:
+                r.setdefault('c7n:NetworkLocation', []).append({
+                    'reason': 'ResourceLocationMismatch',
+                    'subnets': subnet_values,
+                    'resource': r_value,
+                    'security-groups': sg_values})
+
+            if 'c7n:NetworkLocation' in r:
                 results.append(r)
+
+        return results
