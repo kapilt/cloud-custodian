@@ -60,10 +60,38 @@ class DefaultVpcBase(Filter):
 
 class NetworkLocation(Filter):
     """On a network attached resource, determine intersection of
-       security-group attributes to subnet attributes.
+    security-group attributes, subnet attributes, and resource attributes.
+
+    The use case is a bit specialized, but say for example you wanted to
+    verify that an ec2 instance with a tag NetworkLocation and value Public
+    was only ever placed in subnets and security groups with the same tag.
     """
+
     schema = type_schema(
-        'network-location', key={'type': 'string'}, required=['key'])
+        'network-location',
+        **{'missing-ok': {
+            'type': 'boolean',
+            'default': False,
+            'description': (
+                "How to handle missing keys on elements, by default this causes "
+                "resources to be considered not-equal")},
+           'match': {'type': 'string', 'enum': ['equal', 'non-equal'], 'default': 'non-equal'},
+           'compare': {
+            'type': 'array',
+            'description': (
+                'Which elements of network location should be considered when'
+                ' matching.'),
+            'default': ['resource', 'subnet', 'security-group'],
+            'items': {
+                'enum': ['resource', 'subnet', 'security-group']}},
+           'key': {
+               'type': 'string',
+               'description': 'The attribute expression that should be matched on'},
+           'max-cardinality': {
+               'type': 'integer', 'default': 1,
+               'title': ''},
+           'required': ['key']
+           })
 
     permissions = ('ec2:DescribeSecurityGroups', 'ec2:DescribeSubnets')
 
@@ -71,78 +99,100 @@ class NetworkLocation(Filter):
         rfilters = self.manager.filter_registry.keys()
         if 'subnet' not in rfilters:
             raise FilterValidationError(
-                "network-location requires resource subnet filter")
+                "network-location requires resource subnet filter availability")
         if 'security-group' not in rfilters:
             raise FilterValidationError(
-                "network-location requires resource security-group filter")
+                "network-location requires resource security-group filter availability")
         return self
 
     def process(self, resources, event=None):
-        sg_model = self.manager.get_resource_manager('security-group').get_model()
-        sg = self.manager.filter_registry.get('security-group')({}, self.manager)
-        related_sg = sg.get_related(resources)
+        self.sg = self.manager.filter_registry.get('security-group')({}, self.manager)
+        related_sg = self.sg.get_related(resources)
 
-        subnet_model = self.manager.get_resource_manager('subnet').get_model()
-        subnet = self.manager.filter_registry.get('subnet')({}, self.manager)
-        related_subnet = subnet.get_related(resources)
+        self.subnet = self.manager.filter_registry.get('subnet')({}, self.manager)
+        related_subnet = self.subnet.get_related(resources)
 
-        vf = self.manager.filter_registry.get('value')({}, self.manager)
+        self.sg_model = self.manager.get_resource_manager('security-group').get_model()
+        self.subnet_model = self.manager.get_resource_manager('subnet').get_model()
+        self.vf = self.manager.filter_registry.get('value')({}, self.manager)
+
+        # filter options
         key = self.data.get('key')
+        self.compare = self.data.get('compare', ['subnet', 'security-group', 'resource'])
+        self.max_cardinality = self.data.get('max-cardinality', 1)
+        self.match = self.data.get('match', 'not-equal')
+        self.missing_ok = self.data.get('missing-ok', False)
+
         results = []
 
         for r in resources:
-            resource_sgs = [related_sg[sid] for sid in sg.get_related_ids([r])]
+            resource_sgs = [related_sg[sid] for sid in self.sg.get_related_ids([r])]
             resource_subnets = [
-                related_subnet[sid] for sid in subnet.get_related_ids([r])]
+                related_subnet[sid] for sid in self.subnet.get_related_ids([r])]
+            found = self.process_resource(r, resource_sgs, resource_subnets, key)
+            if found:
+                results.append(found)
 
+        return results
+
+    def process_resource(self, r, resource_sgs, resource_subnets, key):
+        evaluation = []
+        if 'subnet' in self.compare:
             subnet_values = {
-                rsub[subnet_model.id]: subnet.get_resource_value(key, rsub)
+                rsub[self.subnet_model.id]: self.subnet.get_resource_value(key, rsub)
                 for rsub in resource_subnets}
 
-            if None in subnet_values.values():
-                r.setdefault('c7n:NetworkLocation', []).append({
+            if not self.missing_ok and None in subnet_values.values():
+                evaluation.append({
                     'reason': 'SubnetLocationAbsent',
                     'subnets': subnet_values})
             subnet_space = set(filter(None, subnet_values.values()))
 
-            if len(subnet_space) > 1:
-                r.setdefault('c7n:NetworkLocation', []).append({
+            if len(subnet_space) > self.max_cardinality:
+                evaluation.append({
                     'reason': 'SubnetLocationCardinality',
                     'subnets': subnet_values})
 
+        if 'security-group' in self.compare:
             sg_values = {
-                rsg[sg_model.id]: sg.get_resource_value(key, rsg)
+                rsg[self.sg_model.id]: self.sg.get_resource_value(key, rsg)
                 for rsg in resource_sgs}
-            if None in sg_values.values():
-                r.setdefault('c7n:NetworkLocation', []).append({
+            if not self.missing_ok and None in sg_values.values():
+                evaluation.append({
                     'reason': 'SecurityGroupLocationAbsent',
                     'security-groups': sg_values})
-    
+
             sg_space = set(filter(None, sg_values.values()))
-            if len(sg_space) > 1:
-                r.setdefault('c7n:NetworkLocation', []).append({
+            if len(sg_space) > self.max_cardinality:
+                evaluation.append({
                     'reason': 'SecurityGroupLocationCardinality',
                     'security-groups': sg_values})
 
-            if sg_space != subnet_space:
-                r.setdefault('c7n:NetworkLocation', []).append({
-                    'reason': 'LocationMismatch',
-                    'subnets': subnet_values,
-                    'security-groups': sg_values})
+        if ('subnet' in self.compare and
+                'security-group' in self.compare and
+                sg_space != subnet_space):
+            evaluation.append({
+                'reason': 'LocationMismatch',
+                'subnets': subnet_values,
+                'security-groups': sg_values})
 
-            r_value = vf.get_resource_value(key, r)
-            if r_value is None:
-                r.setdefault('c7n:NetworkLocation', []).append({
+        if 'resource' in self.compare:
+            r_value = self.vf.get_resource_value(key, r)
+            if not self.missing_ok and r_value is None:
+                evaluation.append({
                     'reason': 'ResourceLocationAbsent',
                     'resource': r_value})
-            elif r_value not in sg_space:
-                r.setdefault('c7n:NetworkLocation', []).append({
+            elif 'security-group' in self.compare and r_value not in sg_space:
+                evaluation.append({
                     'reason': 'ResourceLocationMismatch',
-                    'subnets': subnet_values,
                     'resource': r_value,
                     'security-groups': sg_values})
+            elif 'subnet' in self.compare and r_value not in subnet_space:
+                evaluation.append({
+                    'reason': 'ResourceLocationMismatch',
+                    'resource': r_value,
+                    'subnet': subnet_values})
 
-            if 'c7n:NetworkLocation' in r:
-                results.append(r)
-
-        return results
+        if evaluation:
+            r['c7n:NetworkLocation'] = evaluation
+            return r
