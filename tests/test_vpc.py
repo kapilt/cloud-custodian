@@ -136,6 +136,7 @@ class VpcTest(BaseTest):
 
 class NetworkLocationTest(BaseTest):
 
+    @functional
     def test_network_location_sg_missing(self):
         self.factory = self.replay_flight_data('test_network_location_sg_missing_loc')
         client = self.factory().client('ec2')
@@ -185,7 +186,7 @@ class NetworkLocationTest(BaseTest):
                 'security-groups': {sg_id: None, web_sg_id: 'web'}
             }])
 
-
+    @functional
     def test_network_location_sg_cardinality(self):
         self.factory = self.replay_flight_data('test_network_location_sg_cardinality')
         client = self.factory().client('ec2')
@@ -240,6 +241,7 @@ class NetworkLocationTest(BaseTest):
               'security-groups': {db_sg_id: 'db', web_sg_id: 'web'},
               'subnets': {web_sub_id: 'web'}}])
 
+    @functional
     def test_network_location_resource_missing(self):
         self.factory = self.replay_flight_data('test_network_location_resource_missing')
         client = self.factory().client('ec2')
@@ -280,7 +282,8 @@ class NetworkLocationTest(BaseTest):
         self.assertEqual(
             matched['c7n:NetworkLocation'],
             [{'reason': 'ResourceLocationAbsent', 'resource': None}])
-              
+
+    @functional
     def test_network_location_triple_intersect(self):
         self.factory = self.replay_flight_data('test_network_location_intersection')
         client = self.factory().client('ec2')
