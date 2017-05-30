@@ -946,7 +946,10 @@ class NetworkInterface(QueryResourceManager):
         date = None
         config_type = "AWS::EC2::NetworkInterface"
         id_prefix = "eni-"
-        tags_key = "TagSet"
+
+    def augment(self, resources):
+        for r in resources:
+            r['Tags'] = r.pop('TagSet', [])
 
 
 NetworkInterface.filter_registry.register('flow-logs', FlowLogFilter)

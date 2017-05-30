@@ -270,14 +270,10 @@ class ValueFilter(Filter):
             'op': {'enum': OPERATORS.keys()}}}
 
     annotate = True
-    tag_container_key = "Tags"
 
     def __init__(self, data, manager=None):
         super(ValueFilter, self).__init__(data, manager)
         self.expr = {}
-        if self.manager and type(self) == ValueFilter:
-            self.tag_container_key = getattr(
-                self.manager.get_model(), "tags_key", "Tags")
 
     def _validate_resource_count(self):
         """ Specific validation for `resource_count` type
@@ -356,7 +352,7 @@ class ValueFilter(Filter):
         if k.startswith('tag:'):
             tk = k.split(':', 1)[1]
             r = None
-            for t in i.get(self.tag_container_key, []):
+            for t in i.get("Tags", []):
                 if t.get('Key') == tk:
                     r = t.get('Value')
                     break
