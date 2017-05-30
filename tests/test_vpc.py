@@ -203,13 +203,13 @@ class NetworkLocationTest(BaseTest):
             VpcId=vpc_id,
             Description="for apps")['GroupId']
         self.addCleanup(client.delete_security_group, GroupId=web_sg_id)
-        
+
         db_sg_id = client.create_security_group(
             GroupName="db-tier",
             VpcId=vpc_id,
             Description="for dbs")['GroupId']
         self.addCleanup(client.delete_security_group, GroupId=db_sg_id)
-        
+
         nic = client.create_network_interface(
             SubnetId=web_sub_id,
             Groups=[web_sg_id, db_sg_id])['NetworkInterface']['NetworkInterfaceId']

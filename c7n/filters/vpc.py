@@ -193,6 +193,8 @@ class NetworkLocation(Filter):
                     'resource': r_value,
                     'subnet': subnet_values})
 
-        if evaluation:
+        if evaluation and self.match == 'not-equal':
             r['c7n:NetworkLocation'] = evaluation
+            return r
+        elif not evaluation and self.match == 'equal':
             return r

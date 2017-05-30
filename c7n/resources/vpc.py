@@ -950,6 +950,7 @@ class NetworkInterface(QueryResourceManager):
     def augment(self, resources):
         for r in resources:
             r['Tags'] = r.pop('TagSet', [])
+        return resources
 
 
 NetworkInterface.filter_registry.register('flow-logs', FlowLogFilter)
