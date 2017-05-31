@@ -62,9 +62,10 @@ class NetworkLocation(Filter):
     """On a network attached resource, determine intersection of
     security-group attributes, subnet attributes, and resource attributes.
 
-    The use case is a bit specialized, but say for example you wanted to
-    verify that an ec2 instance with a tag NetworkLocation and value Public
-    was only ever placed in subnets and security groups with the same tag.
+    The use case is a bit specialized, for most use cases using `subnet`
+    and `security-group` filters suffice. but say for example you wanted to
+    verify that an ec2 instance was only using subnets and security groups
+    with a given tag value, and that tag was not present on the resource.
     """
 
     schema = type_schema(
@@ -75,7 +76,8 @@ class NetworkLocation(Filter):
             'description': (
                 "How to handle missing keys on elements, by default this causes "
                 "resources to be considered not-equal")},
-           'match': {'type': 'string', 'enum': ['equal', 'non-equal'], 'default': 'non-equal'},
+           'match': {'type': 'string', 'enum': ['equal', 'non-equal'],
+                     'default': 'non-equal'},
            'compare': {
             'type': 'array',
             'description': (
