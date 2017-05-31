@@ -106,6 +106,9 @@ class SubnetFilter(net_filters.SubnetFilter):
     RelatedIdsExpression = "VpcConfig.SubnetIds[]"
 
 
+filters.register('network-location', net_filters.NetworkLocation)
+
+
 @filters.register('event-source')
 class LambdaEventSource(ValueFilter):
     # this uses iam policy, it should probably use
