@@ -571,7 +571,7 @@ def _elgibile_start_stop(db, state="available"):
     if db.get('DBInstanceStatus') != state:
         return False
 
-    if db.get('MultiAZ') != False:
+    if db.get('MultiAZ') is False:
         return False
 
     if db.get('ReadReplicaDBInstanceIdentifiers'):
@@ -590,6 +590,8 @@ class Stop(BaseAction):
 
     https://goo.gl/N3nw8k
     """
+
+    schema = type_schema('stop')
 
     # permissions are unclear, and not currrently documented or in iam gen
     permissions = ("rds:RebootDBInstance",)
@@ -613,6 +615,8 @@ class Start(BaseAction):
     https://goo.gl/N3nw8k
     """
 
+    schema = type_schema('start')
+
     # permissions are unclear, and not currrently documented or in iam gen
     permissions = ("rds:RebootDBInstance",)
 
@@ -627,7 +631,7 @@ class Start(BaseAction):
                 log.exception(
                     "Error starting db instance:%s err:%s",
                     r['DBInstanceIdentier'], e)
-                
+
 
 @actions.register('delete')
 class Delete(BaseAction):
