@@ -264,7 +264,8 @@ def _get_available_engine_upgrades(client, major=False):
 
 @filters.register('offhour')
 class RDSOffHour(OffHour):
-    pass
+    """Scheduled action on rds instance.
+    """
 
 
 @filters.register('default-vpc')
@@ -916,7 +917,8 @@ def _rds_snap_tags(
 
 @RDSSnapshot.filter_registry.register('onhour')
 class RDSOnHour(OnHour):
-    pass
+    """Scheduled action on rds snapshot."""
+
 
 
 @RDSSnapshot.filter_registry.register('latest')
