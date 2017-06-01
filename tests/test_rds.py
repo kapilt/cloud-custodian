@@ -807,11 +807,6 @@ class TestRDSParameterGroupFilter(BaseTest):
     """ This test assumes two parameter groups have been created and
         assigned to two different RDS instances.
     """
-    DEFAULT_REGION = 'us-east-1'  # N. Virginia
-    REQUIRED_PARAMETERGROUPS = [
-        'rds-pg-group-a',
-        'rds-pg-group-b',
-    ]
 
     PARAMGROUP_PARAMETER_FILTER_TEST_CASES = [
         # filter_struct, test_func, err_message
@@ -827,40 +822,26 @@ class TestRDSParameterGroupFilter(BaseTest):
         ({'key': 'log_destination', 'op': 'ne', 'value': 's3'},
          lambda r: len(r) == 2,
          "instances with log_destination != s3 should be 2"),
-        ({'key': 'autovacuum_multixact_freeze_max_age', 'op': 'eq', 'value': 7,
-          'default': 7},
-         lambda r: len(r) == 2,
-         "autovacuum_multixact_freeze_max_age should default to 7"),
-        ({'key': 'full_page_writes', 'op': 'eq', 'value': 1},
+        ({'key': 'full_page_writes', 'op': 'eq', 'value': True},
          lambda r: len(r) == 2,
          "full_page_writes ( a boolean ) should be on"),
     ]
 
-    def _get_session_factory(self):
-        if not hasattr(self, '_sess_factory'):
-            self._sess_factory = self.replay_flight_data(
-                "_".join(['test', self.__class__.__name__]))
-        return self._sess_factory
+    def test_param_value_cases(self):
+        session_factory = self.replay_flight_data('test_rds_param_filter')
+        policy = self.load_policy(
+            {'name': 'rds-pg-filter', 'resource': 'rds'},
+            session_factory=session_factory)
+        resources = policy.resource_manager.resources()
 
-    def assert_policy(self, policy_struct, callback, err_msg):
-        self.change_environment(AWS_DEFAULT_REGION=self.DEFAULT_REGION)
-        session_factory = self._get_session_factory()
-        policy = self.load_policy(policy_struct,
-                                  session_factory=session_factory)
-        resources = policy.run()
-        self.assertTrue( callback(resources), err_msg)
-
-    def test_cases(self):
         for testcase in self.PARAMGROUP_PARAMETER_FILTER_TEST_CASES:
-            policy_struct = {
-                'name': 'RDS_PARAMETERGROUP_FILTER',
-                'resource': 'rds',
-                'filters': [dict(type='db-parameter', **testcase[0]), ]
-            }
-            assertion = testcase[1]
-            error_message = testcase[2]
-            self.assert_policy(policy_struct, assertion, error_message)
-
+            fdata, assertion, err_msg = testcase
+            f = policy.resource_manager.filter_registry.get(
+                'db-parameter')(fdata, policy.resource_manager)
+            f_resources = f.process(resources)
+            if not assertion(f_resources):
+                print len(f_resources), fdata, assertion
+                self.fail(err_msg)
 
 class Resize(BaseTest):
 
