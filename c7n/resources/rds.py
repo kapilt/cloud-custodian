@@ -1246,6 +1246,7 @@ class RDSSubnetGroup(QueryResourceManager):
 @filters.register('db-parameter')
 class ParameterFilter(ValueFilter):
     """
+    Applies value type filter on set db parameter values.
 
     :example:
 
