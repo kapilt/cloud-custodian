@@ -920,7 +920,6 @@ class RDSOnHour(OnHour):
     """Scheduled action on rds snapshot."""
 
 
-
 @RDSSnapshot.filter_registry.register('latest')
 class LatestSnapshot(Filter):
     """Return the latest snapshot for each database.
