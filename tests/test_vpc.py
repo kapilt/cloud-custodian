@@ -1043,12 +1043,14 @@ class SecurityGroupTest(BaseTest):
               u'UserIdGroupPairs': []}])
 
     def test_egress_validation_error(self):
-        self.assertRaises(
-            FilterValidationError,
-            self.load_policy,
-            {'name': 'sg-find2',
-             'resource': 'security-group',
-             'filters': [
+        p = self.load_policy({
+            'name': 'sg-find2',
+            'resource': 'security-group',
+            'filters': [
                 {'type': 'egress',
                  'InvalidKey': True},
                 {'GroupName': 'sg2'}]})
+            
+        self.assertRaises(
+            FilterValidationError,
+            p.validate)
