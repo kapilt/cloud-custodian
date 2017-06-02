@@ -226,37 +226,37 @@ class SSLPolicyTest(BaseTest):
             'test-elb-invalid-policy')
 
     def test_filter_validation_no_blacklist(self):
-
-        p = self.load_policy({
-            'name': 'test-ssl-ciphers',
-            'resource': 'elb',
-            'filters': [
-                {'type': 'ssl-policy'}
-            ]},
+        self.assertRaises(
+            FilterValidationError,
+            self.load_policy,
+            {'name': 'test-ssl-ciphers',
+             'resource': 'elb',
+             'filters': [
+                 {'type': 'ssl-policy'}
+             ]},
             session_factory=None, validate=False)
-        self.assertRaises(FilterValidationError, p.validate)        
 
     def test_filter_validation_blacklist_not_iterable(self):
-
-        p = self.load_policy({
-            'name': 'test-ssl-ciphers',
-            'resource': 'elb',
-            'filters': [
-                {'type': 'ssl-policy', 'blacklist': 'single-value'}
-            ]},
+        self.assertRaises(
+            FilterValidationError,
+            self.load_policy,
+            {'name': 'test-ssl-ciphers',
+             'resource': 'elb',
+             'filters': [
+                 {'type': 'ssl-policy', 'blacklist': 'single-value'}
+             ]},
             session_factory=None, validate=False)
-        self.assertRaises(FilterValidationError, p.validate)        
 
 
 class TestDefaultVpc(BaseTest):
 
     def test_elb_default_vpc(self):
         session_factory = self.replay_flight_data('test_elb_default_vpc')
-        p = self.load_policy(
-            {'name': 'elb-default-filters',
-             'resource': 'elb',
-             'filters': [
-                 {'type': 'default-vpc'}]},
+        p = self.load_policy({
+            'name': 'elb-default-filters',
+            'resource': 'elb',
+            'filters': [
+                {'type': 'default-vpc'}]},
             config={'region': 'us-west-2'},
             session_factory=session_factory)
 
