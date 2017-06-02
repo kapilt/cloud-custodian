@@ -18,7 +18,8 @@ from botocore.exceptions import ClientError
 from c7n.actions import Action
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
-from c7n.utils import chunks, local_session, get_retry, type_schema, generate_arn, get_account_id
+from c7n.utils import (
+    chunks, local_session, get_retry, type_schema, generate_arn)
 
 log = logging.getLogger('custodian.es')
 
@@ -29,22 +30,13 @@ class ElasticSearchDomain(QueryResourceManager):
         service = 'es'
         type = "elasticsearch"
         enum_spec = (
-            'list_domain_names', 'DomainNames[]', None)
+            'list_domain_names', 'DomainNames[].DomainName', None)
         id = 'DomainName'
         name = 'Name'
         dimension = "DomainName"
-        filter_name = "DomainName"
-        filter_type = "scaler"
 
     _generate_arn = _account_id = None
     retry = staticmethod(get_retry(('Throttled',)))
-
-    @property
-    def account_id(self):
-        if self._account_id is None:
-            session = local_session(self.session_factory)
-            self._account_id = get_account_id(session)
-        return self._account_id
 
     @property
     def generate_arn(self):
@@ -53,34 +45,34 @@ class ElasticSearchDomain(QueryResourceManager):
                 generate_arn,
                 'es',
                 region=self.config.region,
-                account_id=self.account_id,
+                account_id=self.config.account_id,
                 resource_type='domain',
                 separator='/')
         return self._generate_arn
 
+    def get_resources(self, resource_ids):
+        client = local_session(self.session_factory).client('es')
+        return client.describe_elasticsearch_domains(
+            DomainNames=resource_ids)['DomainStatusList']
+
     def augment(self, domains):
-        filter(None, _elasticsearch_tags(
-            self.get_model(),
-            domains, self.session_factory, self.executor_factory,
-            self.generate_arn, self.retry))
-        return domains
+        client = local_session(self.session_factory).client('es')
+        model = self.get_model()
 
-def _elasticsearch_tags(
-        model, domains, session_factory, executor_factory, generator, retry):
-    """ Augment Elasticsearch domains with their respective tags
-    """
+        def _augment(resource_set):
+            resources =  self.retry(
+                client.describe_elasticsearch_domains,
+                DomainNames=resource_set)['DomainStatusList']
+            for r in resources:
+                rarn = self.generate_arn(r[model.id])
+                r['Tags'] = self.retry(
+                    client.list_tags, ARN=rarn).get('TagList', [])
+            return resources
 
-    def process_tags(domain):
-        client = local_session(session_factory).client('es')
-        arn = generator(domain[model.id])
-        tag_list = retry(
-            client.list_tags,
-            ARN=arn)['TagList']
-        domain['Tags'] = tag_list or []
-        return domain
+        with self.executor_factory(max_workers=1) as w:
+            return list(itertools.chain(
+                *w.map(_augment, chunks(domains, 5))))
 
-    with executor_factory(max_workers=1) as w:
-        return list(w.map(process_tags, domains))
 
 @ElasticSearchDomain.action_registry.register('delete')
 class Delete(Action):
