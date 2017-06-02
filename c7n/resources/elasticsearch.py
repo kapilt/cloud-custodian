@@ -14,7 +14,6 @@
 import functools
 import logging
 import itertools
-from botocore.exceptions import ClientError
 from c7n.actions import Action
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
@@ -22,6 +21,7 @@ from c7n.utils import (
     chunks, local_session, get_retry, type_schema, generate_arn)
 
 log = logging.getLogger('custodian.es')
+
 
 @resources.register('elasticsearch')
 class ElasticSearchDomain(QueryResourceManager):
