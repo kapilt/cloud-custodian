@@ -21,6 +21,7 @@ import time
 
 import boto3
 from botocore.client import ClientError
+import jmespath
 
 from c7n.actions import EventAction
 from c7n.cwe import CloudWatchEvents
@@ -455,6 +456,15 @@ class PeriodicMode(LambdaMode, PullMode):
 
 class CloudTrailMode(LambdaMode):
     """A lambda policy using cloudwatch events rules on cloudtrail api logs."""
+
+    def validate(self):
+        events = self.policy.data['mode'].get('events')
+        assert events, "cloud trail mode requires specifiying events to subscribe"
+        for e in events:
+            if isinstance(e, basestring):
+                assert e in CloudWatchEvents.trail_events, "event shortcut not defined"
+            if isinstance(e, dict):
+                jmespath.compile(e['ids'])
 
 
 class EC2InstanceState(LambdaMode):
