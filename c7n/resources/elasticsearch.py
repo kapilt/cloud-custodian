@@ -60,7 +60,7 @@ class ElasticSearchDomain(QueryResourceManager):
         model = self.get_model()
 
         def _augment(resource_set):
-            resources =  self.retry(
+            resources = self.retry(
                 client.describe_elasticsearch_domains,
                 DomainNames=resource_set)['DomainStatusList']
             for r in resources:
