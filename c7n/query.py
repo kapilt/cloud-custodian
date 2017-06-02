@@ -27,7 +27,8 @@ from concurrent.futures import as_completed
 from c7n.actions import ActionRegistry
 from c7n.filters import FilterRegistry, MetricsFilter
 from c7n.tags import register_tags
-from c7n.utils import local_session, get_retry, chunks, camelResource
+from c7n.utils import (
+    local_session, generate_arn, get_retry, chunks, camelResource)
 from c7n.registry import PluginRegistry
 from c7n.manager import ResourceManager
 
@@ -242,6 +243,8 @@ class QueryResourceManager(ResourceManager):
 
     permissions = ()
 
+    _generate_arn = None
+
     def __init__(self, data, options):
         super(QueryResourceManager, self).__init__(data, options)
         self.source = sources.get(self.source_type)(self)
@@ -277,9 +280,7 @@ class QueryResourceManager(ResourceManager):
             resources = self._cache.get(key)
             if resources is not None:
                 self.log.debug("Using cached %s: %d" % (
-                   "%s.%s" % (
-                        self.__class__.__module__,
-                        self.__class__.__name__),
+                    "%s.%s" % (self.__class__.__module__, self.__class__.__name__),
                     len(resources)))
                 return self.filter_resources(resources)
 
@@ -315,6 +316,39 @@ class QueryResourceManager(ResourceManager):
         s3 buckets.
         """
         return self.source.augment(resources)
+
+    @property
+    def account_id(self):
+        """ Return the current account ID.
+
+        This should now be passed in using the --account-id flag, but for a
+        period of time we will support the old behavior of inferring this from
+        IAM.
+        """
+        return self.config.account_id
+
+    def get_arns(self, resources):
+        arns = []
+        for r in resources:
+            _id = r[self.manager.get_model().id]
+            if 'arn' in _id[:3]:
+                arns.append(_id)
+            else:
+                arns.append(self.generate_arn(_id))
+
+    @property
+    def generate_arn(self):
+        """ Generates generic arn if ID is not already arn format.
+        """
+        if self._generate_arn is None:
+            self._generate_arn = functools.partial(
+                generate_arn,
+                self.get_model().service,
+                region=self.config.region,
+                account_id=self.account_id,
+                resource_type=self.get_model().type,
+                separator=':')
+        return self._generate_arn
 
 
 def _batch_augment(manager, model, detail_spec, resource_set):
@@ -355,4 +389,3 @@ def _scalar_augment(manager, model, detail_spec, resource_set):
             r.update(response)
         results.append(r)
     return results
-

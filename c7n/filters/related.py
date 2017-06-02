@@ -33,7 +33,7 @@ class RelatedResourceFilter(ValueFilter):
         if self.RelatedIdsExpression is None:
             raise ValueError(
                 "%s Filter requires resource expression" % name)
-        #if self.AnnotationKey is None:
+        # if self.AnnotationKey is None:
         #    raise ValueError(
         #        "%s Filter requires annotation key" % name)
 
@@ -85,7 +85,7 @@ class RelatedResourceFilter(ValueFilter):
                 found.append(rid)
 
         if self.AnnotationKey is not None:
-            resource['c7n.%s' % self.AnnotationKey] = found
+            resource['c7n:%s' % self.AnnotationKey] = found
 
         if op == 'or' and found:
             return True

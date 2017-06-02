@@ -28,7 +28,7 @@ from c7n.query import QueryResourceManager
 from c7n import tags
 from c7n.utils import (
     type_schema, local_session, chunks, generate_arn, get_retry,
-    get_account_id, snapshot_identifier)
+    snapshot_identifier)
 
 log = logging.getLogger('custodian.redshift')
 
@@ -56,15 +56,8 @@ class Redshift(QueryResourceManager):
     action_registry = actions
     retry = staticmethod(get_retry(('Throttling',)))
 
-    permissions = ('iam:ListRoles',) # account id retrieval
-    _generate_arn = _account_id = None
-
-    @property
-    def account_id(self):
-        if self._account_id is None:
-            session = local_session(self.session_factory)
-            self._account_id = get_account_id(session)
-        return self._account_id
+    permissions = ('iam:ListRoles',)  # account id retrieval
+    _generate_arn = None
 
     @property
     def generate_arn(self):
@@ -124,6 +117,9 @@ class SubnetFilter(net_filters.SubnetFilter):
         self.groups = {r['ClusterSubnetGroupName']: r for r in
                        RedshiftSubnetGroup(self.manager.ctx, {}).resources()}
         return super(SubnetFilter, self).process(resources, event)
+
+
+filters.register('network-location', net_filters.NetworkLocation)
 
 
 @filters.register('param')
@@ -336,6 +332,7 @@ class Snapshot(BaseAction):
                         "Exception creating Redshift snapshot  \n %s",
                         f.exception())
         return clusters
+
     def process_cluster_snapshot(self, cluster):
         c = local_session(self.manager.session_factory).client('redshift')
         cluster_tags = cluster.get('Tags')
@@ -555,14 +552,7 @@ class RedshiftSnapshot(QueryResourceManager):
 
     filter_registry.register('marked-for-op', tags.TagActionFilter)
 
-    _generate_arn = _account_id = None
-
-    @property
-    def account_id(self):
-        if self._account_id is None:
-            session = local_session(self.session_factory)
-            self._account_id = get_account_id(session)
-        return self._account_id
+    _generate_arn = None
 
     @property
     def generate_arn(self):

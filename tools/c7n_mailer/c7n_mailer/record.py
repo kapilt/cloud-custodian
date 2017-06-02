@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import datetime
 import json
+
 from cStringIO import StringIO
 from dateutil import parser
 from dateutil.tz import gettz
@@ -19,6 +22,10 @@ from dateutil.tz import gettz
 
 def date_time_format(utc_str, tz_str='US/Eastern', format='%Y %b %d %H:%M %Z'):
     return parser.parse(utc_str).astimezone(gettz(tz_str)).strftime(format)
+
+
+def get_date_time_delta(delta):
+    return str(datetime.datetime.now().replace(tzinfo=gettz('UTC')) + datetime.timedelta(delta))
 
 
 def format_struct(evt):
@@ -58,7 +65,7 @@ def resource_format(resource, resource_type):
     elif resource_type == 's3':
         return "%s" % (resource['Name'])
     elif resource_type == 'ebs':
-        return "%s %s %s %s" %(
+        return "%s %s %s %s" % (
             resource['VolumeId'],
             resource['Size'],
             resource['State'],
@@ -138,7 +145,7 @@ def resource_format(resource, resource_type):
             resource['SnapshotId'],
             resource['StartTime'])
     elif resource_type == 'subnet':
-        return "%s %s %s %s %s %s" %(
+        return "%s %s %s %s %s %s" % (
             resource['SubnetId'],
             resource['VpcId'],
             resource['AvailabilityZone'],
