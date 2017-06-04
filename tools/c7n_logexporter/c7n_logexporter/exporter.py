@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from botocore.exceptions import ClientError
 import boto3
 import click
+import json
 from c7n.credentials import assumed_session
+from c7n.executor import MainThreadExecutor
 from c7n.utils import get_retry, dumps, chunks
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -54,7 +57,10 @@ CONFIG_SCHEMA = {
             'required': ['role', 'groups'],
             'properties': {
                 'name': {'type': 'string'},
-                'role': {'type': 'string'},
+                'role': {'oneOf': [
+                    {'type': 'array', 'items': {'type': 'string'}},
+                    {'type': 'string'},
+                    ]},
                 'groups': {
                     'type': 'array', 'items': {'type': 'string'}
                 }
@@ -122,14 +128,26 @@ def validate(config):
 @click.option('--config', type=click.Path(), required=True)
 @click.option('--start', required=True)
 @click.option('--end')
+@click.option('-a', '--accounts', multiple=True)
 @debug
-def run(config, start, end):
+def run(config, start, end, accounts):
     config = validate.callback(config)
     destination = config.get('destination')
     start = start and parse(start) or start
     end = end and parse(end) or datetime.now()
-    for account in config.get('accounts', ()):
-        process_account(account, start, end, destination)
+    with ThreadPoolExecutor(max_workers=32) as w:
+        futures = {}
+        for account in config.get('accounts', ()):
+            if accounts and account['name'] not in accounts:
+                continue
+            futures[
+                w.submit(process_account, account, start, end, destination)] = account
+        for f in as_completed(futures):
+            account = futures[f]
+            if f.exception():
+                log.error("Error on account %s err: %s",
+                          account['name'], f.exception())
+            log.info("Completed %s", account['name'])
 
 
 def lambdafan(func):
@@ -177,37 +195,30 @@ def process_account(account, start, end, destination, incremental=True):
     prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
 
     log.info("account:%s matched %d groups of %d",
-             account.get('name', account_id),
-             len(groups), group_count)
+             account.get('name', account_id), len(groups), group_count)
 
     t = time.time()
-    with ThreadPoolExecutor(max_workers=3) as w:
-        futures = []
-        for g in groups:
-            futures.append(
-                w.submit(
-                    export.callback,
-                    g,
-                    destination['bucket'], prefix,
-                    g['exportStart'], end, account['role']))
-        for f in as_completed(futures):
-            if f.exception():
-                log.error(
-                    "Error processing group:%s error:%s",
-                    g, f.exception())
-            f.result()
+    for g in groups:
+        export.callback(
+            g,
+            destination['bucket'], prefix,
+            g['exportStart'], end, account['role'],
+            name=account['name'])
 
     log.info("account:%s exported %d log groups in time:%0.2f",
              account.get('name') or account_id,
-             len(groups),
-             time.time() - t)
+             len(groups), time.time() - t)
 
 
-def get_session(role, session_name="c7n-log-exporter"):
+def get_session(role, session_name="c7n-log-exporter", session=None):
     if role == 'self':
         session = boto3.Session()
-    elif role:
+    elif isinstance(role, basestring):
         session = assumed_session(role, session_name)
+    elif isinstance(role, list):
+        session = None
+        for r in role:
+            session = assumed_session(r, session_name, session=session)
     else:
         session = boto3.Session()
     return session
@@ -289,51 +300,18 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
     """
     end = end or datetime.now()
     # days = [start + timedelta(i) for i in range((end-start).days)]
-    periods = {(d.year, d.month, d.day): d for d in days}
+    try:
+        tag_set = client.get_object_tagging(Bucket=bucket, Key=prefix).get('TagSet', [])
+    except ClientError as e:
+        if e.response['Error']['Code'] != 'NoSuchKey':
+            raise
+        tag_set = []
+    tags = {t['Key']: t['Value'] for t in tag_set}
 
-    keys = client.list_objects_v2(
-        Bucket=bucket, Prefix=prefix, Delimiter='/').get('CommonPrefixes', [])
-
-    years = []
-    for y in keys:
-        part = y['Prefix'].rsplit('/', 1)[-1]
-        if not part.isdigit():
-            continue
-        year = int(part)
-        if year < start or year > end:
-            continue
-        years.append(int(year))
-
-    for y in years:
-        keys = client.list_objects_v2(
-            Bucket=bucket, Prefix="%s/%s" % (prefix.strip('/'), str(y)),
-            Delimiter='/').get('CommonPrefixes', [])
-        months = []
-        for m in keys:
-            part = m['Prefix'].rsplit('/', 1)[-1]
-            if not part.isdigit():
-                continue
-            month = int(part)
-            date_key = (y, month)
-            if (date_key < (start.year, start.month) or
-                    date_key > (end.year, end.month)):
-                continue
-            months.append(month)
-
-        for m in months:
-            keys = client.list_objects_v2(
-                Bucket=bucket, Prefix="%s/%s/%s" % (prefix.strip('/'), y, m),
-                Delimiter='/').get('CommonPrefixes', [])
-            for d in keys:
-                part = d['Prefix'].rsplit('/', 1)[-1]
-                if not part.isdigit():
-                    continue
-                day = int(part)
-                date_key = (y, m, day)
-                if date_key in periods:
-                    periods.pop(date_key)
-
-    return sorted(periods.values())
+    if not 'LastExport' in tags:
+        return sorted(days)
+    last_export = parse(tags['LastExport'])
+    return [d for d in sorted(days) if d > last_export]
 
 
 @cli.command()
@@ -343,11 +321,12 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
 @click.option('--start', required=True, help="export logs from this date")
 @click.option('--end')
 @click.option('--role', help="sts role to assume for log group access")
-# @click.option('--period', type=float)
+@click.option('--role', help="sts role to assume for log group access")
+@click.option('--poll-period', type=float, default=300)
 # @click.option('--bucket-role', help="role to scan destination bucket")
 # @click.option('--stream-prefix)
 @lambdafan
-def export(group, bucket, prefix, start, end, role, session=None):
+def export(group, bucket, prefix, start, end, role, poll_period=300, session=None, name=""):
     start = start and isinstance(start, basestring) and parse(start) or start
     end = (end and isinstance(start, basestring) and
            parse(end) or end or datetime.now())
@@ -358,29 +337,32 @@ def export(group, bucket, prefix, start, end, role, session=None):
         session = get_session(role)
 
     client = session.client('logs')
-    retry = get_retry(('LimitExceededException',), min_delay=4)
 
     if prefix:
         prefix = "%s/%s" % (prefix.rstrip('/'),
-                            group['logGroupName'].strip('/'))
+            group['logGroupName'].strip('/'))
     else:
         prefix = group
 
-    log.debug("Log exporting group:%s start:%s end:%s bucket:%s prefix:%s",
-              group,
-              start.strftime('%Y/%m/%d'),
-              end.strftime('%Y/%m/%d'),
-              bucket,
-              prefix)
+    named_group = "%s:%s" % (name, group['logGroupName'])
+    log.info(
+        "Log exporting group:%s start:%s end:%s bucket:%s prefix:%s size:%s",
+        named_group,
+        start.strftime('%Y/%m/%d'),
+        end.strftime('%Y/%m/%d'),
+        bucket,
+        prefix,
+        group['storedBytes'])
 
     t = time.time()
-    days = [start + timedelta(i) for i in range((end - start).days)]
+    days = [(start + timedelta(i)).replace(minute=0, hour=0, second=0, microsecond=0)
+            for i in range((end - start).days)]
     day_count = len(days)
-    days = filter_extant_exports(
-        boto3.Session().client('s3'), bucket, prefix, days, start, end)
+    s3 = boto3.Session().client('s3')
+    days = filter_extant_exports(s3, bucket, prefix, days, start, end)
 
-    log.debug("Filtering s3 extant keys from %d to %d in %0.2f",
-              day_count, len(days), time.time() - t)
+    log.info("Group:%s filtering s3 extant keys from %d to %d",
+             named_group, day_count, len(days))
     t = time.time()
 
     for idx, d in enumerate(days):
@@ -402,24 +384,56 @@ def export(group, bucket, prefix, start, end, role, session=None):
 
         # if stream_prefix:
         #    params['logStreamPrefix'] = stream_prefix
+        s3.put_object(
+            Bucket=bucket,
+            Key=prefix,
+            Body=json.dumps({}),
+            ACL="bucket-owner-full-control",
+            ServerSideEncryption="AES256")
 
-        result = retry(client.create_export_task, **params)
-        log.debug("Log export group:%s day:%s bucket:%s prefix:%s task:%s",
-                  group,
-                  params['taskName'],
+        t = time.time()
+        counter = 0
+        while True:
+            counter += 1
+            try:
+                result = client.create_export_task(**params)
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'LimitExceededException':
+                    time.sleep(poll_period)
+                    # log every 30m of export waiting
+                    if counter % 6 == 0:
+                        log.debug(
+                            "group:%s day:%s waiting for %0.2f minutes",
+                            named_group, d.strftime('%Y-%m-%d'),
+                            (count * poll_period) / 60.0)
+                    continue
+                raise
+            s3.put_object_tagging(
+                Bucket=bucket, Key=prefix,
+                Tagging={
+                    'TagSet': [{
+                        'Key': 'LastExport',
+                        'Value': d.isoformat()}]})
+            break
+
+        log.info("Log export time:%0.2f group:%s day:%s bucket:%s prefix:%s task:%s",
+                  time.time()-t,
+                  named_group,
+                  d.strftime("%Y-%m-%d"),
                   bucket,
                   params['destinationPrefix'],
                   result['taskId'])
 
-    log.info(("Exported log group:%s time:%0.2f days:%d start:%s"
-              " end:%s bucket:%s prefix:%s"),
-             group,
-             time.time() - t,
-             idx,
-             start.strftime('%Y/%m/%d'),
-             end.strftime('%Y/%m/%d'),
-             bucket,
-             prefix)
+    log.info(
+        ("Exported log group:%s time:%0.2f days:%d start:%s"
+         " end:%s bucket:%s prefix:%s"),
+        named_group,
+        time.time() - t,
+        len(days),
+        start.strftime('%Y/%m/%d'),
+        end.strftime('%Y/%m/%d'),
+        bucket,
+        prefix)
 
 
 if __name__ == '__main__':
