@@ -20,7 +20,7 @@ lint:
 
 test:
 	flake8 c7n
-	AWS_ACCESS_KEY_ID=foo AWS_SECRET_ACCESS_KEY=bar AWS_DEFAULT_REGION=us-east-1 C7N_VALIDATE=true nosetests  --processes=-1 --process-timeout=300 tests -s -v
+	AWS_ACCESS_KEY_ID=foo AWS_SECRET_ACCESS_KEY=bar AWS_DEFAULT_REGION=us-east-1 C7N_VALIDATE=true nosetests  --processes=-1 --process-timeout=300 tests
 
 depcache:
 	mkdir -p deps
@@ -44,4 +44,4 @@ ghpages:
 	git commit -m "Updated generated Sphinx documentation"
 
 clean:
-	rm -rf .Python bin include lib pip-selfcheck.json 
+	rm -rf .Python bin include lib pip-selfcheck.json
