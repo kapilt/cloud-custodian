@@ -429,6 +429,56 @@ def reset_stats():
     d.reset_stats()
 
 
+@cli.command(name='inspect-partitions')
+@click.option('-b', '--bucket', required=True)
+def inspect_partitions(bucket):
+    """Disocver the partitions on a bucket via introspection."""
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s: %(name)s:%(levelname)s %(message)s")
+    logging.getLogger('botocore').setLevel(level=logging.WARNING)
+
+    state = db.db()
+    # add db.bucket accessor
+    found = None
+    for b in state.buckets():
+        if b.name == bucket:
+            found = b
+            break
+    if not found:
+        click.echo("no bucket named: %s" % bucket)
+        return
+
+    keyset = []
+    partitions = []
+
+    def process_keyset(bid, page):
+        keyset.append(len(page))
+
+    def process_bucket_iterator(bid, prefix, delimiter="", **continuation):
+        partitions.append(prefix)
+
+    # synchronous execution
+    def invoke(f, *args, **kw):
+        return f(*args, **kw)
+
+    # unleash the monkies ;-)
+    worker.connection.hincrby = lambda x, y, z: True
+    worker.invoke = invoke
+    worker.process_keyset = process_keyset
+    worker.process_bucket_iterator = process_bucket_iterator
+
+    # kick it off
+    worker.process_bucket_partitions(b.bucket_id)
+
+    keys_scanned = sum(keyset)
+    click.echo(
+        "Found %d partitions %s keys scanned during partitioning" % (
+        len(partitions), keys_scanned))
+    click.echo("\n".join(partitions))
+
+
 @cli.command(name='inspect-bucket')
 @click.option('-b', '--bucket', required=True)
 def inspect_bucket(bucket):
@@ -440,6 +490,7 @@ def inspect_bucket(bucket):
             found = b
     if not found:
         click.echo("no bucket named: %s" % bucket)
+        return
 
     click.echo("Bucket: %s" % found.name)
     click.echo("Account: %s" % found.account)
