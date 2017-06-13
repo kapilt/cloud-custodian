@@ -365,6 +365,8 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
              named_group, day_count, len(days))
     t = time.time()
 
+    retry = get_retry(('SlowDown',))
+
     for idx, d in enumerate(days):
         date = d.replace(minute=0, microsecond=0, hour=0)
         export_prefix = "%s%s" % (prefix, date.strftime("/%Y/%m/%d"))
@@ -408,7 +410,8 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
                             (count * poll_period) / 60.0)
                     continue
                 raise
-            s3.put_object_tagging(
+            retry(
+                s3.put_object_tagging,
                 Bucket=bucket, Key=prefix,
                 Tagging={
                     'TagSet': [{
