@@ -293,7 +293,7 @@ def setup_parser():
     validate.add_argument("-q", "--quiet", action="count", help="Less logging (repeatable)")
     validate.add_argument("--debug", default=False, help=argparse.SUPPRESS)
 
-    schema_desc = ("Browse the available vocabularies (resources, filters, and "
+    schema_desc = ("Browse the availablx vocabularies (resources, filters, and "
                    "actions) for policy construction. The selector "
                    "is specified with RESOURCE[.CATEGORY[.ITEM]] "
                    "examples: s3, ebs.actions, or ec2.filters.instance-age")
