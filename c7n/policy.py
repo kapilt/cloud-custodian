@@ -152,8 +152,8 @@ class PolicyCollection(object):
 
             for region in svc_regions:
                 if available_regions and region not in available_regions:
-                    level = ('all' in self.options.regions
-                             and logging.DEBUG or logging.WARNING)
+                    level = ('all' in self.options.regions and
+                             logging.DEBUG or logging.WARNING)
                     self.log.log(
                         level, "policy:%s resources:%s not available in region:%s",
                         p.name, p.resource_type, region)
