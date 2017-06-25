@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SRCDIR        = docs/source
 SPHINXOPTS    = -W
-SPHINXBUILD   = .tox/py27/bin/sphinx-build
+SPHINXBUILD   = .tox/docs/bin/sphinx-build
 PAPER         =
 BUILDDIR      = $(SRCDIR)/../build
 
