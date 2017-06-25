@@ -5,4 +5,5 @@ pyenv = "py%s-cov" % (os.environ.get(
 toxenv = [pyenv]
 if pyenv == 'py27-cov':
     toxenv.append('docs')
+    toxenv.append('lint')
 print(",".join(toxenv))
