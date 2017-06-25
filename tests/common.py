@@ -19,8 +19,10 @@ import logging
 import os
 import shutil
 import tempfile
-import yaml
 import unittest
+
+import six
+import yaml
 
 from c7n import policy
 from c7n.schema import generate, validate as schema_validate
@@ -177,8 +179,8 @@ class BaseTest(PillTest):
 class TextTestIO(io.StringIO):
 
     def write(self, b):
-        if not isinstance(b, unicode):
-            b = unicode(b)
+        if not isinstance(b, six.types.UnicodeType):
+            b = b.decode('utf8')
         return super(TextTestIO, self).write(b)
 
 
