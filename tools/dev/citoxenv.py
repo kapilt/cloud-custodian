@@ -2,7 +2,7 @@
 import os
 pyenv = "py%s-cov" % (os.environ.get(
     'TRAVIS_PYTHON_VERSION', '').replace('python', 'py').replace('.', ''))
-toxenv = [pyenv, 'lint']
+toxenv = [pyenv]
 if pyenv == 'py27-cov':
     toxenv.append('docs')
-print ",".join(toxenv)
+print(",".join(toxenv))
