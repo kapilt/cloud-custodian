@@ -63,6 +63,7 @@ def main(xml_path, txt_path):
     """
     expected = load_expected_successes(txt_path)
     unexpected = set()
+    previous_count = len(expected)
     walk(minidom.parse(xml_path), expected, unexpected)
 
     if expected:
@@ -75,6 +76,8 @@ def main(xml_path, txt_path):
         print("Conveniently, they have been added to {} for you. Perhaps "
               "commit that?".format(txt_path))
     if expected or unexpected:
+        print("Previously %d passing, now %d" % (
+            previous_count, previous_count - len(expected) + len(unexpected)))
         return 1
     print('All and only tests required to pass under Python 3.6 did.')
     return 0
