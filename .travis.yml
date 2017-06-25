@@ -1,11 +1,12 @@
 language: python
+dist: trusty
 sudo: false
 cache: pip
 python:
   - "2.7"
   - "3.6"
 install:
-  - pip install coveralls
+  - pip install coveralls tox
 script:
   - TOXENV=`tools/dev/citoxenv.py` tox
 after_success:

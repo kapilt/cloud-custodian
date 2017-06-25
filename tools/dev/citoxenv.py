@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-pyenv = "%s-cov" % (os.environ.get(
+pyenv = "py%s-cov" % (os.environ.get(
     'TRAVIS_PYTHON_VERSION', '').replace('python', 'py').replace('.', ''))
 toxenv = [pyenv, 'lint']
 if pyenv == 'py27-cov':
