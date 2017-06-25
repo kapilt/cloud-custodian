@@ -1,7 +1,10 @@
 language: python
 dist: trusty
 sudo: false
-cache: pip
+cache:
+  directories:
+   - .tox
+
 python:
   - "2.7"
   - "3.6"
