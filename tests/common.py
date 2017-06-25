@@ -153,7 +153,7 @@ class BaseTest(PillTest):
             self, name=None, level=logging.INFO,
             formatter=None, log_file=None):
         if log_file is None:
-            log_file = io.StringIO()
+            log_file = TextTestIO()
         log_handler = logging.StreamHandler(log_file)
         if formatter:
             log_handler.setFormatter(formatter)
@@ -172,6 +172,14 @@ class BaseTest(PillTest):
     @property
     def account_id(self):
         return ACCOUNT_ID
+
+
+class TextTestIO(io.StringIO):
+
+    def write(self, b):
+        if not isinstance(b, unicode):
+            b = unicode(b)
+        return super(TextTestIO, self).write(b)
 
 
 def placebo_dir(name):
