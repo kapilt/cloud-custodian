@@ -29,6 +29,8 @@ import jsonschema
 import logging
 import time
 import os
+import operator
+from tabulate import tabulate
 import yaml
 
 logging.basicConfig(level=logging.INFO)
@@ -135,6 +137,9 @@ def run(config, start, end, accounts):
     destination = config.get('destination')
     start = start and parse(start) or start
     end = end and parse(end) or datetime.now()
+    #from c7n.executor import MainThreadExecutor
+    #MainThreadExecutor.async = False
+    #with MainThreadExecutor() as w:
     with ThreadPoolExecutor(max_workers=32) as w:
         futures = {}
         for account in config.get('accounts', ()):
@@ -311,7 +316,199 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
     if not 'LastExport' in tags:
         return sorted(days)
     last_export = parse(tags['LastExport'])
+    if last_export.tzinfo is None:
+        last_export.replace(tzinfo=tzutc())
     return [d for d in sorted(days) if d > last_export]
+
+
+@cli.command()
+@click.option('--config', type=click.Path(), required=True)
+@click.option('-g', '--group', required=True)
+@click.option('-a', '--accounts', multiple=True)
+@click.option('--dryrun/--no-dryrun', is_flag=True, default=False)
+def sync(config, group, accounts=(), dryrun=False):
+    """sync last recorded export to actual"""
+    config = validate.callback(config)
+    destination = config.get('destination')
+    client = boto3.Session().client('s3')
+
+    for account in config.get('accounts', ()):
+        if accounts and account['name'] not in accounts:
+            continue
+
+        session = get_session(account['role'])
+        account_id = session.client('sts').get_caller_identity()['Account']
+        prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
+        prefix = "%s/%s" % (prefix, group)
+        exports = get_exports(client, destination['bucket'], prefix + "/")
+
+
+        role = account.pop('role')
+        if isinstance(role, basestring):
+            account['account_id'] = role.split(':')[4]
+        else:
+            account['account_id'] = role[-1].split(':')[4]
+        account.pop('groups')
+
+        if exports:
+            last_export = exports.pop()
+            account['export'] = last_export
+        else:
+            account['export'] = 'missing'
+
+        try:
+            tag_set = client.get_object_tagging(
+                Bucket=destination['bucket'], Key=prefix).get('TagSet', [])
+        except:
+            tag_set = []
+
+        tags = {t['Key']: t['Value'] for t in tag_set}
+        tagged_last_export = None
+
+        if 'LastExport' in tags:
+            le = parse(tags['LastExport'])
+            tagged_last_export = (le.year, le.month, le.day)
+            account['sync'] = tagged_last_export
+        else:
+            account['sync'] = account['export'] != 'missing' and 'sync' or 'missing'
+
+        if tagged_last_export == last_export or account['export'] == 'missing':
+            continue
+
+        if dryrun:
+            continue
+
+        client.put_object(
+            Bucket=destination['bucket'],
+            Key=prefix,
+            Body=json.dumps({}),
+            ACL="bucket-owner-full-control",
+            ServerSideEncryption="AES256")
+
+        export_time = datetime.now().replace(tzinfo=tzlocal()).astimezone(tzutc())
+        export_time = export_time.replace(
+            year=last_export[0], month=last_export[1], day=last_export[2],
+            minute=0, second=0, microsecond=0, hour=0)
+        client.put_object_tagging(
+            Bucket=destination['bucket'], Key=prefix,
+            Tagging={
+                'TagSet': [{
+                    'Key': 'LastExport',
+                    'Value': export_time.isoformat()}]})
+
+    accounts_report = []
+    for a in config.get('accounts'):
+        if accounts and a['name'] not in accounts:
+            continue
+        if isinstance(a['sync'], tuple):
+            a['sync'] = "%s/%s/%s" % (a['sync'])
+        if isinstance(a['export'], tuple):
+            a['export'] = "%s/%s/%s" % (a['export'])
+        accounts_report.append(a)
+
+    accounts_report.sort(key=operator.itemgetter('export'), reverse=True)
+    print(tabulate(accounts_report, headers='keys'))
+
+
+@cli.command()
+@click.option('--config', type=click.Path(), required=True)
+@click.option('-g', '--group', required=True)
+@click.option('-a', '--accounts', multiple=True)
+def status(config,  group, accounts=()):
+    config = validate.callback(config)
+    destination = config.get('destination')
+    client = boto3.Session().client('s3')
+
+    for account in config.get('accounts', ()):
+        if accounts and account['name'] not in accounts:
+            continue
+
+        session = get_session(account['role'])
+        account_id = session.client('sts').get_caller_identity()['Account']
+        prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
+        prefix = "%s/flow-log" % prefix
+
+        role = account.pop('role')
+        if isinstance(role, basestring):
+            account['account_id'] = role.split(':')[4]
+        else:
+            account['account_id'] = role[-1].split(':')[4]
+
+        account.pop('groups')
+
+        try:
+            tag_set = client.get_object_tagging(
+                Bucket=destination['bucket'], Key=prefix).get('TagSet', [])
+        except:
+            account['export'] = 'missing'
+            continue
+        tags = {t['Key']: t['Value'] for t in tag_set}
+
+        if not 'LastExport' in tags:
+            account['export'] = 'empty'
+        else:
+            last_export = parse(tags['LastExport'])
+            account['export'] = last_export.strftime('%Y/%m/%d')
+
+    accounts = [a for a in config.get('accounts') if a in accounts or not accounts]
+    accounts.sort(key=operator.itemgetter('export'), reverse=True)
+    print(tabulate(accounts, headers='keys'))
+
+
+def get_exports(client, bucket, prefix, latest=True):
+    """Find exports for a given account
+    """
+    keys = client.list_objects_v2(
+        Bucket=bucket, Prefix=prefix, Delimiter='/').get('CommonPrefixes', [])
+    found = []
+    years = []
+    for y in keys:
+        part = y['Prefix'].rsplit('/', 2)[-2]
+        if not part.isdigit():
+            continue
+        year = int(part)
+        years.append(year)
+
+    if not years:
+        return []
+
+    years.sort(reverse=True)
+    if latest:
+        years = [years[0]]
+
+    for y in years:
+        keys = client.list_objects_v2(
+            Bucket=bucket, Prefix="%s/%d/" % (prefix.strip('/'), y),
+            Delimiter='/').get('CommonPrefixes', [])
+        months = []
+        for m in keys:
+            part = m['Prefix'].rsplit('/', 2)[-2]
+            if not part.isdigit():
+                continue
+            month = int(part)
+            date_key = (y, month)
+            months.append(month)
+        months.sort(reverse=True)
+        if not months:
+            continue
+        if latest:
+            months = [months[0]]
+        for m in months:
+            keys = client.list_objects_v2(
+                Bucket=bucket, Prefix="%s/%d/%s/" % (
+                    prefix.strip('/'), y, ('%d' % m).rjust(2, '0')),
+                Delimiter='/').get('CommonPrefixes', [])
+            for d in keys:
+                part = d['Prefix'].rsplit('/', 2)[-2]
+                if not part.isdigit():
+                    continue
+                day = int(part)
+                date_key = (y, m, day)
+                found.append(date_key)
+    found.sort(reverse=True)
+    if latest:
+        found = [found[0]]
+    return found
 
 
 @cli.command()
@@ -361,8 +558,8 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
     s3 = boto3.Session().client('s3')
     days = filter_extant_exports(s3, bucket, prefix, days, start, end)
 
-    log.info("Group:%s filtering s3 extant keys from %d to %d",
-             named_group, day_count, len(days))
+    log.info("Group:%s filtering s3 extant keys from %d to %d start:%s end:%s",
+             named_group, day_count, len(days), days[0], days[-1])
     t = time.time()
 
     retry = get_retry(('SlowDown',))
@@ -407,10 +604,10 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
                         log.debug(
                             "group:%s day:%s waiting for %0.2f minutes",
                             named_group, d.strftime('%Y-%m-%d'),
-                            (count * poll_period) / 60.0)
+                            (counter * poll_period) / 60.0)
                     continue
                 raise
-            retry(
+            result_tag = retry(
                 s3.put_object_tagging,
                 Bucket=bucket, Key=prefix,
                 Tagging={
