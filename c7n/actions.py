@@ -400,7 +400,9 @@ class Notify(EventAction):
 
     schema = {
         'type': 'object',
-        'required': ['type', 'transport', 'to'],
+        'oneOf': [
+            {'required': ['type', 'transport', 'to']},
+            {'required': ['type', 'transport', 'to_from']}],
         'properties': {
             'type': {'enum': ['notify']},
             'to': {'type': 'array', 'items': {'type': 'string'}},
