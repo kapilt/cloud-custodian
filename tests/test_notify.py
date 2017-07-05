@@ -15,8 +15,53 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from .common import BaseTest
 
+import json
+import tempfile
+
 
 class NotifyTest(BaseTest):
+
+    def test_notify_address_from(self):
+        session_factory = self.record_flight_data(
+            'test_notify_address_from')
+        client = session_factory().client('sqs')
+        queue_url = client.create_queue(
+            QueueName='c7n-notify-test')['QueueUrl']
+        import time
+        time.sleep(5)
+        print(queue_url)
+        self.addCleanup(client.delete_queue, QueueUrl=queue_url)
+
+        temp_file = tempfile.NamedTemporaryFile()
+        json.dump({'emails': ['me@example.com']}, temp_file)
+        temp_file.flush()
+        self.addCleanup(temp_file.close)
+
+        policy = self.load_policy({
+            'name': 'notify-address',
+            'resource': 'sqs',
+            'filters': [
+                {'QueueUrl': queue_url}],
+            'actions': [{
+                'type': 'notify',
+                'to_from': {
+                    'url': 'file://%s' % temp_file.name,
+                    'format': 'json',
+                    'expr': 'emails'},
+                'cc_from': {
+                    'url': 'file://%s' % temp_file.name,
+                    'format': 'json',
+                    'expr': 'emails'},
+                'transport': {
+                    'type': 'sqs',
+                    'queue': queue_url}}]
+            }, session_factory=session_factory)
+        resources = policy.run()
+        self.assertEqual(len(resources), 1)
+        messages = client.receive_message(
+            QueueUrl=queue_url,
+            AttributeNames=['All']).get('Messages', [])
+        print(messages)
 
     def test_sns_notify(self):
         session_factory = self.replay_flight_data(

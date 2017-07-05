@@ -451,13 +451,13 @@ class Notify(EventAction):
             to_from['url'] = to_from['url'].format(**message)
             if 'expr' in to_from:
                 to_from['expr'] = to_from['expr'].format(**message)
-            p['to'] = ValuesFrom(to_from).get_values()
+            p['to'] = ValuesFrom(to_from, self.manager).get_values()
         if 'cc_from' in self.data:
             cc_from = self.data['cc_from'].copy()
             cc_from['url'] = cc_from['url'].format(**message)
             if 'expr' in cc_from:
                 cc_from['expr'] = cc_from['expr'].format(**message)
-            p['cc'] = ValuesFrom(cc_from).get_values()
+            p['cc'] = ValuesFrom(cc_from, self.manager).get_values()
         return p
 
     def process(self, resources, event=None):
@@ -501,8 +501,9 @@ class Notify(EventAction):
             Message=base64.b64encode(zlib.compress(utils.dumps(message))))
 
     def send_sqs(self, message):
+        import pdb; pdb.set_trace()
         queue = self.data['transport']['queue']
-        if queue.startswith('https://sqs.'):
+        if queue.startswith('https://sqs') or queue.startswith('https://queue'):
             region = queue.split('.', 2)[1]
             queue_url = queue
         elif queue.startswith('arn:sqs'):
