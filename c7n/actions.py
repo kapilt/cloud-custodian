@@ -501,9 +501,11 @@ class Notify(EventAction):
             Message=base64.b64encode(zlib.compress(utils.dumps(message))))
 
     def send_sqs(self, message):
-        import pdb; pdb.set_trace()
         queue = self.data['transport']['queue']
-        if queue.startswith('https://sqs') or queue.startswith('https://queue'):
+        if queue.startswith('https://queue.amazonaws.com'):
+            region = 'us-east-1'
+            queue_url = queue
+        elif queue.startswith('https://sqs.'):
             region = queue.split('.', 2)[1]
             queue_url = queue
         elif queue.startswith('arn:sqs'):
