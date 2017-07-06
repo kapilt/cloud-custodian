@@ -390,7 +390,7 @@ def sync(config, group, accounts=(), dryrun=False):
             account['export'] = last_export
         else:
             account['export'] = 'missing'
-
+            last_export = None
         try:
             tag_set = client.get_object_tagging(
                 Bucket=destination['bucket'], Key=prefix).get('TagSet', [])
@@ -406,6 +406,9 @@ def sync(config, group, accounts=(), dryrun=False):
             account['sync'] = tagged_last_export
         else:
             account['sync'] = account['export'] != 'missing' and 'sync' or 'missing'
+
+        if last_export is None:
+            continue
 
         if tagged_last_export == last_export or account['export'] == 'missing':
             continue
