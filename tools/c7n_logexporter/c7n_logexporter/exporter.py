@@ -107,6 +107,7 @@ def cli():
 @cli.command()
 @click.option('--config', type=click.Path())
 def validate(config):
+    """validate config file"""
     with open(config) as fh:
         content = fh.read()
 
@@ -133,6 +134,7 @@ def validate(config):
 @click.option('-a', '--accounts', multiple=True)
 @debug
 def run(config, start, end, accounts):
+    """run log group exports across a set of accounts."""
     config = validate.callback(config)
     destination = config.get('destination')
     start = start and parse(start) or start
@@ -323,11 +325,49 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
 
 @cli.command()
 @click.option('--config', type=click.Path(), required=True)
+@click.option('-a', '--accounts', multiple=True)
+def access(config, accounts=()):
+    """Check iam permissions for log export access in each account"""
+    config = validate.callback(config)
+    destination = config.get('destination')
+    accounts_report = []
+
+    for account in config.get('accounts', ()):
+        if accounts and account['name'] not in accounts:
+            continue
+        accounts_report.append(account)
+        session = get_session(account['role'])
+        identity = session.client('sts').get_caller_identity()
+        account['account_id'] = identity['Account']
+        account.pop('groups')
+        account.pop('role')
+        client = session.client('iam')
+        policy_arn = identity['Arn']
+        if policy_arn.count('/') > 1:
+            policy_arn = policy_arn.rsplit('/', 1)[0]
+        if ':sts:' in policy_arn:
+            policy_arn = policy_arn.replace(':sts', ':iam')
+        if ':assumed-role' in policy_arn:
+            policy_arn = policy_arn.replace(':assumed-role', ':role')
+        evaluation = client.simulate_principal_policy(
+            PolicySourceArn=policy_arn,
+            ActionNames=['logs:CreateExportTask'])['EvaluationResults']
+        account['access'] = evaluation[0]['EvalDecision']
+
+    accounts_report.sort(key=operator.itemgetter('access'), reverse=True)
+    print(tabulate(accounts_report, headers='keys'))
+
+
+@cli.command()
+@click.option('--config', type=click.Path(), required=True)
 @click.option('-g', '--group', required=True)
 @click.option('-a', '--accounts', multiple=True)
 @click.option('--dryrun/--no-dryrun', is_flag=True, default=False)
 def sync(config, group, accounts=(), dryrun=False):
-    """sync last recorded export to actual"""
+    """sync last recorded export to actual
+
+    Use --dryrun to check status.
+    """
     config = validate.callback(config)
     destination = config.get('destination')
     client = boto3.Session().client('s3')
@@ -415,6 +455,7 @@ def sync(config, group, accounts=(), dryrun=False):
 @click.option('-g', '--group', required=True)
 @click.option('-a', '--accounts', multiple=True)
 def status(config,  group, accounts=()):
+    """report current export state status"""
     config = validate.callback(config)
     destination = config.get('destination')
     client = boto3.Session().client('s3')
@@ -524,6 +565,7 @@ def get_exports(client, bucket, prefix, latest=True):
 # @click.option('--stream-prefix)
 @lambdafan
 def export(group, bucket, prefix, start, end, role, poll_period=300, session=None, name=""):
+    """export a given log group."""
     start = start and isinstance(start, basestring) and parse(start) or start
     end = (end and isinstance(start, basestring) and
            parse(end) or end or datetime.now())
