@@ -17,7 +17,6 @@ import boto3
 import click
 import json
 from c7n.credentials import assumed_session
-from c7n.executor import MainThreadExecutor
 from c7n.utils import get_retry, dumps, chunks
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -61,8 +60,7 @@ CONFIG_SCHEMA = {
                 'name': {'type': 'string'},
                 'role': {'oneOf': [
                     {'type': 'array', 'items': {'type': 'string'}},
-                    {'type': 'string'},
-                    ]},
+                    {'type': 'string'}]},
                 'groups': {
                     'type': 'array', 'items': {'type': 'string'}
                 }
@@ -132,16 +130,15 @@ def validate(config):
 @click.option('--start', required=True)
 @click.option('--end')
 @click.option('-a', '--accounts', multiple=True)
-@debug
 def run(config, start, end, accounts):
-    """run log group exports across a set of accounts."""
+    """run export across accounts and log groups specified in config."""
     config = validate.callback(config)
     destination = config.get('destination')
     start = start and parse(start) or start
     end = end and parse(end) or datetime.now()
-    #from c7n.executor import MainThreadExecutor
-    #MainThreadExecutor.async = False
-    #with MainThreadExecutor() as w:
+    # from c7n.executor import MainThreadExecutor
+    # MainThreadExecutor.async = False
+    # with MainThreadExecutor() as w:
     with ThreadPoolExecutor(max_workers=32) as w:
         futures = {}
         for account in config.get('accounts', ()):
@@ -315,7 +312,7 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
         tag_set = []
     tags = {t['Key']: t['Value'] for t in tag_set}
 
-    if not 'LastExport' in tags:
+    if 'LastExport' not in tags:
         return sorted(days)
     last_export = parse(tags['LastExport'])
     if last_export.tzinfo is None:
@@ -329,7 +326,6 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
 def access(config, accounts=()):
     """Check iam permissions for log export access in each account"""
     config = validate.callback(config)
-    destination = config.get('destination')
     accounts_report = []
 
     for account in config.get('accounts', ()):
@@ -381,7 +377,6 @@ def sync(config, group, accounts=(), dryrun=False):
         prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
         prefix = "%s/%s" % (prefix, group)
         exports = get_exports(client, destination['bucket'], prefix + "/")
-
 
         role = account.pop('role')
         if isinstance(role, basestring):
@@ -454,7 +449,7 @@ def sync(config, group, accounts=(), dryrun=False):
 @click.option('--config', type=click.Path(), required=True)
 @click.option('-g', '--group', required=True)
 @click.option('-a', '--accounts', multiple=True)
-def status(config,  group, accounts=()):
+def status(config, group, accounts=()):
     """report current export state status"""
     config = validate.callback(config)
     destination = config.get('destination')
@@ -485,7 +480,7 @@ def status(config,  group, accounts=()):
             continue
         tags = {t['Key']: t['Value'] for t in tag_set}
 
-        if not 'LastExport' in tags:
+        if 'LastExport' not in tags:
             account['export'] = 'empty'
         else:
             last_export = parse(tags['LastExport'])
@@ -565,7 +560,7 @@ def get_exports(client, bucket, prefix, latest=True):
 # @click.option('--stream-prefix)
 @lambdafan
 def export(group, bucket, prefix, start, end, role, poll_period=300, session=None, name=""):
-    """export a given log group."""
+    """export a given log group to s3"""
     start = start and isinstance(start, basestring) and parse(start) or start
     end = (end and isinstance(start, basestring) and
            parse(end) or end or datetime.now())
@@ -649,7 +644,7 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
                             (counter * poll_period) / 60.0)
                     continue
                 raise
-            result_tag = retry(
+            retry(
                 s3.put_object_tagging,
                 Bucket=bucket, Key=prefix,
                 Tagging={
@@ -658,13 +653,14 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
                         'Value': d.isoformat()}]})
             break
 
-        log.info("Log export time:%0.2f group:%s day:%s bucket:%s prefix:%s task:%s",
-                  time.time()-t,
-                  named_group,
-                  d.strftime("%Y-%m-%d"),
-                  bucket,
-                  params['destinationPrefix'],
-                  result['taskId'])
+        log.info(
+            "Log export time:%0.2f group:%s day:%s bucket:%s prefix:%s task:%s",
+            time.time() - t,
+            named_group,
+            d.strftime("%Y-%m-%d"),
+            bucket,
+            params['destinationPrefix'],
+            result['taskId'])
 
     log.info(
         ("Exported log group:%s time:%0.2f days:%d start:%s"

@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from common import BaseTest
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from .common import BaseTest
 from c7n.utils import local_session
 
 
@@ -19,7 +21,7 @@ TRAIL = 'nosetest'
 
 import datetime
 from dateutil import parser
-from test_offhours import mock_datetime_now
+from .test_offhours import mock_datetime_now
 
 
 class AccountTests(BaseTest):
@@ -219,6 +221,38 @@ class AccountTests(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 0)
 
+    def test_account_virtual_mfa(self):
+        # only warns when the default threshold goes to warning or above
+        session_factory = self.replay_flight_data('test_account_virtual_mfa')
+        p1 = self.load_policy({
+            'name': 'account-virtual-mfa',
+            'resource': 'account',
+            'filters': [{
+                'type': 'has-virtual-mfa'}]},
+            session_factory=session_factory)
+        resources = p1.run()
+        self.assertEqual(len(resources), 1)
+
+        p2 = self.load_policy({
+            'name': 'account-virtual-mfa',
+            'resource': 'account',
+            'filters': [{
+                'type': 'has-virtual-mfa',
+                'value': True}]},
+            session_factory=session_factory)
+        resources = p2.run()
+        self.assertEqual(len(resources), 1)
+
+        p3 = self.load_policy({
+            'name': 'account-virtual-mfa',
+            'resource': 'account',
+            'filters': [{
+                'type': 'has-virtual-mfa',
+                'value': False}]},
+            session_factory=session_factory)
+        resources = p3.run()
+        self.assertEqual(len(resources), 0)
+
     def test_missing_password_policy(self):
         session_factory = self.replay_flight_data('test_account_missing_password_policy')
         p = self.load_policy({
@@ -229,7 +263,7 @@ class AccountTests(BaseTest):
             session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        
+
     def test_create_trail(self):
         factory = self.replay_flight_data('test_cloudtrail_create')
         p = self.load_policy(
@@ -275,7 +309,7 @@ class AccountTests(BaseTest):
 
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        
+
         # Validate that a case was created
         support = session_factory().client('support')
         cases = support.describe_cases()

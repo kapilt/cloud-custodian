@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import logging
 import itertools
 import json
+import time
 
 from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
@@ -158,23 +161,39 @@ class SnapshotCrossAccountAccess(CrossAccountAccessFilter):
 
 @Snapshot.filter_registry.register('skip-ami-snapshots')
 class SnapshotSkipAmiSnapshots(Filter):
-    """Filter to remove snapshots of AMIs from results
+    """
+    Filter to remove snapshots of AMIs from results
 
     This filter is 'true' by default.
 
     :example:
 
+        .. implicit with no parameters, 'true' by default
         .. code-block: yaml
 
             policies:
               - name: delete-stale-snapshots
-                resource: ebs-snapshots
+                resource: ebs-snapshot
                 filters:
                   - type: age
                     days: 28
                     op: ge
-                  - skip-ami-snapshots: true
+                  - skip-ami-snapshots
 
+    :example:
+
+        .. explicit with parameter
+        .. code-block: yaml
+
+            policies:
+              - name: delete-snapshots
+                resource: ebs-snapshot
+                filters:
+                  - type: age
+                    days: 28
+                    op: ge
+                  - type: skip-ami-snapshots
+                    value: false
     """
 
     schema = type_schema('skip-ami-snapshots', value={'type': 'boolean'})
@@ -668,9 +687,12 @@ class EncryptInstanceVolumes(BaseAction):
        - Delete transient snapshots
        - Detach Unencrypted Volume
        - Attach Encrypted Volume
+       - Set DeleteOnTermination instance attribute equal to source volume
     - For each volume
        - Delete unencrypted volume
     - Start Instance (if originally running)
+    - For each newly encrypted volume
+       - Delete transient tags
 
     :example:
 
@@ -701,7 +723,9 @@ class EncryptInstanceVolumes(BaseAction):
         'ec2:DescribeSnapshots',
         'ec2:DescribeVolumes',
         'ec2:StopInstances',
-        'ec2:StartInstances')
+        'ec2:StartInstances',
+        'ec2:ModifyInstanceAttribute',
+        'ec2:DeleteTags')
 
     def validate(self):
         key = self.data.get('key')
@@ -774,10 +798,25 @@ class EncryptInstanceVolumes(BaseAction):
             client.detach_volume(
                 InstanceId=instance_id, VolumeId=v['VolumeId'])
             # 5/8/2016 The detach isn't immediately consistent
-            self.data.get('delay', 15)
+            time.sleep(self.data.get('delay', 15))
             client.attach_volume(
                 InstanceId=instance_id, VolumeId=vol_id,
                 Device=v['Attachments'][0]['Device'])
+
+            # Set DeleteOnTermination attribute the same as source volume
+            if v['Attachments'][0]['DeleteOnTermination']:
+                client.modify_instance_attribute(
+                    InstanceId=instance_id,
+                    BlockDeviceMappings=[
+                        {
+                            'DeviceName': v['Attachments'][0]['Device'],
+                            'Ebs': {
+                                'VolumeId': vol_id,
+                                'DeleteOnTermination': True
+                            }
+                        }
+                    ]
+                )
 
         if instance_running:
             client.start_instances(InstanceIds=[instance_id])
@@ -788,6 +827,17 @@ class EncryptInstanceVolumes(BaseAction):
 
         for v in vol_set:
             client.delete_volume(VolumeId=v['VolumeId'])
+
+        # Clean-up transient tags on newly created encrypted volume.
+        for v, vol_id in paired:
+            client.delete_tags(
+                Resources=[vol_id],
+                Tags=[
+                    {'Key': 'maid-crypt-remediation'},
+                    {'Key': 'maid-origin-volume'},
+                    {'Key': 'maid-instance-device'}
+                ]
+            )
 
     def stop_instance(self, instance_id):
         client = local_session(self.manager.session_factory).client('ec2')

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
@@ -123,6 +124,9 @@ class SubnetFilter(net_filters.SubnetFilter):
             self.manager.get_resource_manager(
                 'cache-subnet-group').resources()}
         return super(SubnetFilter, self).process(resources, event)
+
+
+filters.register('network-location', net_filters.NetworkLocation)
 
 
 # added mark-for-op

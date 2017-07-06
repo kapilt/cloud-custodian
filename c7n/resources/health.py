@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import itertools
+
+import six
 
 from c7n.query import QueryResourceManager
 from c7n.manager import resources
@@ -40,9 +44,6 @@ class HealthEvents(QueryResourceManager):
         'health:DescribeAffectedEntities')
 
     def __init__(self, ctx, data):
-        if ctx.options.region != 'us-east-1':
-            raise ValueError(
-                'resource:health-event is only available in us-east-1')
         super(HealthEvents, self).__init__(ctx, data)
         self.queries = QueryFilter.parse(
             self.data.get('query', [
@@ -145,6 +146,6 @@ class QueryFilter(object):
 
     def query(self):
         value = self.value
-        if isinstance(self.value, basestring):
+        if isinstance(self.value, six.string_types):
             value = [self.value]
         return {'Name': self.key, 'Values': value}

@@ -14,6 +14,8 @@
 """
 Application Load Balancers
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import logging
 
 from collections import defaultdict
@@ -110,6 +112,9 @@ class SecurityGroupFilter(net_filters.SecurityGroupFilter):
 class SubnetFilter(net_filters.SubnetFilter):
 
     RelatedIdsExpression = "AvailabilityZones[].SubnetId"
+
+
+filters.register('network-location', net_filters.NetworkLocation)
 
 
 @actions.register('mark-for-op')

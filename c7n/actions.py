@@ -14,16 +14,20 @@
 """
 Actions to take on resources
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import base64
 from datetime import datetime
 import jmespath
 import logging
 import zlib
 
+import six
 from botocore.exceptions import ClientError
 
-from c7n.registry import PluginRegistry
 from c7n.executor import ThreadPoolExecutor
+from c7n.registry import PluginRegistry
+from c7n.resolver import ValuesFrom
 from c7n import utils
 from c7n.version import version as VERSION
 
@@ -144,7 +148,7 @@ class Action(object):
     def _run_api(self, cmd, *args, **kw):
         try:
             return cmd(*args, **kw)
-        except ClientError, e:
+        except ClientError as e:
             if (e.response['Error']['Code'] == 'DryRunOperation' and
             e.response['ResponseMetadata']['HTTPStatusCode'] == 412 and
             'would have succeeded' in e.message):
@@ -263,13 +267,13 @@ class ModifyVpcSecurityGroupsAction(Action):
                 remove_groups = rgroups
             elif isinstance(remove_target_group_ids, list):
                 remove_groups = remove_target_group_ids
-            elif isinstance(remove_target_group_ids, basestring):
+            elif isinstance(remove_target_group_ids, six.string_types):
                 remove_groups = [remove_target_group_ids]
 
             # Parse add_groups
             if isinstance(add_target_group_ids, list):
                 add_groups = add_target_group_ids
-            elif isinstance(add_target_group_ids, basestring):
+            elif isinstance(add_target_group_ids, six.string_types):
                 add_groups = [add_target_group_ids]
 
             # seems extraneous with list?
@@ -396,11 +400,15 @@ class Notify(EventAction):
 
     schema = {
         'type': 'object',
-        'required': ['type', 'transport', 'to'],
+        'oneOf': [
+            {'required': ['type', 'transport', 'to']},
+            {'required': ['type', 'transport', 'to_from']}],
         'properties': {
             'type': {'enum': ['notify']},
             'to': {'type': 'array', 'items': {'type': 'string'}},
+            'to_from': ValuesFrom.schema,
             'cc': {'type': 'array', 'items': {'type': 'string'}},
+            'cc_from': ValuesFrom.schema,
             'cc_manager': {'type': 'boolean'},
             'from': {'type': 'string'},
             'subject': {'type': 'string'},
@@ -436,17 +444,38 @@ class Notify(EventAction):
             return ('sqs:SendMessage',)
         return ()
 
+    def expand_variables(self, message):
+        """expand any variables in the action to_from/cc_from fields.
+        """
+        p = self.data.copy()
+        if 'to_from' in self.data:
+            to_from = self.data['to_from'].copy()
+            to_from['url'] = to_from['url'].format(**message)
+            if 'expr' in to_from:
+                to_from['expr'] = to_from['expr'].format(**message)
+            p['to'] = ValuesFrom(to_from, self.manager).get_values()
+        if 'cc_from' in self.data:
+            cc_from = self.data['cc_from'].copy()
+            cc_from['url'] = cc_from['url'].format(**message)
+            if 'expr' in cc_from:
+                cc_from['expr'] = cc_from['expr'].format(**message)
+            p['cc'] = ValuesFrom(cc_from, self.manager).get_values()
+        return p
+
     def process(self, resources, event=None):
         aliases = self.manager.session_factory().client(
             'iam').list_account_aliases().get('AccountAliases', ())
         account_name = aliases and aliases[0] or ''
+        message = {
+            'event': event,
+            'account_id': self.manager.config.account_id,
+            'account': account_name,
+            'region': self.manager.config.region,
+            'policy': self.manager.data}
+        message['action'] = self.expand_variables(message)
+
         for batch in utils.chunks(resources, self.batch_size):
-            message = {'resources': batch,
-                       'event': event,
-                       'account': account_name,
-                       'action': self.data,
-                       'region': self.manager.config.region,
-                       'policy': self.manager.data}
+            message['resources'] = batch
             receipt = self.send_data_message(message)
             self.log.info("sent message:%s policy:%s template:%s count:%s" % (
                 receipt, self.manager.data['name'],
@@ -460,17 +489,42 @@ class Notify(EventAction):
 
     def send_sns(self, message):
         topic = self.data['transport']['topic']
-        region = topic.split(':', 5)[3]
-        client = self.manager.session_factory(region=region, assume=self.assume_role).client('sns')
+        if topic.startswith('arn:aws:sns'):
+            region = region = topic.split(':', 5)[3]
+            topic_arn = topic
+        else:
+            region = message['region']
+            topic_arn = "arn:aws:sns:%s:%s:%s" % (
+                message['region'], message['account_id'], topic)
+        client = self.manager.session_factory(
+            region=region, assume=self.assume_role).client('sns')
         client.publish(
-            TopicArn=topic,
-            Message=base64.b64encode(zlib.compress(utils.dumps(message)))
-        )
+            TopicArn=topic_arn,
+            Message=base64.b64encode(zlib.compress(utils.dumps(message))))
 
     def send_sqs(self, message):
         queue = self.data['transport']['queue']
-        region = queue.split('.', 2)[1]
-        client = self.manager.session_factory(region=region, assume=self.assume_role).client('sqs')
+        if queue.startswith('https://queue.amazonaws.com'):
+            region = 'us-east-1'
+            queue_url = queue
+        elif queue.startswith('https://sqs.'):
+            region = queue.split('.', 2)[1]
+            queue_url = queue
+        elif queue.startswith('arn:sqs'):
+            queue_arn_split = queue.split(':', 5)
+            region = queue_arn_split[3]
+            owner_id = queue_arn_split[4]
+            queue_name = queue_arn_split[5]
+            queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (
+                region, owner_id, queue_name)
+        else:
+            region = self.manager.config.region
+            owner_id = self.manager.config.account_id
+            queue_name = queue
+            queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (
+                region, owner_id, queue_name)
+        client = self.manager.session_factory(
+            region=region, assume=self.assume_role).client('sqs')
         attrs = {
             'mtype': {
                 'DataType': 'String',
@@ -478,7 +532,7 @@ class Notify(EventAction):
             },
         }
         result = client.send_message(
-            QueueUrl=queue,
+            QueueUrl=queue_url,
             MessageBody=base64.b64encode(zlib.compress(utils.dumps(message))),
             MessageAttributes=attrs)
         return result['MessageId']
@@ -492,14 +546,19 @@ class AutoTagUser(EventAction):
       policies:
         - name: ec2-auto-tag-owner
           resource: ec2
+          mode:
+            type: cloudtrail
+            role: arn:aws:iam::123456789000:role/custodian-auto-tagger
+            events:
+              - RunInstances
           filters:
            - tag:Owner: absent
           actions:
-           - type: auto-tag-creator
+           - type: auto-tag-user
              tag: OwnerContact
 
-    There's a number of caveats to usage, resources which don't
-    include tagging as part of their api, may have some delay before
+    There's a number of caveats to usage. Resources which don't
+    include tagging as part of their api may have some delay before
     automation kicks in to create a tag. Real world delay may be several
     minutes, with worst case into hours[0]. This creates a race condition
     between auto tagging and automation.
@@ -510,7 +569,7 @@ class AutoTagUser(EventAction):
 
     References
      - AWS Config (see REQUIRED_TAGS caveat) - http://goo.gl/oDUXPY
-     - CloudTrail User - http://goo.gl/XQhIG6 q
+     - CloudTrail User - http://goo.gl/XQhIG6
     """
 
     schema = utils.type_schema(
@@ -660,7 +719,7 @@ class PutMetric(BaseAction):
                                      {'Resources': resources})
             # I had to wrap resourses in a dict like this in order to not have jmespath expressions
             # start with [] in the yaml files.  It fails to parse otherwise.
-        except TypeError, oops:
+        except TypeError as oops:
             self.log.error(oops.message)
 
         value = 0

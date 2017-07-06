@@ -11,14 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import json
 import datetime
 import os
 import tempfile
 
 from unittest import TestCase
-from common import load_data, BaseTest
-from test_offhours import mock_datetime_now
+from .common import load_data, BaseTest
+from .test_offhours import mock_datetime_now
 
 from dateutil import parser
 
@@ -28,7 +30,6 @@ from c7n.resources.sns import SNS
 from c7n.resources.iam import (
     UserMfaDevice,
     UsedIamPolicies, UnusedIamPolicies,
-    AllowAllIamPolicies,
     UsedInstanceProfiles,
     UnusedInstanceProfiles,
     UsedIamRole, UnusedIamRole,
@@ -216,6 +217,7 @@ class IamUserFilterUsage(BaseTest):
                 'key': 'Status',
                 'value': 'Active'}]}, session_factory=session_factory)
         resources = p.run()
+        self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]['UserName'], 'alphabet_soup')
 
 

@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from botocore.client import ClientError
 
 from collections import Counter
@@ -141,6 +143,9 @@ class SubnetFilter(net_filters.SubnetFilter):
             subnet_ids.update(
                 [sid.strip() for sid in asg.get('VPCZoneIdentifier', '').split(',')])
         return subnet_ids
+
+
+filters.register('network-location', net_filters.NetworkLocation)
 
 
 @filters.register('launch-config')
@@ -1149,10 +1154,6 @@ class Suspend(Action):
     ASG_PROCESSES = set(ASG_PROCESSES)
 
     def process(self, asgs):
-        original_count = len(asgs)
-        asgs = [a for a in asgs if a['Instances']]
-        self.log.debug("Filtered from %d to %d asgs with instances" % (
-            original_count, len(asgs)))
         with self.executor_factory(max_workers=3) as w:
             list(w.map(self.process_asg, asgs))
 

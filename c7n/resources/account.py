@@ -13,6 +13,7 @@
 # limitations under the License.
 """AWS Account as a custodian resource.
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 from botocore.exceptions import ClientError
@@ -223,38 +224,38 @@ class IAMSummary(ValueFilter):
     Example iam summary wrt to matchable fields::
 
       {
-            "UsersQuota": 5000,
-            "GroupsPerUserQuota": 10,
+            "AccessKeysPerUserQuota": 2,
+            "AccountAccessKeysPresent": 0,
+            "AccountMFAEnabled": 1,
+            "AccountSigningCertificatesPresent": 0,
+            "AssumeRolePolicySizeQuota": 2048,
             "AttachedPoliciesPerGroupQuota": 10,
-            "PoliciesQuota": 1000,
+            "AttachedPoliciesPerRoleQuota": 10,
+            "AttachedPoliciesPerUserQuota": 10,
+            "GroupPolicySizeQuota": 5120,
+            "Groups": 1,
+            "GroupsPerUserQuota": 10,
             "GroupsQuota": 100,
             "InstanceProfiles": 0,
-            "SigningCertificatesPerUserQuota": 2,
-            "PolicySizeQuota": 5120,
-            "PolicyVersionsInUseQuota": 10000,
-            "RolePolicySizeQuota": 10240,
-            "AccountSigningCertificatesPresent": 0,
-            "Users": 5,
-            "ServerCertificatesQuota": 20,
-            "ServerCertificates": 0,
-            "AssumeRolePolicySizeQuota": 2048,
-            "Groups": 1,
-            "MFADevicesInUse": 2,
-            "RolesQuota": 250,
-            "VersionsPerPolicyQuota": 5,
-            "AccountAccessKeysPresent": 0,
-            "Roles": 4,
-            "AccountMFAEnabled": 1,
-            "MFADevices": 3,
-            "Policies": 3,
-            "GroupPolicySizeQuota": 5120,
             "InstanceProfilesQuota": 100,
-            "AccessKeysPerUserQuota": 2,
-            "AttachedPoliciesPerRoleQuota": 10,
+            "MFADevices": 3,
+            "MFADevicesInUse": 2,
+            "Policies": 3,
+            "PoliciesQuota": 1000,
+            "PolicySizeQuota": 5120,
             "PolicyVersionsInUse": 5,
+            "PolicyVersionsInUseQuota": 10000,
             "Providers": 0,
-            "AttachedPoliciesPerUserQuota": 10,
-            "UserPolicySizeQuota": 2048
+            "RolePolicySizeQuota": 10240,
+            "Roles": 4,
+            "RolesQuota": 250,
+            "ServerCertificates": 0,
+            "ServerCertificatesQuota": 20,
+            "SigningCertificatesPerUserQuota": 2,
+            "UserPolicySizeQuota": 2048,
+            "Users": 5,
+            "UsersQuota": 5000,
+            "VersionsPerPolicyQuota": 5,
         }
 
     For example to determine if an account has either not been
@@ -656,3 +657,41 @@ class EnableTrail(BaseAction):
             if update_args:
                 update_args['Name'] = trail_name
                 client.update_trail(**update_args)
+
+
+@filters.register('has-virtual-mfa')
+class HasVirtualMFA(Filter):
+    """Is the account configured with a virtual MFA device?
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+                - name: account-with-virtual-mfa
+                  resource: account
+                  region: us-east-1
+                  filters:
+                    - type: has-virtual-mfa
+                      value: true
+    """
+
+    schema = type_schema('has-virtual-mfa', **{'value': {'type': 'boolean'}})
+
+    permissions = ('iam:ListVirtualMFADevices',)
+
+    def mfa_belongs_to_root_account(self, mfa):
+        return mfa['SerialNumber'].endswith(':mfa/root-account-mfa-device')
+
+    def account_has_virtual_mfa(self, account):
+        if not account.get('c7n:VirtualMFADevices'):
+            client = local_session(self.manager.session_factory).client('iam')
+            paginator = client.get_paginator('list_virtual_mfa_devices')
+            raw_list = paginator.paginate().build_full_result()['VirtualMFADevices']
+            account['c7n:VirtualMFADevices'] = filter(self.mfa_belongs_to_root_account, raw_list)
+        expect_virtual_mfa = self.data.get('value', True)
+        has_virtual_mfa = any(account['c7n:VirtualMFADevices'])
+        return expect_virtual_mfa == has_virtual_mfa
+
+    def process(self, resources, event=None):
+        return filter(self.account_has_virtual_mfa, resources)
