@@ -136,9 +136,9 @@ def run(config, start, end, accounts):
     destination = config.get('destination')
     start = start and parse(start) or start
     end = end and parse(end) or datetime.now()
-    # from c7n.executor import MainThreadExecutor
-    # MainThreadExecutor.async = False
-    # with MainThreadExecutor() as w:
+    #from c7n.executor import MainThreadExecutor
+    #MainThreadExecutor.async = False
+    #with MainThreadExecutor() as w:
     with ThreadPoolExecutor(max_workers=32) as w:
         futures = {}
         for account in config.get('accounts', ()):
@@ -328,9 +328,7 @@ def access(config, accounts=()):
     config = validate.callback(config)
     accounts_report = []
 
-    for account in config.get('accounts', ()):
-        if accounts and account['name'] not in accounts:
-            continue
+    def check_access(account):
         accounts_report.append(account)
         session = get_session(account['role'])
         identity = session.client('sts').get_caller_identity()
@@ -350,9 +348,86 @@ def access(config, accounts=()):
             ActionNames=['logs:CreateExportTask'])['EvaluationResults']
         account['access'] = evaluation[0]['EvalDecision']
 
+    with ThreadPoolExecutor(max_workers=16) as w:
+        futures = {}
+        for account in config.get('accounts', ()):
+            if accounts and account['name'] not in accounts:
+                continue
+            futures[w.submit(check_access, account)] = None
+        for f in as_completed(futures):
+            pass
     accounts_report.sort(key=operator.itemgetter('access'), reverse=True)
     print(tabulate(accounts_report, headers='keys'))
 
+
+def GetHumanSize(size, precision=2):
+    # interesting discussion on 1024 vs 1000 as base
+    # https://en.wikipedia.org/wiki/Binary_prefix
+    suffixes=['B','KB','MB','GB','TB', 'PB']
+    suffixIndex = 0
+    while size > 1024:
+        suffixIndex += 1
+        size = size / 1024.0
+
+    return "%.*f %s" % (precision, size, suffixes[suffixIndex])
+
+
+@cli.command()
+@click.option('--config', type=click.Path(), required=True)
+@click.option('-a', '--accounts', multiple=True)
+@click.option('--day', required=True, help="calculate sizes for this day")
+@click.option('--group', required=True)
+@click.option('--human/--no-human', default=True)
+def size(config, accounts=(), day=None, group=None, human=True):
+    """size of exported records for a given day."""
+    config = validate.callback(config)
+    destination = config.get('destination')
+    client = boto3.Session().client('s3')
+    day = parse(day)
+
+    def export_size(client, account):
+        paginator = client.get_paginator('list_objects_v2')
+        count = 0
+        size = 0
+        session = get_session(account['role'])
+        account_id = session.client('sts').get_caller_identity()['Account']
+        prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
+        prefix = "%s/%s/%s" % (prefix, group, day.strftime("%Y/%m/%d"))
+        account['account_id'] = account_id
+        for page in paginator.paginate(
+                Bucket=destination['bucket'],
+                Prefix=prefix):
+            for k in page.get('Contents', ()):
+                size += k['Size']
+                count += 1
+        return (count, size)
+
+    total_size = 0
+    accounts_report = []
+    logging.getLogger('botocore').setLevel(logging.ERROR)
+    with ThreadPoolExecutor(max_workers=16) as w:
+        futures = {}
+        for account in config.get('accounts'):
+            if accounts and account['name'] not in accounts:
+                continue
+            futures[w.submit(export_size, client, account)] = account
+
+        for f in as_completed(futures):
+            account = futures[f]
+            count, size = f.result()
+            account.pop('role')
+            account.pop('groups')
+            total_size += size
+            if human:
+                account['size'] = GetHumanSize(size)
+            else:
+                account['size'] = size
+            account['count'] = count
+            accounts_report.append(account)
+
+    accounts_report.sort(key=operator.itemgetter('count'), reverse=True)
+    print(tabulate(accounts_report, headers='keys'))
+    log.info("total size:%s", GetHumanSize(total_size))
 
 @cli.command()
 @click.option('--config', type=click.Path(), required=True)
@@ -376,6 +451,7 @@ def sync(config, group, accounts=(), dryrun=False):
         account_id = session.client('sts').get_caller_identity()['Account']
         prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
         prefix = "%s/%s" % (prefix, group)
+
         exports = get_exports(client, destination['bucket'], prefix + "/")
 
         role = account.pop('role')
@@ -562,7 +638,7 @@ def get_exports(client, bucket, prefix, latest=True):
 # @click.option('--bucket-role', help="role to scan destination bucket")
 # @click.option('--stream-prefix)
 @lambdafan
-def export(group, bucket, prefix, start, end, role, poll_period=300, session=None, name=""):
+def export(group, bucket, prefix, start, end, role, poll_period=120, session=None, name=""):
     """export a given log group to s3"""
     start = start and isinstance(start, basestring) and parse(start) or start
     end = (end and isinstance(start, basestring) and
@@ -623,12 +699,17 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
 
         # if stream_prefix:
         #    params['logStreamPrefix'] = stream_prefix
-        s3.put_object(
-            Bucket=bucket,
-            Key=prefix,
-            Body=json.dumps({}),
-            ACL="bucket-owner-full-control",
-            ServerSideEncryption="AES256")
+        try:
+            head = s3.head_object(Bucket=bucket, Key=prefix)
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NotFound':
+                raise
+            s3.put_object(
+                Bucket=bucket,
+                Key=prefix,
+                Body=json.dumps({}),
+                ACL="bucket-owner-full-control",
+                ServerSideEncryption="AES256")
 
         t = time.time()
         counter = 0
@@ -647,7 +728,7 @@ def export(group, bucket, prefix, start, end, role, poll_period=300, session=Non
                             (counter * poll_period) / 60.0)
                     continue
                 raise
-            retry(
+            log_result = retry(
                 s3.put_object_tagging,
                 Bucket=bucket, Key=prefix,
                 Tagging={
