@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from cStringIO import StringIO
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import csv
 import datetime
 from datetime import timedelta
@@ -19,6 +20,8 @@ from dateutil.parser import parse
 from dateutil.tz import tzutc
 import itertools
 import time
+
+import six
 from botocore.exceptions import ClientError
 
 from c7n.actions import BaseAction
@@ -164,7 +167,7 @@ class IamRoleUsage(Filter):
         client = local_session(self.manager.session_factory).client('ecs')
         for cluster in client.describe_clusters()['clusters']:
             services = client.list_services(
-                    cluster=cluster['clusterName'])['serviceArns']
+                cluster=cluster['clusterName'])['serviceArns']
             if services:
                 for service in client.describe_services(
                         cluster=cluster['clusterName'],
@@ -251,6 +254,67 @@ class IamRoleInlinePolicy(Filter):
         return [r for r in resources if self._inline_policies(c, r) == 0]
 
 
+@Role.filter_registry.register('has-specific-managed-policy')
+class SpecificIamRoleManagedPolicy(Filter):
+    """Filter IAM roles that has a specific policy attached
+
+    For example, if the user wants to check all roles with 'admin-policy':
+
+    .. code-block: yaml
+
+     - name: iam-roles-have-admin
+       resource: iam-role
+       filters:
+        - type: has-specific-managed-policy
+          value: admin-policy
+
+    """
+
+    schema = type_schema('has-specific-managed-policy', value={'type': 'string'})
+    permissions = ('iam:ListAttachedRolePolicies',)
+
+    def _managed_policies(self, client, resource):
+        return [r['PolicyName'] for r in client.list_attached_role_policies(
+            RoleName=resource['RoleName'])['AttachedPolicies']]
+
+    def process(self, resources, event=None):
+        c = local_session(self.manager.session_factory).client('iam')
+        if self.data.get('value'):
+            return [r for r in resources if self.data.get('value') in self._managed_policies(c, r)]
+        return []
+
+
+@Role.filter_registry.register('no-specific-managed-policy')
+class NoSpecificIamRoleManagedPolicy(Filter):
+    """Filter IAM roles that do not have a specific policy attached
+
+    For example, if the user wants to check all roles without 'ip-restriction':
+
+    .. code-block: yaml
+
+     - name: iam-roles-no-ip-restriction
+       resource: iam-role
+       filters:
+        - type: no-specific-managed-policy
+          value: ip-restriction
+
+    """
+
+    schema = type_schema('no-specific-managed-policy', value={'type': 'string'})
+    permissions = ('iam:ListAttachedRolePolicies',)
+
+    def _managed_policies(self, client, resource):
+        return [r['PolicyName'] for r in client.list_attached_role_policies(
+            RoleName=resource['RoleName'])['AttachedPolicies']]
+
+    def process(self, resources, event=None):
+        c = local_session(self.manager.session_factory).client('iam')
+        if self.data.get('value'):
+            return [r for r in resources if not self.data.get('value') in
+            self._managed_policies(c, r)]
+        return []
+
+
 ######################
 #    IAM Policies    #
 ######################
@@ -331,9 +395,9 @@ class AllowAllIamPolicies(Filter):
         for s in statements:
             if ('Condition' not in s and
                     'Action' in s and
-                    isinstance(s['Action'], basestring) and
+                    isinstance(s['Action'], six.string_types) and
                     s['Action'] == "*" and
-                    isinstance(s['Resource'], basestring) and
+                    isinstance(s['Resource'], six.string_types) and
                     s['Resource'] == "*" and
                     s['Effect'] == "Allow"):
                 return True
@@ -378,8 +442,7 @@ class UnusedInstanceProfiles(IamRoleUsage):
         results = []
         profiles = self.instance_profile_usage()
         for r in resources:
-            if (r['Arn'] not in profiles or
-                        r['InstanceProfileName'] not in profiles):
+            if (r['Arn'] not in profiles or r['InstanceProfileName'] not in profiles):
                 results.append(r)
         self.log.info(
             "%d of %d instance profiles currently not in use." % (
@@ -455,12 +518,13 @@ class CredentialReport(Filter):
                  'certs',
                  'certs.active',
                  'certs.last_rotated',
-                 ]},
+             ]},
         value={'oneOf': [
             {'type': 'array'},
             {'type': 'string'},
             {'type': 'boolean'},
-            {'type': 'number'}]},
+            {'type': 'number'},
+            {'type': 'null'}]},
         op={'enum': OPERATORS.keys()},
         report_generate={
             'title': 'Generate a report if none is present.',
@@ -495,7 +559,7 @@ class CredentialReport(Filter):
             return report
         data = self.fetch_credential_report()
         report = {}
-        reader = csv.reader(StringIO(data))
+        reader = csv.reader(six.StringIO(data))
         headers = reader.next()
         for line in reader:
             info = dict(zip(headers, line))
@@ -570,6 +634,7 @@ class CredentialReport(Filter):
             if vf.match(v):
                 return True
 
+
 @User.filter_registry.register('credential')
 class UserCredentialReport(CredentialReport):
 
@@ -628,7 +693,6 @@ class UserPolicy(ValueFilter):
         matched = []
         for r in resources:
             for p in r['c7n:Policies']:
-                print p
                 if self.match(p) and r not in matched:
                     matched.append(r)
         return matched
@@ -672,6 +736,7 @@ class UserAccessKey(ValueFilter):
             for k in r['c7n:AccessKeys']:
                 if self.match(k):
                     matched.append(r)
+                    break
         return matched
 
 
@@ -710,11 +775,27 @@ class UserMfaDevice(ValueFilter):
 
 @User.action_registry.register('remove-keys')
 class UserRemoveAccessKey(BaseAction):
+    """Delete or disable user's access keys.
+
+    For example if we wanted to disable keys after 90 days of non-use and
+    delete them after 180 days of nonuse:
+
+    .. code-block: yaml
+
+     - name: iam-mfa-active-keys-no-login
+       resource: iam-user
+       actions:
+         - type: remove-keys
+           disable: true
+           age: 90
+         - type: remove-keys
+           age: 180
+    """
 
     schema = type_schema(
         'remove-keys', age={'type': 'number'}, disable={'type': 'boolean'})
     permissions = ('iam:ListAccessKeys', 'iam:UpdateAccessKey',
-                   'iam:DeleteAccssKey')
+                   'iam:DeleteAccessKey')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('iam')
@@ -766,7 +847,6 @@ class IamGroupUsers(Filter):
 
     def process(self, resources, events=None):
         c = local_session(self.manager.session_factory).client('iam')
-        value = self.data.get('value')
         if self.data.get('value', True):
             return [r for r in resources if self._user_count(c, r) > 0]
         return [r for r in resources if self._user_count(c, r) == 0]

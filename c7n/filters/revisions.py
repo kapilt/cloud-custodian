@@ -15,8 +15,11 @@
 Custodian support for diffing and patching across multiple versions
 of a resource.
 """
-from dateutil.tz import tzlocal, tzutc
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import six
+from dateutil.tz import tzlocal, tzutc
 from botocore.exceptions import ClientError
 from dateutil.parser import parse as parse_date
 
@@ -68,7 +71,7 @@ class Diff(Filter):
             for n in self.manager.data['filters'][:idx]:
                 if isinstance(n, dict) and n.get('type', '') == 'locked':
                     found = True
-                if isinstance(n, basestring) and n == 'locked':
+                if isinstance(n, six.string_types) and n == 'locked':
                     found = True
             if not found:
                 raise FilterValidationError(
