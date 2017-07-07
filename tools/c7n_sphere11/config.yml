@@ -13,4 +13,4 @@ accounts:
   "644160558196":
     name: custodian-skunkworks
     role: "arn:aws:iam::644160558196:role/sphere11-account-role"
-    api-endpoint: "https://5xhc1cnb7h.execute-api.us-east-1.amazonaws.com/latest"    
+    api-endpoint: "https://5xhc1cnb7h.execute-api.us-east-1.amazonaws.com/latest"

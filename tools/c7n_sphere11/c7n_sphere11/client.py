@@ -68,7 +68,7 @@ class Client(object):
             "%s/%s/locks/delta" % (self.endpoint, account_id),
             json={'region': region},
             auth=self.get_api_auth())
-    
+
     # implementation helpers
 
     def get_account_id(self, account_id):

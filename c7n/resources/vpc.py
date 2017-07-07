@@ -176,7 +176,6 @@ class FlowLogFilter(Filter):
                         results.append(r)
 
         return results
->>>>>>> upstream
 
 
 @Vpc.filter_registry.register('security-group')
