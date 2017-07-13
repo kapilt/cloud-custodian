@@ -13,8 +13,11 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from c7n.actions import BaseAction
+from c7n.filters import Filter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
+from c7n.utils import local_session, type_schema
 
 
 @resources.register('shield-protection')
@@ -38,3 +41,50 @@ class ShieldAttack(QueryResourceManager):
         id = 'AttackId'
         date = 'StartTime'
         dimension = None
+
+
+class IsShieldProtected(Filter):
+
+    permissions = ('shield:ListProtections',)
+    schema = type_schema('shield-enabled', state={'type': 'boolean'})
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('shield')
+        protections = client.list_protections().get('Protections', ())
+        protected_resources = {p['ResourceArn'] for p in protections}
+
+        state = self.data.get('state', False)
+        results = []
+
+        for r in resources:
+            arn = self.manager.get_arn(r)
+            r['c7n:ShieldProtected'] = shielded = arn in protected_resources
+            if shielded and state:
+                results.append(r)
+            elif not shielded and not state:
+                results.append(r)
+        return results
+
+
+class SetShieldProtection(BaseAction):
+    """Enable shield protection on applicable resource.
+    """
+
+    permissions = ('shield:CreateProtection', 'shield:ListProtections',)
+    schema = type_schema(
+        'set-shield',
+        state={'type': 'boolean'})
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('shield')
+        model = self.manager.get_model()
+        protections = client.list_protections().get('Protections', ())
+        protected_resources = {p['ResourceArn'] for p in protections}
+
+        for r in resources:
+            arn = self.manager.get_arn(r)
+            if arn in protected_resources:
+                continue
+            client.create_protection(
+                Name=r[model.name],
+                ResourceArn=arn)

@@ -34,14 +34,19 @@ from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.utils import local_session, chunks, type_schema, get_retry, worker
 
+from c7n.resources.shield import IsShieldProtected, SetShieldProtection
+
 log = logging.getLogger('custodian.elb')
 
 filters = FilterRegistry('elb.filters')
 actions = ActionRegistry('elb.actions')
 
 actions.register('auto-tag-user', AutoTagUser)
+actions.register('set-shield', SetShieldProtection)
+
 filters.register('tag-count', tags.TagCountFilter)
 filters.register('marked-for-op', tags.TagActionFilter)
+filters.register('shield-enabled', IsShieldProtected)
 
 
 @resources.register('elb')
@@ -75,6 +80,12 @@ class ELB(QueryResourceManager):
     def get_permissions(cls):
         return ('elasticloadbalancing:DescribeLoadBalancers',
                 'elasticloadbalancing:DescribeTags')
+
+    def get_arn(self, r):
+        return "arn:aws:elasticloadbalancing:%s:%s:loadbalancer/%s" % (
+            self.manager.config.region,
+            self.manager.config.account_id,
+            r[self.resource_type].id)
 
     def augment(self, resources):
         _elb_tags(

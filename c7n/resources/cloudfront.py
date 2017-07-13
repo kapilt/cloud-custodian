@@ -31,6 +31,9 @@ class Distribution(QueryResourceManager):
         date = 'LastModifiedTime'
         dimension = "DistributionId"
 
+    def get_arn(self, r):
+        return r['ARN']
+
 
 @resources.register('streaming-distribution')
 class StreamingDistribution(QueryResourceManager):
@@ -44,6 +47,9 @@ class StreamingDistribution(QueryResourceManager):
         name = 'DomainName'
         date = 'LastModifiedTime'
         dimension = "DistributionId"
+
+    def get_arn(self, r):
+        return r['ARN']
 
 
 @Distribution.filter_registry.register('metrics')
@@ -161,6 +167,32 @@ class StreamingDistributionDisableAction(BaseAction):
                 "Exception trying to disable Distribution: %s error: %s",
                 distribution['ARN'], e)
             return
+
+
+@Distribution.action_registry.register('set-waf')
+class SetWaf(BaseAction):
+
+    permissions = ('cloudfront:UpdateDistribution',)
+    schema = type_schema(
+        'set-waf', required=['web-acl'], **{
+            'web-acl': {'type': 'string'},
+            'force': {'type': 'boolean'},
+            'state': {'type': 'boolean'}})
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client(
+            'cloudfront')
+        force = self.data.get('force', False)
+        web_acl_id = self.resolve_web_acl()
+        for r in resources:
+            if r.get('WebACLId') and not force:
+                continue
+            client.update_distribution(
+                Id=r['Id'],
+                DistributionConfig={'WebAclId': web_acl_id})
+
+    def resolve_web_acl(self):
+        return self.data.get('web-acl')
 
 
 @Distribution.action_registry.register('set-protocols')
