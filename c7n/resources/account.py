@@ -447,15 +447,23 @@ class ShieldEnabled(Filter):
         'shield-enabled',
         state={'type': 'boolean'})
 
-    def process(self, resources):
+    def process(self, resources, event=None):
         state = self.data.get('state', False)
         client = self.manager.session_factory().client('shield')
 
-        subscription = client.describe_subscription().get('Subscription', None)
+        try:
+            subscription = client.describe_subscription().get('Subscription', None)
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'ResourceNotFoundException':
+                raise
+            subscription = None
+
+        resources[0]['c7n:ShieldSubscription'] = subscription
         if state and subscription:
             return resources
         elif not state and not subscription:
             return resources
+        return []
 
 
 @actions.register('set-shield-advanced')

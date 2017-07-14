@@ -48,7 +48,7 @@ class IsShieldProtected(Filter):
     permissions = ('shield:ListProtections',)
     schema = type_schema('shield-enabled', state={'type': 'boolean'})
 
-    def process(self, resources):
+    def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('shield')
         protections = client.list_protections().get('Protections', ())
         protected_resources = {p['ResourceArn'] for p in protections}

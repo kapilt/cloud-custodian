@@ -19,6 +19,8 @@ from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.utils import local_session, type_schema
 
+from c7n.resources.shield import IsShieldProtected, SetShieldProtection
+
 
 @resources.register('distribution')
 class Distribution(QueryResourceManager):
@@ -168,6 +170,9 @@ class StreamingDistributionDisableAction(BaseAction):
                 distribution['ARN'], e)
             return
 
+
+Distribution.filter_registry.register('shield-enabled', IsShieldProtected)
+Distribution.action_registry.register('set-shield', SetShieldProtection)
 
 @Distribution.action_registry.register('set-waf')
 class SetWaf(BaseAction):
