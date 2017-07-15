@@ -144,7 +144,7 @@ def _get_values(record, field_list, tag_map):
 class Formatter(object):
 
     def __init__(self, model, extra_fields=(), include_default_fields=True,
-                 include_region=False, include_policy=False):
+                 include_region=False, include_policy=False, fields=None):
         # Lookup default fields for resource type.
         self._id_field = model.id
         self._date_field = getattr(model, 'date', None)
@@ -157,7 +157,10 @@ class Formatter(object):
             if model.date:
                 mfields.append(model.date)
 
-        if include_default_fields:
+        if fields is not None:
+            for m in mfields:
+                fields[m] = m
+        elif include_default_fields:
             fields = OrderedDict(zip(mfields, mfields))
         else:
             fields = OrderedDict()

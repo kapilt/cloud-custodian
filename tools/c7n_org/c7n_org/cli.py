@@ -15,6 +15,7 @@ import yaml
 
 import click
 import jsonschema
+from botocore.compat import OrderedDict
 
 from c7n.executor import MainThreadExecutor
 from c7n.handler import Config as Bag
@@ -22,7 +23,7 @@ from c7n.policy import PolicyCollection
 from c7n.reports.csvout import Formatter, fs_record_set
 from c7n.resources import load_resources
 from c7n.manager import resources as resource_registry
-from c7n.utils import CONN_CACHE
+from c7n.utils import CONN_CACHE, dumps
 
 log = logging.getLogger('c7n_org')
 
@@ -104,7 +105,7 @@ def cli():
     """custodian organization multi-account runner."""
 
 
-def init(config, use, debug, verbose, accounts, tags):
+def init(config, use, debug, verbose, accounts, tags, policies):
     level = verbose and logging.DEBUG or logging.INFO
     logging.basicConfig(
         level=level,
@@ -120,6 +121,13 @@ def init(config, use, debug, verbose, accounts, tags):
 
     with open(use) as fh:
         custodian_config = yaml.safe_load(fh.read())
+
+    filtered_policies = []
+    for p in custodian_config.get('policies', ()):
+        if policies and p['name'] not in policies:
+            continue
+        filtered_policies.append(p)
+    custodian_config['policies'] = filtered_policies
 
     filtered_accounts = []
     for a in accounts_config.get('accounts', ()):
@@ -161,6 +169,10 @@ def report_account(account, region, policies_config, output_path, debug):
             r['policy'] = p.name
             r['region'] = p.options.region
             r['account'] = account['name']
+            for t in account['tags']:
+                if ':' in t:
+                    k, v = t.split(':', 1)
+                    r[k] = v
         records.extend(policy_records)
     return records
 
@@ -176,9 +188,11 @@ def report_account(account, region, policies_config, output_path, debug):
 @click.option('-r', '--region', default=['us-east-1', 'us-west-2'], multiple=True)
 @click.option('--debug', default=False, is_flag=True)
 @click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
-def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose):
+@click.option('-p', '--policy', multiple=True)
+@click.option('--format', default='csv', type=click.Choice(['csv', 'json']))
+def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose, policy, format):
     accounts_config, custodian_config, executor = init(
-        config, use, debug, verbose, accounts, tags)
+        config, use, debug, verbose, accounts, tags, policy)
 
     resource_types = set()
     for p in custodian_config.get('policies'):
@@ -214,17 +228,22 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
         len(records), len(accounts_config['accounts']),
         len(custodian_config['policies']))
 
-    report_fields = ['account=account']
-    report_fields.extend(field)
+    if format == 'json':
+        dumps(records, output, indent=2)
+        return
+
+    prefix_fields = OrderedDict(
+        (('Account', 'account'), ('Region', 'region'), ('Policy', 'policy')))
     config = Bag.empty()
     factory = resource_registry.get(list(resource_types)[0])
 
     formatter = Formatter(
         factory.resource_type,
-        extra_fields=report_fields,
+        extra_fields=field,
         include_default_fields=True,
-        include_region=True,
-        include_policy=True)
+        include_region=False,
+        include_policy=False,
+        fields=prefix_fields)
 
     rows = formatter.to_csv(records)
     writer = csv.writer(output, formatter.headers())
@@ -239,13 +258,14 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
 @click.option('-a', '--accounts', multiple=True, default=None)
 @click.option('-t', '--tags', multiple=True, default=None)
 @click.option('-r', '--region', default=['us-east-1', 'us-west-2'], multiple=True)
+@click.option('-p', '--policy', multiple=True)
 @click.option('--cache-period', default=15, type=int)
 @click.option("--dryrun", default=False, is_flag=True)
 @click.option('--debug', default=False, is_flag=True)
 @click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
-def run(config, use, output_dir, accounts, tags, region, cache_period, dryrun, debug, verbose):
+def run(config, use, output_dir, accounts, tags, region, policy, cache_period, dryrun, debug, verbose):
     accounts_config, custodian_config, executor = init(
-        config, use, debug, verbose, accounts, tags)
+        config, use, debug, verbose, accounts, tags, policy)
     policy_counts = Counter()
     with executor(max_workers=32) as w:
         futures = {}

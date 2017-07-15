@@ -51,6 +51,9 @@ import ssl
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from botocore.vendored.requests.exceptions import SSLError
+from botocore.vendored import requests
+from botocore.vendored.requests.packages import urllib3
+
 from concurrent.futures import as_completed
 
 from c7n.actions import ActionRegistry, BaseAction, AutoTagUser, PutMetric
@@ -358,7 +361,6 @@ class GlobalGrantsFilter(Filter):
             return results
 
     def process_bucket(self, b):
-
         acl = b.get('Acl', {'Grants': []})
         if not acl or not acl['Grants']:
             return
