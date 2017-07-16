@@ -7,6 +7,7 @@ from io import StringIO
 import urllib2
 import os
 import time
+import subprocess
 
 from concurrent.futures import (
     ProcessPoolExecutor,
@@ -17,6 +18,7 @@ import click
 import jsonschema
 from botocore.compat import OrderedDict
 
+from c7n.credentials import assumed_session
 from c7n.executor import MainThreadExecutor
 from c7n.handler import Config as Bag
 from c7n.policy import PolicyCollection
@@ -119,8 +121,11 @@ def init(config, use, debug, verbose, accounts, tags, policies):
         accounts_config = yaml.safe_load(fh.read())
         jsonschema.validate(accounts_config, CONFIG_SCHEMA)
 
-    with open(use) as fh:
-        custodian_config = yaml.safe_load(fh.read())
+    if use:
+        with open(use) as fh:
+            custodian_config = yaml.safe_load(fh.read())
+    else:
+        custodian_config = {}
 
     filtered_policies = []
     for p in custodian_config.get('policies', ()):
@@ -191,6 +196,7 @@ def report_account(account, region, policies_config, output_path, debug):
 @click.option('-p', '--policy', multiple=True)
 @click.option('--format', default='csv', type=click.Choice(['csv', 'json']))
 def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose, policy, format):
+    """report on a cross account policy execution."""
     accounts_config, custodian_config, executor = init(
         config, use, debug, verbose, accounts, tags, policy)
 
@@ -251,6 +257,83 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
     writer.writerows(rows)
 
 
+def run_account_script(account, region, output_dir, debug, script_args):
+    try:
+        session = assumed_session(account['role'], "org-script", region=region)
+        creds = session._session.get_credentials()
+    except:
+        log.error(
+            "unable to obtain credentials for account:%s role:%s",
+            account['name'], account['role'])
+        return 1
+
+    env = os.environ.copy()
+    env['AWS_ACCESS_KEY_ID'] = creds.access_key
+    env['AWS_SECRET_ACCESS_KEY'] = creds.secret_key
+    env['AWS_SESSION_TOKEN'] = creds.token
+    env['AWS_DEFAULT_REGION'] = region
+
+    log.info("running script on account:%s region:%s script: `%s`",
+             account['name'], region, " ".join(script_args))
+
+    if debug:
+        subprocess.check_call(args=script_args, env=env)
+        return 0
+
+    output_dir = os.path.join(output_dir, account['name'], region)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    with open(os.path.join(output_dir, 'stdout'), 'wb') as stdout:
+        with open(os.path.join(output_dir, 'stderr'), 'wb') as stderr:
+            return subprocess.call(
+                args=script_args, env=env, stdout=stdout, stderr=stderr)
+
+
+@cli.command(name='run-script', context_settings=dict(ignore_unknown_options=True))
+@click.option('-c', '--config', required=True, help="Accounts config file")
+@click.option('-s', '--output-dir', required=True, type=click.Path())
+@click.option('-a', '--accounts', multiple=True, default=None)
+@click.option('-t', '--tags', multiple=True, default=None)
+@click.option('-r', '--region', default=['us-east-1', 'us-west-2'], multiple=True)
+@click.option('--echo', default=False, is_flag=True)
+@click.option('--serial', default=False, is_flag=True)
+@click.argument('script_args', nargs=-1, type=click.UNPROCESSED)
+def run_script(config, output_dir, accounts, tags, region, echo, serial, script_args):
+    """run an aws script across accounts"""
+    accounts_config, custodian_config, executor = init(
+        config, None, serial, True, accounts, tags, ())
+
+    if echo:
+        print("command to run: `%s`" % (" ".join(script_args)))
+        return
+
+    with executor(max_workers=4) as w:
+        futures = {}
+        for a in accounts_config.get('accounts', ()):
+            account_regions = region or a['regions']
+            for r in account_regions:
+                futures[w.submit(
+                    run_account_script, a, r, output_dir, serial, script_args)
+                            ] = (a, r)
+        for f in as_completed(futures):
+            a, r = futures[f]
+            if f.exception():
+                if debug:
+                    raise
+                log.warning(
+                    "Error running script in %s @ %s exception: %s",
+                    a['name'], r, f.exception())
+            exit_code = f.result()
+            if exit_code == 0:
+                log.info(
+                    "ran script on account:%s region:%s script: `%s`",
+                    a['name'], r, " ".join(script_args))
+            else:
+                log.info(
+                    "error running script on account:%s region:%s script: `%s`",
+                    a['name'], r, " ".join(script_args))
+
 @cli.command(name='run')
 @click.option('-c', '--config', required=True, help="Accounts config file")
 @click.option("-u", "--use", required=True)
@@ -264,6 +347,7 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
 @click.option('--debug', default=False, is_flag=True)
 @click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
 def run(config, use, output_dir, accounts, tags, region, policy, cache_period, dryrun, debug, verbose):
+    """run a custodian policy across accounts"""
     accounts_config, custodian_config, executor = init(
         config, use, debug, verbose, accounts, tags, policy)
     policy_counts = Counter()
