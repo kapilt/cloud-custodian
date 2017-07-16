@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from botocore.exceptions import ClientError
 from c7n.actions import BaseAction
 from c7n.filters import Filter
 from c7n.manager import resources
@@ -49,7 +50,8 @@ class IsShieldProtected(Filter):
     schema = type_schema('shield-enabled', state={'type': 'boolean'})
 
     def process(self, resources, event=None):
-        client = local_session(self.manager.session_factory).client('shield')
+        client = local_session(self.manager.session_factory).client(
+            'shield', region_name='us-east-1')
         protections = client.list_protections().get('Protections', ())
         protected_resources = {p['ResourceArn'] for p in protections}
 
@@ -76,7 +78,8 @@ class SetShieldProtection(BaseAction):
         state={'type': 'boolean'})
 
     def process(self, resources):
-        client = local_session(self.manager.session_factory).client('shield')
+        client = local_session(self.manager.session_factory).client(
+            'shield', region_name='us-east-1')
         model = self.manager.get_model()
         protections = client.list_protections().get('Protections', ())
         protected_resources = {p['ResourceArn'] for p in protections}
@@ -85,6 +88,11 @@ class SetShieldProtection(BaseAction):
             arn = self.manager.get_arn(r)
             if arn in protected_resources:
                 continue
-            client.create_protection(
-                Name=r[model.name],
-                ResourceArn=arn)
+            try:
+                client.create_protection(
+                    Name=r[model.name],
+                    ResourceArn=arn)
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'ResourceAlreadyExistsException':
+                    continue
+                raise

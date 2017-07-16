@@ -139,12 +139,11 @@ def init(config, use, debug, verbose, accounts, tags, policies):
         if accounts and a['name'] not in accounts:
             continue
         if tags:
-            found = False
+            found = set()
             for t in tags:
                 if t in a.get('tags', ()):
-                    found = True
-                    break
-            if not found:
+                    found.add(t)
+            if not found == set(tags):
                 continue
         filtered_accounts.append(a)
     accounts_config['accounts'] = filtered_accounts

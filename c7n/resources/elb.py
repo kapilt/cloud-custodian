@@ -83,9 +83,9 @@ class ELB(QueryResourceManager):
 
     def get_arn(self, r):
         return "arn:aws:elasticloadbalancing:%s:%s:loadbalancer/%s" % (
-            self.manager.config.region,
-            self.manager.config.account_id,
-            r[self.resource_type].id)
+            self.config.region,
+            self.config.account_id,
+            r[self.resource_type.id])
 
     def augment(self, resources):
         _elb_tags(
