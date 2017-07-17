@@ -1,5 +1,7 @@
 """Run a custodian policy across an organization's accounts
 """
+
+from contextlib import contextmanager
 from collections import Counter
 import csv
 import logging
@@ -60,6 +62,28 @@ CONFIG_SCHEMA = {
     }
 }
 
+@contextmanager
+def environ(**kw):
+    current_env = dict(os.environ)
+    for k, v in kw.items():
+        os.environ[k] = v
+    yield os.environ
+
+    for k in kw.keys():
+        del os.environ[k]
+    os.environ.update(current_env)
+
+
+def account_tags(account):
+    tags = {'AccountName': account['name'], 'AccountId': account['account_id']}
+    for t in account.get('tags'):
+        if not ':' in t:
+            continue
+        k, v = t.split(':', 1)
+        k = 'Account%s' % k.capitalize()
+        tags[k] = v
+    return tags
+
 
 def run_account(account, region, policies_config, output_path, cache_period, dryrun, debug):
     """Execute a set of policies on an account.
@@ -78,29 +102,31 @@ def run_account(account, region, policies_config, output_path, cache_period, dry
         cache=cache_path, log_group=None, profile=None, external_id=None)
 
     policies = PolicyCollection.from_data(policies_config, bag)
-
     policy_counts = {}
-    for p in policies:
-        log.debug(
-            "Running policy:%s account:%s region:%s", p.name, account['name'], region)
-        try:
-            resources = p.run()
-            policy_counts[p.name] = resources and len(resources) or 0
-            if not resources:
-                continue
-            log.info("Ran account:%s region:%s policy:%s matched:%d",
-                         account['name'], region, p.name, len(resources))
-        except Exception as e:
-            log.error(
-                "Exception running policy:%s account:%s region:%s error:%s",
-                p.name, account['name'], region, e)
-            if not debug:
-                continue
-            import traceback, pdb, sys
-            pdb.post_mortem(sys.exc_info()[-1])
-            raise
+
+    with environ(**account_tags(account)):
+        for p in policies:
+            log.debug(
+                "Running policy:%s account:%s region:%s", p.name, account['name'], region)
+            try:
+                resources = p.run()
+                policy_counts[p.name] = resources and len(resources) or 0
+                if not resources:
+                    continue
+                log.info("Ran account:%s region:%s policy:%s matched:%d",
+                             account['name'], region, p.name, len(resources))
+            except Exception as e:
+                log.error(
+                    "Exception running policy:%s account:%s region:%s error:%s",
+                    p.name, account['name'], region, e)
+                if not debug:
+                    continue
+                import traceback, pdb, sys
+                pdb.post_mortem(sys.exc_info()[-1])
+                raise
 
     return policy_counts
+
 
 @click.group()
 def cli():
@@ -116,6 +142,7 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None):
     logging.getLogger('botocore').setLevel(logging.ERROR)
     logging.getLogger('custodian').setLevel(logging.WARNING)
     logging.getLogger('custodian.s3').setLevel(logging.ERROR)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
 
     with open(config) as fh:
         accounts_config = yaml.safe_load(fh.read())
@@ -303,6 +330,7 @@ def run_account_script(account, region, output_dir, debug, script_args):
 @click.argument('script_args', nargs=-1, type=click.UNPROCESSED)
 def run_script(config, output_dir, accounts, tags, region, echo, serial, script_args):
     """run an aws script across accounts"""
+    # TODO count up on success / error / error list by account
     accounts_config, custodian_config, executor = init(
         config, None, serial, True, accounts, tags, ())
 

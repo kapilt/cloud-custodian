@@ -16,7 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import uuid
 
 from c7n.actions import BaseAction
-from c7n.filters import MetricsFilter, Filter
+from c7n.filters import MetricsFilter, ShieldMetrics, Filter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.utils import local_session, type_schema, get_retry
@@ -55,6 +55,7 @@ class StreamingDistribution(QueryResourceManager):
     def get_arn(self, r):
         return r['ARN']
 
+Distribution.filter_registry.register('shield-metrics', ShieldMetrics)
 
 @Distribution.filter_registry.register('metrics')
 @StreamingDistribution.filter_registry.register('metrics')

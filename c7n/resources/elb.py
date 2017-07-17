@@ -25,7 +25,9 @@ from botocore.exceptions import ClientError
 from c7n.actions import (
     ActionRegistry, BaseAction, AutoTagUser, ModifyVpcSecurityGroupsAction)
 from c7n.filters import (
-    Filter, FilterRegistry, FilterValidationError, DefaultVpcBase, ValueFilter)
+    Filter, FilterRegistry, FilterValidationError, DefaultVpcBase, ValueFilter,
+    ShieldMetrics)
+
 import c7n.filters.vpc as net_filters
 from datetime import datetime
 from dateutil.tz import tzutc
@@ -47,6 +49,7 @@ actions.register('set-shield', SetShieldProtection)
 filters.register('tag-count', tags.TagCountFilter)
 filters.register('marked-for-op', tags.TagActionFilter)
 filters.register('shield-enabled', IsShieldProtected)
+filters.register('shield-metrics', ShieldMetrics)
 
 
 @resources.register('elb')
