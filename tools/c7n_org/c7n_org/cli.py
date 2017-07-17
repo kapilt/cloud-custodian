@@ -107,7 +107,7 @@ def cli():
     """custodian organization multi-account runner."""
 
 
-def init(config, use, debug, verbose, accounts, tags, policies):
+def init(config, use, debug, verbose, accounts, tags, policies, resource=None):
     level = verbose and logging.DEBUG or logging.INFO
     logging.basicConfig(
         level=level,
@@ -130,6 +130,8 @@ def init(config, use, debug, verbose, accounts, tags, policies):
     filtered_policies = []
     for p in custodian_config.get('policies', ()):
         if policies and p['name'] not in policies:
+            continue
+        if resource and p['resource'] != resource:
             continue
         filtered_policies.append(p)
     custodian_config['policies'] = filtered_policies
@@ -194,10 +196,11 @@ def report_account(account, region, policies_config, output_path, debug):
 @click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
 @click.option('-p', '--policy', multiple=True)
 @click.option('--format', default='csv', type=click.Choice(['csv', 'json']))
-def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose, policy, format):
+@click.option('--resource', default=None)
+def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose, policy, format, resource):
     """report on a cross account policy execution."""
     accounts_config, custodian_config, executor = init(
-        config, use, debug, verbose, accounts, tags, policy)
+        config, use, debug, verbose, accounts, tags, policy, resource=resource)
 
     resource_types = set()
     for p in custodian_config.get('policies'):
@@ -318,7 +321,7 @@ def run_script(config, output_dir, accounts, tags, region, echo, serial, script_
         for f in as_completed(futures):
             a, r = futures[f]
             if f.exception():
-                if debug:
+                if serial:
                     raise
                 log.warning(
                     "Error running script in %s @ %s exception: %s",

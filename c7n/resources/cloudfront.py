@@ -195,7 +195,7 @@ class IsWafEnabled(Filter):
         target_acl = self.data.get('web-acl')
         target_acl_id = waf_name_id_map.get(target_acl, target_acl)
 
-        if target_acl_id not in waf_name_id_map.values():
+        if target_acl_id and target_acl_id not in waf_name_id_map.values():
             raise ValueError("invalid web acl: %s" % (target_acl_id))
 
         client = local_session(self.manager.session_factory).client(
