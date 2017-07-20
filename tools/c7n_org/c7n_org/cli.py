@@ -103,7 +103,7 @@ def run_account(account, region, policies_config, output_path, cache_period, dry
 
     policies = PolicyCollection.from_data(policies_config, bag)
     policy_counts = {}
-
+    st = time.time()
     with environ(**account_tags(account)):
         for p in policies:
             log.debug(
@@ -113,8 +113,8 @@ def run_account(account, region, policies_config, output_path, cache_period, dry
                 policy_counts[p.name] = resources and len(resources) or 0
                 if not resources:
                     continue
-                log.info("Ran account:%s region:%s policy:%s matched:%d",
-                             account['name'], region, p.name, len(resources))
+                log.info("Ran account:%s region:%s policy:%s matched:%d time:%0.2f",
+                             account['name'], region, p.name, len(resources), time.time()-st)
             except Exception as e:
                 log.error(
                     "Exception running policy:%s account:%s region:%s error:%s",
@@ -280,7 +280,7 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
         include_policy=False,
         fields=prefix_fields)
 
-    rows = formatter.to_csv(records)
+    rows = formatter.to_csv(records, unique=False)
     writer = csv.writer(output, formatter.headers())
     writer.writerow(formatter.headers())
     writer.writerows(rows)
