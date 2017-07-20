@@ -185,7 +185,8 @@ class Formatter(object):
 
     def extract_csv(self, record):
         tag_map = {t['Key']: t['Value'] for t in record.get('Tags', ())}
-        return _get_values(record, self.fields.values(), tag_map)
+        return [s.encode('utf-8') for s in
+                    _get_values(record, self.fields.values(), tag_map)]
 
     def uniq_by_id(self, records):
         """Only the first record for each id"""
@@ -198,7 +199,7 @@ class Formatter(object):
                 keys.add(rec_id)
         return uniq
 
-    def to_csv(self, records, reverse=True):
+    def to_csv(self, records, reverse=True, unique=True):
         if not records:
             return []
 
@@ -209,8 +210,11 @@ class Formatter(object):
             records.sort(
                 key=lambda r: r[date_sort], reverse=reverse)
 
-        uniq = self.uniq_by_id(records)
-        log.debug("Uniqued from %d to %d" % (len(records), len(uniq)))
+        if unique:
+            uniq = self.uniq_by_id(records)
+            log.debug("Uniqued from %d to %d" % (len(records), len(uniq)))
+        else:
+            uniq = records
         rows = list(map(self.extract_csv, uniq))
         return rows
 

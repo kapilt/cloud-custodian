@@ -166,7 +166,7 @@ class MetricsFilter(Filter):
                     EndTime=self.end,
                     Period=self.period,
                     Dimensions=dimensions)['Datapoints']
-            if len(collected_metrics[key]) == 0:
+            if self.value is not None and len(collected_metrics[key]) == 0:
                 continue
             if self.data.get('percent-attr'):
                 rvalue = r[self.data.get('percent-attr')]
