@@ -23,6 +23,8 @@ setup(
         "Topic :: System :: Distributed Computing"
     ],
     url="https://github.com/capitalone/cloud-custodian",
+    author="Kapil Thangavelu",
+    author_email="kapil.foss@gmail.com",
     license="Apache-2.0",
     packages=find_packages(),
     entry_points={

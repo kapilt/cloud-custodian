@@ -29,6 +29,8 @@ from c7n.resources import load_resources
 from c7n.manager import resources as resource_registry
 from c7n.utils import CONN_CACHE, dumps
 
+from c7n_org.utils import environ, account_tags
+
 log = logging.getLogger('c7n_org')
 
 CONFIG_SCHEMA = {
@@ -62,70 +64,7 @@ CONFIG_SCHEMA = {
     }
 }
 
-@contextmanager
-def environ(**kw):
-    current_env = dict(os.environ)
-    for k, v in kw.items():
-        os.environ[k] = v
-    yield os.environ
 
-    for k in kw.keys():
-        del os.environ[k]
-    os.environ.update(current_env)
-
-
-def account_tags(account):
-    tags = {'AccountName': account['name'], 'AccountId': account['account_id']}
-    for t in account.get('tags'):
-        if not ':' in t:
-            continue
-        k, v = t.split(':', 1)
-        k = 'Account%s' % k.capitalize()
-        tags[k] = v
-    return tags
-
-
-def run_account(account, region, policies_config, output_path, cache_period, dryrun, debug):
-    """Execute a set of policies on an account.
-    """
-    CONN_CACHE.session = None
-    CONN_CACHE.time = None
-    output_path = os.path.join(output_path, account['name'], region)
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-
-    cache_path = os.path.join(output_path, "c7n.cache")
-    bag = Bag.empty(
-        region=region, assume_role=account['role'],
-        cache_period=cache_period, dryrun=dryrun, output_dir=output_path,
-        account_id=account['account_id'], metrics_enabled=False,
-        cache=cache_path, log_group=None, profile=None, external_id=None)
-
-    policies = PolicyCollection.from_data(policies_config, bag)
-    policy_counts = {}
-    st = time.time()
-    with environ(**account_tags(account)):
-        for p in policies:
-            log.debug(
-                "Running policy:%s account:%s region:%s", p.name, account['name'], region)
-            try:
-                resources = p.run()
-                policy_counts[p.name] = resources and len(resources) or 0
-                if not resources:
-                    continue
-                log.info("Ran account:%s region:%s policy:%s matched:%d time:%0.2f",
-                             account['name'], region, p.name, len(resources), time.time()-st)
-            except Exception as e:
-                log.error(
-                    "Exception running policy:%s account:%s region:%s error:%s",
-                    p.name, account['name'], region, e)
-                if not debug:
-                    continue
-                import traceback, pdb, sys
-                pdb.post_mortem(sys.exc_info()[-1])
-                raise
-
-    return policy_counts
 
 
 @click.group()
@@ -363,6 +302,51 @@ def run_script(config, output_dir, accounts, tags, region, echo, serial, script_
                 log.info(
                     "error running script on account:%s region:%s script: `%s`",
                     a['name'], r, " ".join(script_args))
+
+
+def run_account(account, region, policies_config, output_path, cache_period, dryrun, debug):
+    """Execute a set of policies on an account.
+    """
+    CONN_CACHE.session = None
+    CONN_CACHE.time = None
+    output_path = os.path.join(output_path, account['name'], region)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    cache_path = os.path.join(output_path, "c7n.cache")
+    bag = Bag.empty(
+        region=region, assume_role=account['role'],
+        cache_period=cache_period, dryrun=dryrun, output_dir=output_path,
+        account_id=account['account_id'], metrics_enabled=False,
+        cache=cache_path, log_group=None, profile=None, external_id=None)
+
+    policies = PolicyCollection.from_data(policies_config, bag)
+    policy_counts = {}
+    st = time.time()
+    with environ(**account_tags(account)):
+        for p in policies:
+            log.debug(
+                "Running policy:%s account:%s region:%s", p.name, account['name'], region)
+            try:
+                resources = p.run()
+                policy_counts[p.name] = resources and len(resources) or 0
+                if not resources:
+                    continue
+                log.info("Ran account:%s region:%s policy:%s matched:%d time:%0.2f",
+                             account['name'], region, p.name, len(resources), time.time()-st)
+            except Exception as e:
+                log.error(
+                    "Exception running policy:%s account:%s region:%s error:%s",
+                    p.name, account['name'], region, e)
+                if not debug:
+                    continue
+                import traceback, pdb, sys
+                pdb.post_mortem(sys.exc_info()[-1])
+                raise
+
+    return policy_counts
+
+
 
 @cli.command(name='run')
 @click.option('-c', '--config', required=True, help="Accounts config file")
