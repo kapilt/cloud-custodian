@@ -731,6 +731,7 @@ class IndexMetrics(BaseAction):
                         break
                 if key is None:
                     self.log.warning("requested metric:%s not found", m)
+                    continue
                 point_set = metrics_data.get(key)
                 rtags = {
                     'ResourceId': r[model.id],
@@ -742,7 +743,7 @@ class IndexMetrics(BaseAction):
                     resource_tags = {t['Key']: t['Value'] for t in r.get('Tags', ())}
                     for rt in self.data.get('resource-tags'):
                         if rt in resource_tags:
-                            ortags[rt] = resource_tags[rt]
+                            rtags[rt] = resource_tags[rt]
                 for p in point_set:
                     p = dict(p)
                     p['fields'] = {}
