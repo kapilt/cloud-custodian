@@ -13,7 +13,7 @@ region = "us-west-2"
 
 install:
 	virtualenv -p python2.7 .venv
-	source .venv/bin/activate && pip install -r requirements.txt
+	. .venv/bin/activate && pip install -r requirements.txt
 	.venv/bin/python setup.py develop
 
 clean:
