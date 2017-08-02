@@ -35,7 +35,7 @@ log = logging.getLogger('c7n_org')
 
 CONFIG_SCHEMA = {
     '$schema': 'http://json-schema.org/schema#',
-    'id': 'http://schema.cloudcustodian.io/v0/logexporter.json',
+    'id': 'http://schema.cloudcustodian.io/v0/orgrunner.json',
     'definitions': {
         'account': {
             'type': 'object',
@@ -50,9 +50,9 @@ CONFIG_SCHEMA = {
                 'role': {'oneOf': [
                     {'type': 'array', 'items': {'type': 'string'}},
                     {'type': 'string'}]},
-                }
             }
-        },
+        }
+    },
     'type': 'object',
     'additionalProperties': False,
     'required': ['accounts'],
@@ -60,11 +60,9 @@ CONFIG_SCHEMA = {
         'accounts': {
             'type': 'array',
             'items': {'$ref': '#/definitions/account'}
-            }
+        }
     }
 }
-
-
 
 
 @click.group()
@@ -333,7 +331,7 @@ def run_account(account, region, policies_config, output_path, cache_period, dry
                 if not resources:
                     continue
                 log.info("Ran account:%s region:%s policy:%s matched:%d time:%0.2f",
-                             account['name'], region, p.name, len(resources), time.time()-st)
+                         account['name'], region, p.name, len(resources), time.time()-st)
             except Exception as e:
                 log.error(
                     "Exception running policy:%s account:%s region:%s error:%s",
@@ -345,7 +343,6 @@ def run_account(account, region, policies_config, output_path, cache_period, dry
                 raise
 
     return policy_counts
-
 
 
 @cli.command(name='run')
@@ -392,12 +389,3 @@ def run(config, use, output_dir, accounts, tags, region, policy, cache_period, d
                 policy_counts[p] += count
 
     log.info("Policy resource counts %s" % policy_counts)
-
-if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        raise
-        import traceback, pdb, sys
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
