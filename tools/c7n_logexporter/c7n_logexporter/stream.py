@@ -1,8 +1,6 @@
 """VPC Flow log s3 archiver via kinesis cloudwatch subscription.
 """
-
 from __future__ import print_function
-
 
 from base64 import b64decode
 from cStringIO import StringIO
