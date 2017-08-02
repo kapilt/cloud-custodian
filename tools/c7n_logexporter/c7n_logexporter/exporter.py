@@ -32,6 +32,9 @@ import operator
 from tabulate import tabulate
 import yaml
 
+from c7n.executor import MainThreadExecutor
+MainThreadExecutor.async = False
+
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('c7n.worker').setLevel(logging.DEBUG)
 logging.getLogger('botocore').setLevel(logging.WARNING)
@@ -130,16 +133,15 @@ def validate(config):
 @click.option('--start', required=True)
 @click.option('--end')
 @click.option('-a', '--accounts', multiple=True)
-def run(config, start, end, accounts):
+@click.option('--debug', is_flag=True, default=False)
+def run(config, start, end, accounts, debug=False):
     """run export across accounts and log groups specified in config."""
     config = validate.callback(config)
     destination = config.get('destination')
     start = start and parse(start) or start
     end = end and parse(end) or datetime.now()
-    #from c7n.executor import MainThreadExecutor
-    #MainThreadExecutor.async = False
-    #with MainThreadExecutor() as w:
-    with ThreadPoolExecutor(max_workers=32) as w:
+    executor = debug and MainThreadExecutor or ThreadPoolExecutor
+    with executor(max_workers=32) as w:
         futures = {}
         for account in config.get('accounts', ()):
             if accounts and account['name'] not in accounts:
@@ -183,13 +185,13 @@ def process_account(account, start, end, destination, incremental=True):
     client = session.client('logs')
 
     paginator = client.get_paginator('describe_log_groups')
-    groups = []
+    all_groups = []
     for p in paginator.paginate():
-        groups.extend([g for g in p.get('logGroups', ())])
+        all_groups.extend([g for g in p.get('logGroups', ())])
 
-    group_count = len(groups)
+    group_count = len(all_groups)
     groups = filter_creation_date(
-        filter_group_names(groups, account['groups']),
+        filter_group_names(all_groups, account['groups']),
         start, end)
 
     if incremental:
@@ -201,6 +203,10 @@ def process_account(account, start, end, destination, incremental=True):
     log.info("account:%s matched %d groups of %d",
              account.get('name', account_id), len(groups), group_count)
 
+    if not groups:
+        log.warning("account:%s no groups matched, all groups \n  %s",
+                    account.get('name', account_id), "\n  ".join(
+                        [g['logGroupName'] for g in all_groups]))
     t = time.time()
     for g in groups:
         export.callback(
@@ -316,7 +322,7 @@ def filter_extant_exports(client, bucket, prefix, days, start, end=None):
         return sorted(days)
     last_export = parse(tags['LastExport'])
     if last_export.tzinfo is None:
-        last_export.replace(tzinfo=tzutc())
+        last_export = last_export.replace(tzinfo=tzutc())
     return [d for d in sorted(days) if d > last_export]
 
 
