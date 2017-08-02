@@ -58,6 +58,7 @@ class CrossAccountAccessFilter(Filter):
         whitelist={'type': 'array', 'items': {'type': 'string'}})
 
     policy_attribute = 'Policy'
+    annotation_key = 'CrossAccountViolations'
 
     def process(self, resources, event=None):
         self.everyone_only = self.data.get('everyone_only', False)
@@ -85,7 +86,7 @@ class CrossAccountAccessFilter(Filter):
         violations = check_cross_account(
             p, self.accounts, self.everyone_only, self.any_condition, self.actions)
         if violations:
-            r['CrossAccountViolations'] = violations
+            r[self.annotation_key] = violations
             return True
 
 

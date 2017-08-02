@@ -561,7 +561,10 @@ class RemovePolicyStatement(BucketActionBase):
 
     schema = type_schema(
         'remove-statements',
-        statement_ids={'type': 'array', 'items': {'type': 'string'}})
+        required=['statement_ids'],
+        statement_ids={'oneOf': [
+            {'enum': ['matched']},
+            {'type': 'array', 'items': {'type': 'string'}}]})
     permissions = ("s3:PutBucketPolicy", "s3:DeleteBucketPolicy")
 
     def process(self, buckets):
@@ -576,10 +579,17 @@ class RemovePolicyStatement(BucketActionBase):
         else:
             p = json.loads(p)
 
-        statements = p.get('Statement', [])
         found = []
+        statement_ids = self.data.get('statement_ids')
+        statements = p.get('Statement', [])
+        resource_statements = set(bucket.get(CrossAccountAccessFilter.annotation_key, ()))
+
         for s in list(statements):
-            if s['Sid'] in self.data['statement_ids']:
+            if statement_ids == 'matched':
+                if s in resource_statements:
+                    found.append(s)
+                    statements.remove(s)
+            elif s['Sid'] in self.data['statement_ids']:
                 found.append(s)
                 statements.remove(s)
         if not found:

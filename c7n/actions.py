@@ -663,7 +663,8 @@ class AutoTagUser(EventAction):
 
 
 class IndexMetrics(BaseAction):
-
+    """Store resource cloud watch metrics into a data store.
+    """
     permissions = ()
     schema = {
         'type': 'object',
