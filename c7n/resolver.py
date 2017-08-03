@@ -141,4 +141,4 @@ class ValuesFrom(object):
                 return jmespath.search(self.data['expr'], data)
             return data
         elif format == 'txt':
-            return [s.strip() for s in io.StringIO(contents).readlines()]
+            return [s.strip() for s in io.BytesIO(contents).readlines()]
