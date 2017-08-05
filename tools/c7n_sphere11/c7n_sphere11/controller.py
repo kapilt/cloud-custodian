@@ -116,7 +116,7 @@ class Controller(object):
                  'role': role},
                 {'type': 'diff', 'selector': 'locked'}]})
         return manager.resources()
-    
+
     def get_resource_delta(self, account_id, resource_id, region):
         session = self.get_session(account_id)
         manager = self.get_resource_manager(
