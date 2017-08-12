@@ -104,7 +104,6 @@ class PolicyPermissions(BaseTest):
         for k, v in manager.resources.items():
             if not getattr(v.resource_type, 'universal_taggable', None):
                 continue
-            print(k, v.augment.__name__)
             if v.augment.__name__ == 'universal_augment' and getattr(
                     v.resource_type, 'detail_spec', None):
                 self.fail(
