@@ -1382,7 +1382,6 @@ class MissingSecurityGroupPermission(Filter):
     """
 
 
-
 @resources.register('key-pair')
 class KeyPair(QueryResourceManager):
 
