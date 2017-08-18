@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2016-2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
 Custodian support for diffing and patching across multiple versions
 of a resource.
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import six
 from botocore.exceptions import ClientError
 from dateutil.parser import parse as parse_date
 
@@ -64,7 +67,7 @@ class Diff(Filter):
             for n in self.manager.data['filters'][:idx]:
                 if isinstance(n, dict) and n.get('type', '') == 'is-locked':
                     found = True
-                if isinstance(n, basestring) and n == 'is-locked':
+                if isinstance(n, six.string_types) and n == 'is-locked':
                     found = True
             if not found:
                 raise FilterValidationError(

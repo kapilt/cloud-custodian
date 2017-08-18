@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2016-2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,21 @@
 """
 Application Load Balancers
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import json
 import logging
 
 from collections import defaultdict
 from c7n.actions import ActionRegistry, BaseAction
-from c7n.filters import Filter, FilterRegistry, DefaultVpcBase, ValueFilter
+from c7n.filters import (
+    Filter, FilterRegistry, FilterValidationError, DefaultVpcBase, ValueFilter)
 import c7n.filters.vpc as net_filters
 from c7n import tags
 from c7n.manager import resources
-from c7n.query import QueryResourceManager
-from c7n.utils import local_session, chunks, type_schema, get_retry
+
+from c7n.query import QueryResourceManager, DescribeSource, ConfigSource
+from c7n.utils import local_session, chunks, type_schema, get_retry, set_annotation
 
 log = logging.getLogger('custodian.app-elb')
 
@@ -62,12 +67,34 @@ class AppELB(QueryResourceManager):
         return ("elasticloadbalancing:DescribeLoadBalancers",
                 "elasticloadbalancing:DescribeTags")
 
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeAppElb(self)
+        elif source_type == 'config':
+            return ConfigAppElb(self)
+        raise ValueError("Unsupported source: %s for %s" % (
+            source_type, self.resource_type.config_type))
+
+
+class DescribeAppElb(DescribeSource):
+
     def augment(self, albs):
         _describe_appelb_tags(
-            albs, self.session_factory,
-            self.executor_factory, self.retry)
+            albs,
+            self.manager.session_factory,
+            self.manager.executor_factory,
+            self.manager.retry)
 
         return albs
+
+
+class ConfigAppElb(ConfigSource):
+
+    def load_resource(self, item):
+        resource = super(ConfigAppElb, self).load_resource(item)
+        resource['Tags'] = [{u'Key': t['key'], u'Value': t['value']}
+          for t in json.loads(item['Tags'])]
+        return resource
 
 
 def _describe_appelb_tags(albs, session_factory, executor_factory, retry):
@@ -75,7 +102,7 @@ def _describe_appelb_tags(albs, session_factory, executor_factory, retry):
         client = local_session(session_factory).client('elbv2')
         alb_map = {alb['LoadBalancerArn']: alb for alb in alb_set}
 
-        results = retry(client.describe_tags, ResourceArns=alb_map.keys())
+        results = retry(client.describe_tags, ResourceArns=list(alb_map.keys()))
         for tag_desc in results['TagDescriptions']:
             if ('ResourceArn' in tag_desc and
                     tag_desc['ResourceArn'] in alb_map):
@@ -109,6 +136,9 @@ class SecurityGroupFilter(net_filters.SecurityGroupFilter):
 class SubnetFilter(net_filters.SubnetFilter):
 
     RelatedIdsExpression = "AvailabilityZones[].SubnetId"
+
+
+filters.register('network-location', net_filters.NetworkLocation)
 
 
 @actions.register('mark-for-op')
@@ -220,8 +250,10 @@ class AppELBDeleteAction(BaseAction):
                   - delete
     """
 
-    schema = type_schema('delete')
-    permissions = ("elasticloadbalancing:DeleteLoadBalancer",)
+    schema = type_schema('delete', force={'type': 'boolean'})
+    permissions = (
+        "elasticloadbalancing:DeleteLoadBalancer",
+        "elasticloadbalancing:ModifyLoadBalancerAttributes",)
 
     def process(self, load_balancers):
         with self.executor_factory(max_workers=2) as w:
@@ -229,7 +261,24 @@ class AppELBDeleteAction(BaseAction):
 
     def process_alb(self, alb):
         client = local_session(self.manager.session_factory).client('elbv2')
-        client.delete_load_balancer(LoadBalancerArn=alb['LoadBalancerArn'])
+        try:
+            if self.data.get('force'):
+                client.modify_load_balancer_attributes(
+                    LoadBalancerArn=alb['LoadBalancerArn'],
+                    Attributes=[{
+                        'Key': 'deletion_protection.enabled',
+                        'Value': 'false',
+                    }])
+            self.manager.retry(
+                client.delete_load_balancer, LoadBalancerArn=alb['LoadBalancerArn'])
+        except Exception as e:
+            if e.response['Error']['Code'] in ['OperationNotPermitted',
+                                               'LoadBalancerNotFound']:
+                self.log.warning(
+                    "Exception trying to delete ALB: %s error: %s",
+                    alb['LoadBalancerArn'], e)
+                return
+            raise
 
 
 class AppELBListenerFilterBase(object):
@@ -282,10 +331,49 @@ class AppELBTargetGroupFilterBase(object):
 
 @filters.register('listener')
 class AppELBListenerFilter(ValueFilter, AppELBListenerFilterBase):
-    """Filter ALB based on matching listener attributes"""
+    """Filter ALB based on matching listener attributes
 
-    schema = type_schema('listener', rinherit=ValueFilter.schema)
+    Adding the `matched` flag will filter on previously matched listeners
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+              - name: app-elb-invalid-ciphers
+                resource: app-elb
+                filters:
+                  - type: listener
+                    key: Protocol
+                    value: HTTPS
+                  - type: listener
+                    key: SslPolicy
+                    value: ['ELBSecurityPolicy-TLS-1-1-2017-01','ELBSecurityPolicy-TLS-1-2-2017-01']
+                    op: ni
+                    matched: true
+                actions:
+                  - type: modify-listener
+                    sslpolicy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+    """
+
+    schema = type_schema(
+        'listener', rinherit=ValueFilter.schema, matched={'type': 'boolean'})
     permissions = ("elasticloadbalancing:DescribeLoadBalancerAttributes",)
+
+    def validate(self):
+        if not self.data.get('matched'):
+            return
+        listeners = [f for f in self.manager.filters
+                     if isinstance(f, self.__class__)]
+        found = False
+        for f in listeners[:listeners.index(self)]:
+            if not f.data.get('matched', False):
+                found = True
+                break
+        if not found:
+            raise FilterValidationError(
+                "matched listener filter, requires preceding listener filter")
+        return self
 
     def process(self, albs, event=None):
         self.initialize(albs)
@@ -293,7 +381,76 @@ class AppELBListenerFilter(ValueFilter, AppELBListenerFilterBase):
 
     def __call__(self, alb):
         listeners = self.listener_map[alb['LoadBalancerArn']]
-        return self.match(listeners)
+        if self.data.get('matched', False):
+            listeners = alb.pop('c7n:MatchedListeners', [])
+
+        found_listeners = False
+        for listener in listeners:
+            if self.match(listener):
+                set_annotation(alb, 'c7n:MatchedListeners', listener)
+                found_listeners = True
+        return found_listeners
+
+
+@actions.register('modify-listener')
+class AppELBModifyListenerPolicy(BaseAction):
+    """Action to modify the policy for an App ELB
+
+    :example:
+
+        .. code-block: yaml
+
+            policies:
+              - name: appelb-modify-listener
+                resource: app-elb
+                filters:
+                  - type: listener
+                    key: Protocol
+                    value: HTTP
+                actions:
+                  - type: modify-listener
+                    protocol: HTTPS
+                    sslpolicy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+                    certificate: "arn:aws:acm:region:123456789012:certificate/12345678-\
+                    1234-1234-1234-123456789012"
+    """
+
+    schema = type_schema(
+        'modify-listener',
+        port={'type': 'integer'},
+        protocol={'enum': ['HTTP', 'HTTPS']},
+        sslpolicy={'type': 'string'},
+        certificate={'type': 'string'}
+    )
+
+    permissions = ("elasticloadbalancing:ModifyListener",)
+
+    def validate(self):
+        for f in self.manager.data.get('filters', ()):
+            if 'listener' in f.get('type', ()):
+                return self
+        raise FilterValidationError(
+            "modify-listener action requires the listener filter")
+
+    def process(self, load_balancers):
+        args = {}
+        if 'port' in self.data:
+            args['Port'] = self.data.get('port')
+        if 'protocol' in self.data:
+            args['Protocol'] = self.data.get('protocol')
+        if 'sslpolicy' in self.data:
+            args['SslPolicy'] = self.data.get('sslpolicy')
+        if 'certificate' in self.data:
+            args['Certificates'] = [{'CertificateArn': self.data.get('certificate')}]
+        with self.executor_factory(max_workers=2) as w:
+            list(w.map(self.process_alb, load_balancers, [args]))
+
+    def process_alb(self, alb, args):
+        client = local_session(self.manager.session_factory).client('elbv2')
+        for matched_listener in alb.get('c7n:MatchedListeners', ()):
+            client.modify_listener(
+                ListenerArn=matched_listener['ListenerArn'],
+                **args)
 
 
 @filters.register('healthcheck-protocol-mismatch')
@@ -426,7 +583,7 @@ def _describe_target_group_tags(target_groups, session_factory,
 
         results = retry(
             client.describe_tags,
-            ResourceArns=target_group_map.keys())
+            ResourceArns=list(target_group_map.keys()))
         for tag_desc in results['TagDescriptions']:
             if ('ResourceArn' in tag_desc and
                     tag_desc['ResourceArn'] in target_group_map):
