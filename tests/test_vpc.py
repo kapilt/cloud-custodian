@@ -430,6 +430,29 @@ class NetworkInterfaceTest(BaseTest):
         self.assertEqual([g['GroupId'] for g in results[0]['Groups']], [qsg_id])
 
 
+class RouteTableTest(BaseTest):
+
+    def test_rt_subnet_filter(self):
+        factory = self.record_flight_data('test_rt_subnet_filter')
+        p = self.load_policy({
+            'name': 'subnet-find',
+            'resource': 'route-table',
+            'filters': [{
+                'type': 'subnet',
+                'key': 'SubnetId',
+                'value': web_sub_id}]
+            }, session_factory=factory)
+        resources = p.run()
+        self.maxDiff = None
+        self.assertEqual(resources[0], {})
+
+    def test_route_filter(self):
+        pass
+
+    def test_bad_peer(self):
+        pass
+
+
 class SecurityGroupTest(BaseTest):
 
     def test_id_selector(self):
