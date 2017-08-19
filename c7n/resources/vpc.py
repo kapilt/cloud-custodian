@@ -1380,13 +1380,6 @@ class VpcEndpoint(QueryResourceManager):
         id_prefix = "vpce-"
 
 
-#VpcEndpoint.filter_registry.register('missing-sg')
-class MissingSecurityGroupPermission(Filter):
-    """Endpoints need to be both in route tables, and referenced
-    via prefix list into security groups.
-    """
-
-
 @resources.register('key-pair')
 class KeyPair(QueryResourceManager):
 
