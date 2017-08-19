@@ -1085,6 +1085,37 @@ class SubnetRoute(net_filters.SubnetFilter):
 
     RelatedIdsExpression = "Associations[].SubnetId"
 
+    RelatedMapping = None
+
+    def get_related_ids(self, resources):
+        if self.RelatedIdMapping is None:
+            return super(SubnetRoute, self).get_related_ids(resources)
+        return list(itertools.chain(*[self.RelatedIdMapping[r['RouteTableId']] for r in resources]))
+
+    def get_related(self, resources):
+        rt_subnet_map = {}
+        main_tables = {}
+
+        manager = self.get_resource_manager()
+        for r in resources:
+            rt_subnet_map[r['RouteTableId']] = []
+            for a in r.get('Associations', ()):
+                if 'SubnetId' in a:
+                    rt_subnet_map[r['RouteTableId']].append(a['SubnetId'])
+                elif a.get('Main'):
+                    main_tables[r['VpcId']] = r['RouteTableId']
+        explicit_subnet_ids = set(itertools.chain(*rt_subnet_map.values()))
+        subnets = manager.resources()
+        for s in subnets:
+            if s['SubnetId'] in explicit_subnet_ids:
+                continue
+            if s['VpcId'] not in main_tables:
+                continue
+            rt_subnet_map.setdefault(main_tables[s['VpcId']], []).append(s['SubnetId'])
+        related_subnets = set(itertools.chain(*rt_subnet_map.values()))
+        self.RelatedIdMapping = rt_subnet_map
+        return {s['SubnetId']: s for s in subnets if s['SubnetId'] in related_subnets}
+
 
 @RouteTable.filter_registry.register('route')
 class Route(ValueFilter):

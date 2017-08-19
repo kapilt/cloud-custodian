@@ -433,21 +433,38 @@ class NetworkInterfaceTest(BaseTest):
 class RouteTableTest(BaseTest):
 
     def test_rt_subnet_filter(self):
-        factory = self.record_flight_data('test_rt_subnet_filter')
+        factory = self.replay_flight_data('test_rt_subnet_filter')
         p = self.load_policy({
             'name': 'subnet-find',
             'resource': 'route-table',
-            'filters': [{
-                'type': 'subnet',
-                'key': 'SubnetId',
-                'value': web_sub_id}]
+            'filters': [
+                {'RouteTableId': 'rtb-309e3d5b'},
+                {'type': 'subnet',
+                 'key': 'tag:Name',
+                 'value': 'Somewhere'}]
             }, session_factory=factory)
         resources = p.run()
-        self.maxDiff = None
-        self.assertEqual(resources[0], {})
+        self.assertEqual(resources[0]['c7n:matched-subnets'], ['subnet-389e3d53'])
 
-    def test_route_filter(self):
-        pass
+    def test_rt_route_filter(self):
+        factory = self.replay_flight_data('test_rt_route_filter')
+        p = self.load_policy({
+            'name': 'subnet-find',
+            'resource': 'route-table',
+            'filters': [
+                {'RouteTableId': 'rtb-309e3d5b'},
+                {'type': 'route',
+                 'key': 'GatewayId',
+                 'op': 'glob',
+                 'value': 'igw*'}]
+            }, session_factory=factory)
+        resources = p.run()
+        self.assertEqual(
+            resources[0]['c7n:matched-routes'],
+            [{u'DestinationCidrBlock': '0.0.0.0/0',
+              u'GatewayId': 'igw-3d9e3d56',
+              u'Origin': 'CreateRoute',
+              u'State': 'active'}])
 
     def test_bad_peer(self):
         pass
