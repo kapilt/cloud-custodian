@@ -1178,7 +1178,6 @@ class MissingRoute(Filter):
                     routed_vpcs.setdefault(r[mid], []).append(t['VpcId'])
         results = []
         for r in resources:
-            found = None
             if r[mid] not in routed_vpcs:
                 results.append(r)
                 continue
