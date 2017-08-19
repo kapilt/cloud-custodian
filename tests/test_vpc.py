@@ -470,6 +470,46 @@ class RouteTableTest(BaseTest):
         pass
 
 
+
+class PeeringConnectionTest(BaseTest):
+
+    def test_peer_missing_route(self):
+        # peer from all routes
+        factory = self.replay_flight_data('test_peer_miss_route_filter')
+        p = self.load_policy({
+            'name': 'route-miss',
+            'resource': 'peering-connection',
+            'filters': [
+                {'type': 'missing-route'}]
+             }, session_factory=factory)
+        resources = p.run()
+        self.assertEqual(resources[0]['VpcPeeringConnectionId'], 'pcx-36096b5f')
+
+    def test_peer_missing_one_route(self):
+        # peer in one route table, with both sides in the same account
+        factory = self.replay_flight_data('test_peer_miss_route_filter_one')
+        p = self.load_policy({
+            'name': 'route-miss',
+            'resource': 'peering-connection',
+            'filters': [
+                {'type': 'missing-route'}]
+             }, session_factory=factory, config=dict(account_id='619193117841'))
+        resources = p.run()
+        self.assertEqual(resources[0]['VpcPeeringConnectionId'], 'pcx-36096b5f')
+
+    def test_peer_missing_not_found(self):
+        # peer in all sides in a single account.
+        factory = self.record_flight_data('test_peer_miss_route_filter_not_found')
+        p = self.load_policy({
+            'name': 'route-miss',
+            'resource': 'peering-connection',
+            'filters': [
+                {'type': 'missing-route'}]
+             }, session_factory=factory, config=dict(account_id='619193117841'))
+        resources = p.run()
+        self.assertEqual(len(resources), 0)
+
+
 class SecurityGroupTest(BaseTest):
 
     def test_id_selector(self):

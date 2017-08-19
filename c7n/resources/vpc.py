@@ -1136,31 +1136,6 @@ class Route(ValueFilter):
         return results
 
 
-@RouteTable.filter_registry.register('bad-peer')
-class BadPeer(Filter):
-    """Find bad peers in route tables."""
-
-    schema = type_schema('bad-peer')
-    permissions = ('DescribeVpcPeeringConnections',)
-
-    def process(self, resources, event=None):
-        peers = {p['VpcPeeringConnectionId'] for
-                 p in self.manager.get_resource_manager(
-                     'peering-connection').resources()}
-        results = []
-        for r in resources:
-            for route in r['Routes']:
-                if 'VpcPeeringConnectionId' not in route:
-                    continue
-                if route['VpcPeeringConnectionId'] in peers:
-                    continue
-                r.setdefault('c7n:bad-peer', []).append(
-                    route)
-            if 'c7n:bad-peer' in r:
-                results.append(r)
-        return results
-
-
 @resources.register('peering-connection')
 class PeeringConnection(QueryResourceManager):
 
@@ -1179,22 +1154,40 @@ class PeeringConnection(QueryResourceManager):
 
 @PeeringConnection.filter_registry.register('missing-route')
 class MissingRoute(Filter):
-    """Return peers which are missing a route in any route table.
+    """Return peers which are missing a route in route tables.
+
+    If the peering connection is between two vpcs in the same account,
+    the connection is returned unless it is in present route tables in
+    each vpc.
+
+    If the peering connection is between accounts, then the local vpc's
+    route table is checked.
     """
+
     schema = type_schema('missing-route')
     permissions = ('DescribeRouteTables',)
 
     def process(self, resources, event=None):
         tables = self.manager.get_resource_manager(
             'route-table').resources()
-        routed_peers = set()
+        routed_vpcs = {}
+        mid = 'VpcPeeringConnectionId'
         for t in tables:
             for r in t.get('Routes', ()):
-                routed_peers.add(r.get('VpcPeeringConnectionId'))
+                if mid in r:
+                    routed_vpcs.setdefault(r[mid], []).append(t['VpcId'])
         results = []
         for r in resources:
-            if r['VpcPeeringConnectionId'] not in routed_peers:
+            found = None
+            if r[mid] not in routed_vpcs:
                 results.append(r)
+                continue
+            for k in ('AccepterVpcInfo', 'RequesterVpcInfo'):
+                if r[k]['OwnerId'] != self.manager.config.account_id:
+                    continue
+                if r[k]['VpcId'] not in routed_vpcs[r['VpcPeeringConnectionId']]:
+                    results.append(r)
+                    break
         return results
 
 
