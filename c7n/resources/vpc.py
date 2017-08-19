@@ -1121,6 +1121,8 @@ class SubnetRoute(net_filters.SubnetFilter):
 class Route(ValueFilter):
     """Filter a route table by its routes' attributes."""
 
+    schema = type_schema('route', rinherit=ValueFilter.schema)
+
     def process(self, resources, event=None):
         results = []
         for r in resources:
@@ -1137,6 +1139,9 @@ class Route(ValueFilter):
 @RouteTable.filter_registry.register('bad-peer')
 class BadPeer(Filter):
     """Find bad peers in route tables."""
+
+    schema = type_schema('bad-peer')
+    permissions = ('DescribeVpcPeeringConnections',)
 
     def process(self, resources, event=None):
         peers = {p['VpcPeeringConnectionId'] for
@@ -1176,6 +1181,9 @@ class PeeringConnection(QueryResourceManager):
 class MissingRoute(Filter):
     """Return peers which are missing a route in any route table.
     """
+    schema = type_schema('missing-route')
+    permissions = ('DescribeRouteTables',)
+
     def process(self, resources, event=None):
         tables = self.manager.get_resource_manager(
             'route-table').resources()
@@ -1379,7 +1387,7 @@ class VpcEndpoint(QueryResourceManager):
         id_prefix = "vpce-"
 
 
-@VpcEndpoint.filter_registry.register('missing-sg')
+#VpcEndpoint.filter_registry.register('missing-sg')
 class MissingSecurityGroupPermission(Filter):
     """Endpoints need to be both in route tables, and referenced
     via prefix list into security groups.
