@@ -499,7 +499,7 @@ class PeeringConnectionTest(BaseTest):
 
     def test_peer_missing_not_found(self):
         # peer in all sides in a single account.
-        factory = self.record_flight_data('test_peer_miss_route_filter_not_found')
+        factory = self.replay_flight_data('test_peer_miss_route_filter_not_found')
         p = self.load_policy({
             'name': 'route-miss',
             'resource': 'peering-connection',
