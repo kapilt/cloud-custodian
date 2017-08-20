@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2015-2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -135,8 +135,8 @@ def _get_values(record, field_list, tag_map):
             value = jmespath.search(field, record)
             if value is None:
                 value = ''
-            if not isinstance(value, six.string_types):
-                value = unicode(value)
+            if not isinstance(value, six.text_type):
+                value = six.text_type(value)
         vals.append(value)
     return vals
 
@@ -157,7 +157,7 @@ class Formatter(object):
             mfields = [model.id]
             if model.name != model.id:
                 mfields.append(model.name)
-            if model.date:
+            if getattr(model, 'date', None):
                 mfields.append(model.date)
 
         if include_default_fields:
@@ -211,7 +211,7 @@ class Formatter(object):
 
         uniq = self.uniq_by_id(records)
         log.debug("Uniqued from %d to %d" % (len(records), len(uniq)))
-        rows = map(self.extract_csv, uniq)
+        rows = list(map(self.extract_csv, uniq))
         return rows
 
 
