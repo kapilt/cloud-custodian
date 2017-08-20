@@ -1,3 +1,16 @@
+# Copyright 2016-2017 Capital One Services, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import calendar
 import datetime
 import json
@@ -79,7 +92,6 @@ class Controller(object):
         session = self.get_session(account_id)
         delta = {}
         records = self.db.iter_resources(account_id)
-        import pdb; pdb.set_trace()
         for rid, rtype in resource_types:
             method = getattr(
                 self, 'get_account_%s_delta' % (rtype.replace('-', '_')))
@@ -102,14 +114,14 @@ class Controller(object):
                      'key': 'GroupId',
                      'op': 'in',
                      'value': [g['ResourceId'] for g in records
-                               if g['ResourceId'].startswith('sg-')
-                               and g.get('LockStatus', '') == 'locked']},
+                               if g['ResourceId'].startswith('sg-') and
+                               g.get('LockStatus', '') == 'locked']},
                     {'type': 'value',
                      'key': 'VpcId',
                      'op': 'in',
                      'value': [g['ResourceId'] for g in records
-                               if g['ResourceId'].startswith('vpc-')
-                               and g.get('LockStatus', '') == 'locked']},
+                               if g['ResourceId'].startswith('vpc-') and
+                               g.get('LockStatus', '') == 'locked']},
                 ]},
                 {'type': 'locked',
                  'endpoint': endpoint,
@@ -136,7 +148,7 @@ class Controller(object):
     def lock(self, account_id, resource_id, region):
         resource, delta = self.get_resource_delta(
             account_id, resource_id, region)
-        parent_id = self.get_resource_parent_id(resource_id, resource)
+        #  parent_id = self.get_resource_parent_id(resource_id, resource)
 
         # The most recent config revision is not current, waiting..
         if delta:
@@ -151,8 +163,8 @@ class Controller(object):
         record = dict(
             AccountId=account_id,
             ResourceId=resource_id,
-            #ParentId=parent_id,
-            #Region=region,
+            #  ParentId=parent_id,
+            #  Region=region,
             LockDate=calendar.timegm(datetime.datetime.utcnow().timetuple()),
             LockStatus=lock_status)
         if not delta:
@@ -233,4 +245,3 @@ class Controller(object):
                 if topic:
                     sns.publish(
                         TopicArn=topic, Message=json.dumps(p, cls=Encoder))
-

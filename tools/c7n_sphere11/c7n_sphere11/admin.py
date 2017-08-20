@@ -1,3 +1,16 @@
+# Copyright 2016-2017 Capital One Services, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta
 import json
@@ -45,10 +58,10 @@ def raster_metrics(data):
     BARS = u'▁▂▃▄▅▆▇█'
     incr = min(data)
     width = (max(data) - min(data)) / (len(BARS) - 1)
-    bins = [i*width+incr for i in range(len(BARS))]
+    bins = [i * width + incr for i in range(len(BARS))]
     indexes = [i for n in data
                for i, thres in enumerate(bins)
-               if thres <= n < thres+width]
+               if thres <= n < thres + width]
     return ''.join(BARS[i] for i in indexes)
 
 
@@ -58,13 +71,13 @@ def check():
     """
     t = time.time()
     results = Client(BASE_URL).version()
-    print "Endpoint", BASE_URL
-    print "Response Time %0.2f" % (time.time()-t)
-    print "Headers"
+    print("Endpoint", BASE_URL)
+    print("Response Time %0.2f" % (time.time() - t))
+    print("Headers")
     for k, v in results.headers.items():
-        print " %s: %s" % (k, v)
-    print "Body"
-    print results.text
+        print(" %s: %s" % (k, v))
+    print("Body")
+    print(results.text)
 
 
 @admin.command()
@@ -81,7 +94,7 @@ def metrics(function, api, start, period):
     start = parse_date(start)
     period = int(abs(parse_timedelta(period).total_seconds()))
 
-    print "Lambda Metrics"
+    print("Lambda Metrics")
     metrics = manager.metrics(
         [{'FunctionName': function}],
         start=start, end=datetime.utcnow(),
@@ -93,7 +106,7 @@ def metrics(function, api, start, period):
     if not api:
         return
 
-    print "Api Metrics"
+    print("Api Metrics")
     metrics = gateway_metrics(
         boto3.Session, api, "latest", start, datetime.utcnow(), period)
     for k, data in metrics.items():
@@ -103,7 +116,7 @@ def metrics(function, api, start, period):
             values = [n['Average'] for n in data]
         render_metrics(k, values)
 
-    print "Db Metrics"
+    print("Db Metrics")
     metrics = db_metrics(
         boto3.Session, "Sphere11.Dev.ResourceLocks",
         start, datetime.utcnow(), period)
@@ -123,13 +136,13 @@ def db_metrics(session_factory, table_name, start, end, period):
             "WriteThrottleEvents",
             "ReturnedItemCount",
             "SuccessfulRequestLatency"
-            #"ReturnedRecordsCount"
+            #  "ReturnedRecordsCount"
     ):
         values[m.replace('Capacity', '')] = metrics.get_metric_statistics(
             Namespace="AWS/DynamoDB",
             Dimensions=[
                 {'Name': 'TableName', 'Value': table_name}
-                ],
+            ],
             Statistics=["Average"],
             StartTime=start,
             EndTime=end,
@@ -150,7 +163,7 @@ def gateway_metrics(session_factory, gateway_id, stage_name, start, end, period)
             Dimensions=[
                 {'Name': 'ApiName', 'Value': gateway_id},
                 {'Name': 'Stage', 'Value': stage_name},
-                ],
+            ],
             Statistics=["Average", "Sum"],
             StartTime=start,
             EndTime=end,
@@ -159,7 +172,7 @@ def gateway_metrics(session_factory, gateway_id, stage_name, start, end, period)
     return values
 
 
-def parse_timedelta(datetime_text, default=timedelta(seconds=60*5*-1)):
+def parse_timedelta(datetime_text, default=timedelta(seconds=60 * 5 * -1)):
     # from awslogs script
     ago_regexp = r'(\d+)\s?(m|minute|minutes|h|hour|hours|d|day|days|w|weeks|weeks)(?: ago)?'
     ago_match = re.match(ago_regexp, datetime_text)
@@ -192,10 +205,10 @@ def records(account_id):
         if 'RevisionDate' in r:
             r['RevisionDate'] = datetime.fromtimestamp(r['RevisionDate'])
 
-    print tabulate.tabulate(
+    print(tabulate.tabulate(
         results['Items'],
         headers="keys",
-        tablefmt='fancy_grid')
+        tablefmt='fancy_grid'))
 
 
 @admin.command()
@@ -208,7 +221,7 @@ def flush_pending(function):
     results = client.invoke(
         FunctionName=function,
         Payload=json.dumps({'detail-type': 'Scheduled Event'})
-        )
+    )
     content = results.pop('Payload').read()
     pprint.pprint(results)
     pprint.pprint(json.loads(content))
@@ -223,7 +236,7 @@ def config_status():
     channels = client.describe_delivery_channel_status()[
         'DeliveryChannelsStatus']
     for c in channels:
-        print yaml.safe_dump({
+        print(yaml.safe_dump({
             c['name']: dict(
                 snapshot=str(
                     c['configSnapshotDeliveryInfo'].get('lastSuccessfulTime')),
@@ -231,15 +244,15 @@ def config_status():
                     c['configHistoryDeliveryInfo'].get('lastSuccessfulTime')),
                 stream=str(
                     c['configStreamDeliveryInfo'].get('lastStatusChangeTime'))
-                ),
-            }, default_flow_style=False)
+            ),
+        }, default_flow_style=False))
 
 
 @admin.command()
 @click.option('--account-id', required=True)
 @click.option('--region', required=True)
 def delta(account_id, region):
-    print Client(BASE_URL).delta(account_id, region).text
+    print(Client(BASE_URL).delta(account_id, region).text)
 
 
 @admin.command()
@@ -253,11 +266,11 @@ def local(reload, port):
     from app import controller, app
     from c7n.resources import load_resources
     load_resources()
-    print "Loaded resources definitions"
+    print("Loaded resources definitions")
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger('botocore').setLevel(logging.WARNING)
     if controller.db.provision():
-        print "Table Created"
+        print("Table Created")
     run(app, reloader=reload, port=port)
 
 

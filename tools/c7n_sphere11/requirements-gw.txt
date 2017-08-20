@@ -1,5 +1,4 @@
 bottle
-# using custom branch rollup in dist
 c7n
 ipaddress
 raven

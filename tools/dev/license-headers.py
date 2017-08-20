@@ -16,6 +16,7 @@
 import fnmatch
 import os
 import inspect
+import sys
 
 import c7n
 
@@ -59,10 +60,18 @@ def update_headers(src_tree):
 
 
 def main():
-    srctree = os.path.dirname(inspect.getabsfile(c7n))
+    explicit = False
+    if len(sys.argv) == 2:
+        explicit = True
+        srctree = os.path.abspath(sys.argv[1])
+    else:
+        srctree = os.path.dirname(inspect.getabsfile(c7n))
+
     update_headers(srctree)
-    update_headers(os.path.abspath('tests'))
-    update_headers(os.path.abspath('ftests'))
+
+    if not explicit:
+        update_headers(os.path.abspath('tests'))
+        update_headers(os.path.abspath('ftests'))
 
 
 if __name__ == '__main__':

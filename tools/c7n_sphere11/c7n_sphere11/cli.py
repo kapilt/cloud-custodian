@@ -1,3 +1,16 @@
+# Copyright 2016-2017 Capital One Services, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from datetime import datetime
 import json
 from pprint import pprint
@@ -33,10 +46,10 @@ def list_locks(account_id, resource_type=None, resource_id=None):
         if 'RevisionDate' in r:
             r['RevisionDate'] = datetime.fromtimestamp(r['RevisionDate'])
 
-    print tabulate.tabulate(
+    print(tabulate.tabulate(
         locks,
         headers="keys",
-        tablefmt='fancy_grid')
+        tablefmt='fancy_grid'))
 
 
 def validate_parent_id(ctx, param, value):
@@ -81,15 +94,13 @@ def unlock(resource_id, account_id):
 
 def output(result):
     if not result.ok:
-        print "Url", result.url
-        print "Status", result.status_code
-        print "Headers"
+        print("Url", result.url)
+        print("Status", result.status_code)
+        print("Headers")
         pprint(dict(result.headers))
-        print "Body"
-        print
+        print("Body")
+        print()
     try:
-        print json.dumps(result.json(), indent=2)
+        print(json.dumps(result.json(), indent=2))
     except:
-        print result.text
-
-
+        print(result.text)
