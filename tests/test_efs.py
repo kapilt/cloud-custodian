@@ -26,7 +26,7 @@ class ElasticFileSystem(BaseTest):
         client = factory().client('efs')
         token = str(uuid.uuid4())
         fs_id = client.create_file_system(
-            CreationToken=token, Encrypted=True).get('FileSystemId')
+            CreationToken=token).get('FileSystemId')
         tags = [{'Key': 'Name', 'Value': 'Somewhere'}]
         client.create_tags(FileSystemId=fs_id, Tags=tags)
         if self.recording:
