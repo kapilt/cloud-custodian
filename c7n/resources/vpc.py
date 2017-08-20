@@ -960,27 +960,8 @@ class RemovePermissions(BaseAction):
         ingress={'type': 'string', 'enum': ['matched', 'all']},
         egress={'type': 'string', 'enum': ['matched', 'all']})
 
-    isolation_ingress_rule = {
-        'IpProtocol': 'udp',
-        'FromPort': 53,
-        'ToPort': 53,
-        'CidrIp': '8.8.8.8/32'
-    }
-
     permissions = ('ec2:RevokeSecurityGroupIngress',
                    'ec2:RevokeSecurityGroupEgress')
-
-    # if we isolated before, we should consider whether the extant rule
-    # matches.
-    def isolation_rule_needed(self, client, r):
-        if (self.data.get('ingress', 'matched') == 'all' and
-                self.data.get('egress', 'matched') == 'all'):
-            try:
-                self.manager.retry(client.delete_security_group, GroupId=r['GroupId'])
-            except ClientError as e:
-                self.log.info("Error deleting security group: %s" % e)
-                return False
-        return True
 
     def process(self, resources):
         i_perms = self.data.get('ingress', 'matched')
@@ -988,12 +969,6 @@ class RemovePermissions(BaseAction):
 
         client = local_session(self.manager.session_factory).client('ec2')
         for r in resources:
-            deleted = self.isolation_rule_needed(client, r)
-            if deleted:
-                return
-
-            client.authorize_security_group_ingress(
-                GroupId=r['GroupId'], **self.isolation_ingress_rule)
             for label, perms in [('ingress', i_perms), ('egress', e_perms)]:
                 if perms == 'matched':
                     key = 'MatchedIpPermissions%s' % (
