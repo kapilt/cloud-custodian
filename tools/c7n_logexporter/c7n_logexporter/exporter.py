@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ def validate(config):
 @click.option('--end')
 @click.option('-a', '--accounts', multiple=True)
 @click.option('--debug', is_flag=True, default=False)
-def run(config, start, end, accounts, debug=False):
+def run(config, start, end, accounts):
     """run export across accounts and log groups specified in config."""
     config = validate.callback(config)
     destination = config.get('destination')
@@ -369,7 +369,7 @@ def access(config, accounts=()):
 def GetHumanSize(size, precision=2):
     # interesting discussion on 1024 vs 1000 as base
     # https://en.wikipedia.org/wiki/Binary_prefix
-    suffixes=['B','KB','MB','GB','TB', 'PB']
+    suffixes = ['B','KB','MB','GB','TB', 'PB']
     suffixIndex = 0
     while size > 1024:
         suffixIndex += 1
@@ -434,6 +434,7 @@ def size(config, accounts=(), day=None, group=None, human=True):
     accounts_report.sort(key=operator.itemgetter('count'), reverse=True)
     print(tabulate(accounts_report, headers='keys'))
     log.info("total size:%s", GetHumanSize(total_size))
+
 
 @cli.command()
 @click.option('--config', type=click.Path(), required=True)
