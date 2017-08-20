@@ -14,7 +14,7 @@
 
 import time
 
-from common import BaseTest, Bag
+from .common import BaseTest, Bag
 
 from botocore.vendored import requests
 from c7n.filters.locked import SignatureAuth
