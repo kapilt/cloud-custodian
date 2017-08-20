@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2016-2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from c7n.actions import Action
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
+from c7n.tags import universal_augment
 from c7n.utils import local_session, type_schema
 
 
@@ -29,10 +30,15 @@ class KinesisStream(QueryResourceManager):
         detail_spec = (
             'describe_stream', 'StreamName', None, 'StreamDescription')
         name = id = 'StreamName'
-        filter_name = 'StreamNames'
-        filter_type = 'list'
+        filter_name = None
+        filter_type = None
         date = None
         dimension = 'StreamName'
+        universal_taggable = True
+
+    def augment(self, resources):
+        return universal_augment(
+            self, super(KinesisStream, self).augment(resources))
 
 
 @KinesisStream.action_registry.register('delete')
