@@ -965,7 +965,7 @@ class RemovePermissions(BaseAction):
         'FromPort': 53,
         'ToPort': 53,
         'CidrIp': '8.8.8.8/32'
-        }
+    }
 
     permissions = ('ec2:RevokeSecurityGroupIngress',
                    'ec2:RevokeSecurityGroupEgress')
@@ -974,7 +974,7 @@ class RemovePermissions(BaseAction):
     # matches.
     def isolation_rule_needed(self, client, r):
         if (self.data.get('ingress', 'matched') == 'all' and
-            self.data.get('egress', 'matched') == 'all'):
+                self.data.get('egress', 'matched') == 'all'):
             try:
                 self.manager.retry(client.delete_security_group, GroupId=r['GroupId'])
             except ClientError as e:

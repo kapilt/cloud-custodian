@@ -136,7 +136,7 @@ class Diff(Filter):
             # convert unix timestamp to utc to be normalized with other dates
             if rev['configurationItemCaptureTime'].tzinfo and \
                isinstance(rev['configurationItemCaptureTime'].tzinfo, tzlocal):
-                rev['configurationItemCaptureTime'] =  rev[
+                rev['configurationItemCaptureTime'] = rev[
                     'configurationItemCaptureTime'].astimezone(UTC)
             return {
                 'date': rev['configurationItemCaptureTime'],
