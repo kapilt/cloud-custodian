@@ -9,7 +9,7 @@ from dateutil.tz import tzutc
 
 from c7n.credentials import assumed_session
 from c7n.filters import Filter
-from c7n.utils import local_session, type_schema, get_account_id
+from c7n.utils import local_session, type_schema
 
 
 class Locked(Filter):
@@ -37,7 +37,7 @@ class Locked(Filter):
         endpoint = self.data['endpoint'].rstrip('/')
         region = self.data.get('region', 'us-east-1')
         auth = SignatureAuth(credentials, region, 'execute-api')
-        account_id = get_account_id(session)
+        account_id = self.manager.config.account_id
         m = self.manager.get_model()
         results = []
         for r in resources:
