@@ -30,7 +30,7 @@ from c7n.utils import local_session, type_schema
 class Locked(Filter):
     """Has the resource been locked using sphere11
     """
-    permissions = ('sts:AssumeRole')
+    permissions = ('sts:AssumeRole',)
 
     schema = type_schema(
         'locked',
