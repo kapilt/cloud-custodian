@@ -146,7 +146,8 @@ class Diff(Filter):
 
     def transform_revision(self, revision):
         """make config revision look like describe output."""
-        raise NotImplementedError("subclass responsibility")
+        config = self.manager.get_source('config')
+        return config.augment([revision])[0]
 
     def diff(self, source, target):
         raise NotImplementedError("Subclass responsibility")

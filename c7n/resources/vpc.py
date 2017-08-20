@@ -49,25 +49,6 @@ class Vpc(QueryResourceManager):
         id_prefix = "vpc-"
 
 
-@Vpc.filter_registry.register('diff')
-class VpcDiffFilter(Diff):
-
-    def diff(self, source, target):
-        updated = []
-        for k in source:
-            if k == 'Tags':
-                continue
-            if source[k] != target[k]:
-                updated.append(k)
-        if updated:
-            return {'updated': updated}
-
-    def transform_revision(self, revision):
-        # config does some odd transforms, walk them back
-        resource = camelResource(json.loads(revision['configuration']))
-        return resource
-
-
 @Vpc.filter_registry.register('flow-logs')
 class FlowLogFilter(Filter):
     """Are flow logs enabled on the resource.
@@ -259,7 +240,7 @@ class ConfigSG(ConfigSource):
             for p in r.get('IpPermissions', ()):
                 p['IpRanges'] = p.pop('Ipv4Ranges')
             for p in r.get('IpPermissionsEgress', ()):
-                p['IpRanges'] = p.pop('Ipv4Ranges')            
+                p['IpRanges'] = p.pop('Ipv4Ranges')
         return resources
 
 
@@ -276,29 +257,6 @@ class SecurityGroupDiffFilter(Diff):
     def diff(self, source, target):
         differ = SecurityGroupDiff()
         return differ.diff(source, target)
-
-    def transform_revision(self, revision):
-        # config does some odd transforms, walk them back
-        resource = camelResource(json.loads(revision['configuration']))
-        for rset in ('IpPermissions', 'IpPermissionsEgress'):
-            for p in resource.get(rset, ()):
-                if p.get('FromPort', '') is None:
-                    p.pop('FromPort')
-                if p.get('ToPort', '') is None:
-                    p.pop('ToPort')
-                if 'Ipv6Ranges' not in p:
-                    p[u'Ipv6Ranges'] = []
-                for i in p.get('UserIdGroupPairs', ()):
-                    for k, v in list(i.items()):
-                        if v is None:
-                            i.pop(k)
-
-                for attribute, element_key in (
-                        ('IpRanges', u'CidrIp'),):
-                    if attribute not in p:
-                        continue
-                    p[attribute] = [{element_key: v} for v in p[attribute]]
-        return resource
 
 
 class SecurityGroupDiff(object):
