@@ -259,7 +259,7 @@ class ConfigSG(ConfigSource):
             for p in r.get('IpPermissions', ()):
                 p['IpRanges'] = p.pop('Ipv4Ranges')
             for p in r.get('IpPermissionsEgress', ()):
-                p['IpRanges'] = p.pop('Ipv4Ranges')
+                p['IpRanges'] = p.pop('Ipv4Ranges')            
         return resources
 
 
