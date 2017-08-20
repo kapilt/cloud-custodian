@@ -707,7 +707,7 @@ def export(group, bucket, prefix, start, end, role, poll_period=120, session=Non
         # if stream_prefix:
         #    params['logStreamPrefix'] = stream_prefix
         try:
-            head = s3.head_object(Bucket=bucket, Key=prefix)
+            s3.head_object(Bucket=bucket, Key=prefix)
         except ClientError as e:
             if e.response['Error']['Code'] != 'NotFound':
                 raise
@@ -735,7 +735,7 @@ def export(group, bucket, prefix, start, end, role, poll_period=120, session=Non
                             (counter * poll_period) / 60.0)
                     continue
                 raise
-            log_result = retry(
+            retry(
                 s3.put_object_tagging,
                 Bucket=bucket, Key=prefix,
                 Tagging={

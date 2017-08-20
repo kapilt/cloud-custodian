@@ -3,12 +3,15 @@
 from __future__ import print_function
 
 from base64 import b64decode
-from cStringIO import StringIO
 from datetime import datetime
 import json
+import gzip
 import logging
+import os
 import uuid
 from zlib import decompress, MAX_WBITS
+
+import boto3
 
 
 def load_config():
@@ -29,19 +32,19 @@ def handler(event, context):
         # https://observable.net/blog/aws-lambda-for-flow-logs-processing/
         compressed_json = b64decode(record['kinesis']['data'])
         uncompressed_json = decompress(compressed_json, 16 + MAX_WBITS)
-        input_data = loads(uncompressed_json)
+        input_data = json.loads(uncompressed_json)
         flow_records = input_data['logEvents']
         record_key = str(uuid.uuid4())
         key = "%s/%s/%s/%s.gz" % (
             config['destination']['prefix'].rstrip('/'),
             input_data['owner'], input_data['logStream'], record_key)
 
-        with open('/tmp/%s' % short_key, 'w+') as fh:
+        with open('/tmp/%s' % record_key, 'w+') as fh:
             record_file = gzip.GzipFile(record_key, mode='wb', compresslevel=5, fileobj=fh)
             for r in flow_records:
                 if timestamp is None:
                     timestamp = datetime.datetime.fromtimestamp(
-                        r['timestamp']/1000).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                        r['timestamp'] / 1000).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
                 record_file.write("%s %s\n" % (timestamp, r['message']))
             record_file.close()
             fh.seek(0)
