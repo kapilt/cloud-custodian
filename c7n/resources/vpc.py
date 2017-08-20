@@ -18,7 +18,6 @@ import itertools
 import operator
 import zlib
 
-from botocore.exceptions import ClientError
 import jmespath
 
 from c7n.actions import BaseAction, ModifyVpcSecurityGroupsAction
