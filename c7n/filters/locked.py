@@ -14,7 +14,7 @@
 """Filters for api integration with tools/c7n_sphere11
 """
 from datetime import datetime
-from urlparse import urlparse
+from six.moves import urllib_parse as urlparse
 
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
