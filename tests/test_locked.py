@@ -76,5 +76,5 @@ class LockedTests(BaseTest):
         f_locked = p.resource_manager.filters[0]
         result = f_locked.process([
             {'GroupId': 'sg-123', 'VpcId': 'vpc-123'}])
-        self.assertEqual(len(result), 1)        
+        self.assertEqual(len(result), 1)
 
