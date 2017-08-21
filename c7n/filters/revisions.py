@@ -18,6 +18,7 @@ of a resource.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
 import six
 
 from botocore.exceptions import ClientError
@@ -25,7 +26,7 @@ from dateutil.parser import parse as parse_date
 from dateutil.tz import tzlocal, tzutc
 
 from c7n.filters import Filter, FilterValidationError
-from c7n.utils import local_session, type_schema
+from c7n.utils import local_session, type_schema, camelResource
 
 
 ErrNotFound = "ResourceNotDiscoveredException"
@@ -147,7 +148,7 @@ class Diff(Filter):
     def transform_revision(self, revision):
         """make config revision look like describe output."""
         config = self.manager.get_source('config')
-        return config.augment([revision])[0]
+        return config.augment([camelResource(json.loads(revision['configuration']))])[0]
 
     def diff(self, source, target):
         raise NotImplementedError("Subclass responsibility")
