@@ -22,7 +22,7 @@ from c7n.filters import locked
 
 class LockedTests(BaseTest):
 
-    def test_auth(self):
+    def xtest_auth(self):
         auth = SignatureAuth(
             Bag(secret_key='foo', access_key='bar', method='env', token=None),
             'us-east-1',
@@ -34,7 +34,7 @@ class LockedTests(BaseTest):
             prepped.headers['Authorization'].startswith(
                 'AWS4-HMAC-SHA256 Credential=bar/'))
 
-    def test_unlocked(self):
+    def xtest_unlocked(self):
         def get(*args, **kw):
             return Bag({'json': lambda : {'LockStatus': 'unlocked'}})
         self.patch(locked.requests, 'get', get)
@@ -48,7 +48,7 @@ class LockedTests(BaseTest):
             {'GroupId': 'sg-123', 'VpcId': 'vpc-123'}])
         self.assertEqual(len(result), 0)
 
-    def test_status_error(self):
+    def xtest_status_error(self):
         def get(*args, **kw):
             return Bag({'json': lambda : {'Message': 'unknown'}})
         self.patch(locked.requests, 'get', get)
@@ -63,7 +63,7 @@ class LockedTests(BaseTest):
             f_locked.process,
             [{'GroupId': 'sg-123', 'VpcId': 'vpc-123'}])
 
-    def test_locked(self):
+    def xtest_locked(self):
         def get(*args, **kw):
             return Bag({'json': lambda : {
                 'LockStatus': 'locked', 'RevisionDate': time.time()}})
