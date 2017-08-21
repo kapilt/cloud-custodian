@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import json
 import itertools
 import operator
 import zlib
@@ -30,7 +29,7 @@ from c7n.filters.locked import Locked
 from c7n.query import QueryResourceManager, ConfigSource
 from c7n.manager import resources
 from c7n.utils import (
-    chunks, local_session, type_schema, get_retry, camelResource, parse_cidr)
+    chunks, local_session, type_schema, get_retry, parse_cidr)
 
 
 @resources.register('vpc')
