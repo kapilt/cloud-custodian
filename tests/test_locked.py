@@ -17,12 +17,14 @@ import time
 from .common import BaseTest, Bag
 
 from botocore.vendored import requests
-from c7n.filters.locked import SignatureAuth
-from c7n.filters import locked
+from c7n.filters.locked import SignatureAuth, Locked
+
+def noop(*args):
+    return
 
 class LockedTests(BaseTest):
 
-    def xtest_auth(self):
+    def test_auth(self):
         auth = SignatureAuth(
             Bag(secret_key='foo', access_key='bar', method='env', token=None),
             'us-east-1',
@@ -34,10 +36,11 @@ class LockedTests(BaseTest):
             prepped.headers['Authorization'].startswith(
                 'AWS4-HMAC-SHA256 Credential=bar/'))
 
-    def xtest_unlocked(self):
+    def test_unlocked(self):
         def get(*args, **kw):
-            return Bag({'json': lambda : {'LockStatus': 'unlocked'}})
-        self.patch(locked.requests, 'get', get)
+            return {'LockStatus': 'unlocked'}
+        self.patch(Locked, 'get_api_credentials', noop)
+        self.patch(Locked, 'get_lock_status', get)
         p = self.load_policy({
             'name': 'ltest',
             'resource': 'security-group',
@@ -48,10 +51,11 @@ class LockedTests(BaseTest):
             {'GroupId': 'sg-123', 'VpcId': 'vpc-123'}])
         self.assertEqual(len(result), 0)
 
-    def xtest_status_error(self):
+    def test_status_error(self):
         def get(*args, **kw):
-            return Bag({'json': lambda : {'Message': 'unknown'}})
-        self.patch(locked.requests, 'get', get)
+            return {'Message': 'unknown'}
+        self.patch(Locked, 'get_api_credentials', noop)
+        self.patch(Locked, 'get_lock_status', get)
         p = self.load_policy({
             'name': 'ltest',
             'resource': 'security-group',
@@ -63,11 +67,11 @@ class LockedTests(BaseTest):
             f_locked.process,
             [{'GroupId': 'sg-123', 'VpcId': 'vpc-123'}])
 
-    def xtest_locked(self):
+    def test_locked(self):
         def get(*args, **kw):
-            return Bag({'json': lambda : {
-                'LockStatus': 'locked', 'RevisionDate': time.time()}})
-        self.patch(locked.requests, 'get', get)
+            return {'LockStatus': 'locked', 'RevisionDate': time.time()}
+        self.patch(Locked, 'get_api_credentials', noop)
+        self.patch(Locked, 'get_lock_status', get)
         p = self.load_policy({
             'name': 'ltest',
             'resource': 'security-group',

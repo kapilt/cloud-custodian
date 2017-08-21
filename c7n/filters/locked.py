@@ -40,28 +40,11 @@ class Locked(Filter):
         required=('endpoint',))
 
     def process(self, resources, event=None):
-        session = local_session(self.manager.session_factory)
-
-        if self.data.get('role'):
-            api_session = assumed_session(
-                self.data.get('role'), 'CustodianSphere11', session)
-        else:
-            api_session = session
-
-        credentials = api_session.get_credentials()
-        endpoint = self.data['endpoint'].rstrip('/')
-        region = self.data.get('region', 'us-east-1')
-        auth = SignatureAuth(credentials, region, 'execute-api')
-        account_id = self.manager.config.account_id
-        m = self.manager.get_model()
+        self._model = self.manager.get_model()
+        self._auth = self.get_api_credentials()
         results = []
         for r in resources:
-            params = {'parent_id': self.get_parent_id(r, account_id)}
-            result = requests.get("%s/%s/locks/%s" % (
-                endpoint,
-                account_id,
-                r[m.id]), params=params, auth=auth)
-            data = result.json()
+            data = self.get_lock_status(r)
             if 'Message' in data:
                 raise RuntimeError(data['Message'])
             if data['LockStatus'] == 'locked':
@@ -69,6 +52,28 @@ class Locked(Filter):
                     data['RevisionDate']).replace(tzinfo=tzutc())
                 results.append(r)
         return results
+
+    def get_api_credentials(self):
+        session = local_session(self.manager.session_factory)
+        if self.data.get('role'):
+            api_session = assumed_session(
+                self.data.get('role'), 'CustodianSphere11', session)
+        else:
+            api_session = session
+        credentials = api_session.get_credentials()
+        region = self.data.get('region', 'us-east-1')
+        auth = SignatureAuth(credentials, region, 'execute-api')
+        return auth
+
+    def get_lock_status(self, resource):
+        endpoint = self.data['endpoint'].rstrip('/')
+        account_id = self.manager.config.account_id
+        params = {'parent_id': self.get_parent_id(resource, account_id)}
+        result = requests.get("%s/%s/locks/%s" % (
+            endpoint,
+            account_id,
+            resource[self._model.id]), params=params, auth=self._auth)
+        return result.json()
 
     def get_parent_id(self, resource, account_id):
         return account_id
