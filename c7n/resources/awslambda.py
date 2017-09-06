@@ -235,7 +235,7 @@ class RemovePolicyStatement(RemovePolicyBase):
             {'type': 'array', 'items': {'type': 'string'}}]})
 
     permissions = ("lambda:GetPolicy", "lambda:RemovePermission")
-    
+
     def process(self, resources):
         results = []
         client = local_session(self.manager.session_factory).client('lambda')
@@ -267,13 +267,13 @@ class RemovePolicyStatement(RemovePolicyBase):
             p, resource, CrossAccountAccessFilter.annotation_key)
         if not found:
             return
-        
+
         for f in found:
             client.remove_permission(
                 FunctionName=resource['FunctionName'],
                 StatementId=f['Sid'])
 
-    
+
 @actions.register('mark-for-op')
 class TagDelayedAction(TagDelayedAction):
     """Action to specify an action to occur at a later date
