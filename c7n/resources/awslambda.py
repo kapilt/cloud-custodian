@@ -211,7 +211,7 @@ class LambdaCrossAccountAccessFilter(CrossAccountAccessFilter):
 
 @actions.register('remove-statements')
 class RemovePolicyStatement(RemovePolicyBase):
-    """Action to remove policy/permission statements from lambda
+    """Action to remove policy/permission statements from lambda functions.
 
     :example:
 
