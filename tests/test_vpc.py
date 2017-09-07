@@ -36,7 +36,7 @@ class VpcTest(BaseTest):
             'resource': 'vpc',
             'filters': [
                 {'VpcId': vpc_id},
-                'flow-logs']},
+                 'flow-logs']},
             session_factory=factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
@@ -68,7 +68,6 @@ class VpcTest(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
 
-    @functional
     def test_flow_logs_absent(self):
         # Test that ONLY vpcs with no flow logs are retained
         #
@@ -93,7 +92,6 @@ class VpcTest(BaseTest):
         self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]['VpcId'], vpc_id)
 
-    @functional
     def test_flow_logs_misconfiguration(self):
         # Validate that each VPC has at least one valid configuration
         #
@@ -465,10 +463,6 @@ class RouteTableTest(BaseTest):
               u'GatewayId': 'igw-3d9e3d56',
               u'Origin': 'CreateRoute',
               u'State': 'active'}])
-
-    def test_bad_peer(self):
-        pass
-
 
 
 class PeeringConnectionTest(BaseTest):

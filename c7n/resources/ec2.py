@@ -471,7 +471,7 @@ class EphemeralInstanceFilter(Filter):
     @staticmethod
     def is_ephemeral(i):
         for bd in i.get('BlockDeviceMappings', []):
-            if bd['DeviceName'] in ('/dev/sda1', '/dev/xvda'):
+            if bd['DeviceName'] in ('/dev/sda1', '/dev/xvda', 'xvda'):
                 if 'Ebs' in bd:
                     return False
                 return True
@@ -1166,6 +1166,7 @@ EC2_VALID_FILTERS = {
     'tag-key': str,
     'tag-value': str,
     'tag:': str,
+    'tenancy': ('dedicated', 'default', 'host'),
     'vpc-id': str}
 
 
