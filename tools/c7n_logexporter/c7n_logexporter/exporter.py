@@ -168,11 +168,12 @@ def subscribe(config, accounts, force, debug):
         client.put_destination_policy(
             destinationName=destination_name,
             accessPolicy=json.dumps({
-                'Statement': ['Action': 'logs:PutSubscriptionFilter',
-                              'Effect': 'Allow',
-                              'Principal': {'AWS': account_ids},
-                              'Resource': subscription['destination-arn'],
-                              'Sid': 'CrossAccountDelivery']}))
+                'Statement': [{
+                    'Action': 'logs:PutSubscriptionFilter',
+                    'Effect': 'Allow',
+                    'Principal': {'AWS': account_ids},
+                    'Resource': subscription['destination-arn'],
+                    'Sid': 'CrossAccountDelivery'}]}))
 
     def subscribe_account(account, subscription):
         session = get_session(account['role'])
