@@ -1,4 +1,4 @@
-# Copyright 2016 Capital One Services, LLC
+# Copyright 2016-2017 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from common import BaseTest
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import six
+
+from .common import BaseTest
+from c7n.filters import FilterValidationError
 from c7n.executor import MainThreadExecutor
 from c7n.resources.appelb import AppELB, AppELBTargetGroup
 
@@ -27,6 +32,35 @@ class AppELBTest(BaseTest):
             session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 2)
+
+    def test_appelb_validate(self):
+        self.assertRaises(
+            FilterValidationError,
+            self.load_policy,
+            {'name': 'appelb-simple-filter',
+             'resource': 'app-elb',
+             'filters': [
+                 {'type': 'listener',
+                  'key': 'LoadBalancerName',
+                  'matched': True,
+                  'value': 'alb-1'}]})
+
+        try:
+            self.load_policy(
+                {'name': 'appelb-simple-filter',
+                 'resource': 'app-elb',
+                 'filters': [
+                     {'type': 'listener',
+                      'key': 'LoadBalancerName',
+                      'value': 'alb-1'},
+                     {'type': 'listener',
+                      'key': 'LoadBalancerName',
+                      'matched': True,
+                      'value': 'alb-1'}
+                 ]})
+        except FilterValidationError:
+            raise
+            self.fail("filter validation should not have failed")
 
     def test_appelb_simple_filter(self):
         self.patch(AppELB, 'executor_factory', MainThreadExecutor)
@@ -80,12 +114,36 @@ class AppELBTest(BaseTest):
             'resource': 'app-elb',
             'filters': [
                 {'type': 'listener',
-                 'key': "length([?Protocol=='HTTPS'])", 'value': 1,
-                 'op': 'gte'}
+                 'key': "Protocol",
+                 'value': "HTTPS"}
             ]},
             session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 0)
+
+    def test_appelb_modify_listener(self):
+        self.patch(AppELB, 'executor_factory', MainThreadExecutor)
+        session_factory = self.replay_flight_data('test_appelb_modify_listener')
+        client = session_factory().client('elbv2')
+        p = self.load_policy({
+            'name': 'appelb-modify-listener-policy',
+            'resource': 'app-elb',
+            'filters': [{
+                'type': 'listener',
+                'key': 'Port',
+                'value': 8080
+            }],
+            'actions': [{
+                'type': 'modify-listener',
+                'port': 80
+            }]
+            },
+            session_factory=session_factory
+            )
+        resources = p.run()
+        arn = resources[0]['LoadBalancerArn']
+        listeners = client.describe_listeners(LoadBalancerArn=arn)['Listeners']
+        self.assertEqual(listeners[0]['Port'],80)
 
     def test_appelb_target_group_filter(self):
         self.patch(AppELB, 'executor_factory', MainThreadExecutor)
@@ -206,6 +264,46 @@ class AppELBTest(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
 
+    def test_appelb_delete_force(self):
+        self.patch(AppELB, 'executor_factory', MainThreadExecutor)
+        session_factory = self.replay_flight_data('test_appelb_delete_force')
+        client = session_factory().client('elbv2')
+        p = self.load_policy({
+            'name': 'appelb-modify-listener-policy',
+            'resource': 'app-elb',
+            'filters': [{
+                'type': 'listener',
+                'key': 'Port',
+                'value': 80
+            }],
+            'actions': [{'type': 'delete'}]
+            },
+            session_factory=session_factory
+            )
+        resources = p.run()
+        arn = resources[0]['LoadBalancerArn']
+        attributes = client.describe_load_balancer_attributes(LoadBalancerArn=arn)['Attributes']
+        for attribute in attributes:
+            for key,value in six.iteritems(attribute):
+                if 'deletion_protection.enabled' in key:
+                    self.assertTrue(value)
+        self.assertEqual(len(resources), 1)
+
+        p = self.load_policy({
+            'name': 'appelb-modify-listener-policy',
+            'resource': 'app-elb',
+            'filters': [{
+                'type': 'listener',
+                'key': 'Port',
+                'value': 80
+            }],
+            'actions': [{'type': 'delete', 'force': True}]
+            },
+            session_factory=session_factory
+            )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
 
 class AppELBHealthcheckProtocolMismatchTest(BaseTest):
 
@@ -273,3 +371,114 @@ class AppELBTargetGroupTest(BaseTest):
             session_factory=session_factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
+
+
+class TestAppElbLogging(BaseTest):
+
+    def test_enable_s3_logging(self):
+        session_factory = self.replay_flight_data(
+            'test_appelb_enable_s3_logging')
+        policy = self.load_policy({
+            'name': 'test-enable-s3-logging',
+            'resource': 'app-elb',
+            'filters': [{'LoadBalancerName': 'alb1'}],
+            'actions': [
+                {'type': 'set-s3-logging',
+                 'state': 'enabled',
+                 'bucket': 'elbv2logtest',
+                 'prefix': 'elblogs/{LoadBalancerName}'},
+            ]},
+            session_factory=session_factory)
+        resources = policy.run()
+        self.assertEqual(len(resources), 1)
+
+        client = session_factory().client('elbv2')
+        attrs = {t['Key']: t['Value'] for t in
+                 client.describe_load_balancer_attributes(
+                     LoadBalancerArn=resources[0][
+                         'LoadBalancerArn']).get('Attributes')}
+        self.assertEqual(
+            attrs,
+            {'access_logs.s3.enabled': 'true',
+             'access_logs.s3.bucket': 'elbv2logtest',
+             'access_logs.s3.prefix': 'gah5/alb1'})
+
+    def test_disable_s3_logging(self):
+        session_factory = self.replay_flight_data(
+            'test_appelb_disable_s3_logging')
+        policy = self.load_policy({
+            'name': 'test-disable-s3-logging',
+            'resource': 'app-elb',
+            'filters': [
+                {'LoadBalancerName': 'alb1'}],
+            'actions': [{
+                'type': 'set-s3-logging',
+                'state': 'disabled'}]},
+            session_factory=session_factory)
+
+        resources = policy.run()
+        self.assertEqual(len(resources), 1)
+
+        client = session_factory().client('elbv2')
+        attrs = {t['Key']: t['Value'] for t in
+                 client.describe_load_balancer_attributes(
+                     LoadBalancerArn=resources[0][
+                         'LoadBalancerArn']).get('Attributes')}
+        self.assertEqual(
+            attrs,
+            {'access_logs.s3.enabled': 'false',
+             'access_logs.s3.bucket': 'elbv2logtest',
+             'access_logs.s3.prefix': 'gah5'})
+
+
+class TestAppElbIsLoggingFilter(BaseTest):
+    """ replicate
+        - name: appelb-is-logging-to-bucket-test
+          resource: app-elb
+          filters:
+            - type: is-logging
+            bucket: elbv2logtest
+    """
+
+    def test_is_logging_to_bucket(self):
+        session_factory = self.replay_flight_data('test_appelb_is_logging_filter')
+        policy = self.load_policy({
+            'name': 'appelb-is-logging-to-bucket-test',
+            'resource': 'app-elb',
+            'filters': [
+                {'type': 'is-logging',
+                 'bucket': 'elbv2logtest',
+                 },
+            ]
+        }, session_factory=session_factory)
+
+        resources = policy.run()
+
+        self.assertGreater(len(resources), 0, "Test should find appelbs logging "
+                                              "to elbv2logtest")
+class TestAppElbIsNOtLoggingFilter(BaseTest):
+    """ replicate
+        - name: appelb-is-not-logging-to-bucket-test
+          resource: app-elb
+          filters:
+            - type: is-not-logging
+            bucket: elbv2logtest
+    """
+
+    def test_is_logging_to_bucket(self):
+        session_factory = self.replay_flight_data('test_appelb_is_logging_filter')
+        policy = self.load_policy({
+            'name': 'appelb-is-logging-to-bucket-test',
+            'resource': 'app-elb',
+            'filters': [
+                {'type': 'is-not-logging',
+                 'bucket': 'otherbucket',
+                 },
+            ]
+        }, session_factory=session_factory)
+
+        resources = policy.run()
+
+        self.assertGreater(len(resources), 0, "Test should find appelbs not"
+                                              "logging to otherbucket")
+
