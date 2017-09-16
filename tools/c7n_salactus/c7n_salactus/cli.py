@@ -44,6 +44,67 @@ except ImportError:
     HAVE_BIN_LIBS = False
 
 
+CONFIG_SCHEMA = {
+    '$schema': 'http://json-schema.org/schema#',
+    'id': 'http://schema.cloudcustodian.io/v0/salactus.json',
+    'definitions': {
+
+        'encrypt-keys': {
+            'type': 'object',
+            'required': ['type'],
+            'properties': {
+                'type': {'type': 'string', 'enum': ['encrypt-keys']},
+                'report-only': {'type': 'boolean'},
+                'glacier' {'type': 'boolean'},
+                'key-id': {'type': 'string'},
+                'crypto': {'type': 'string', 'enum': ['AES256', 'aws:kms']}
+                }
+        },
+
+        'object-acl': {
+            'type': 'object',
+            'required': ['type'],
+            'properties': {
+                'type': {'type': 'string', 'enum': ['object-acl']},
+                'report-only': {'type': 'boolean'},
+                'allow-log': {'type': 'boolean'},
+#                'allow-permissions': {'type': 'array', 'item': {'type': 'string', 'enum': ''}}
+                'whitelist-accounts': {'type': 'array', 'item': {'type': 'string'}}
+            }
+        },
+
+        'visitor': {
+            'type': 'object',
+            'oneOf': [
+                {'$ref': '#/definitions/encrypt-keys'}
+            ],
+        },
+        'account': {
+            'type': 'object',
+            'additionalProperties': False,
+            'required': ['role', 'account_id', 'name'],
+            'properties': {
+                'name': {'type': 'string'},
+                'account_id': {'type': 'string'},
+                'role': {'type': 'string'},
+                'tags': {'type': 'array', 'items': {'type': 'string'}}
+            },
+        },
+    },
+    'type': 'object',
+    'addditionalProperties': False,
+    'required': ['accounts'],
+    'properties': {
+        'visitors': {
+            'type': 'array',
+            'items': {'$ref': '#/definitions/visitor'}
+        'accounts': {
+            'type': 'array',
+            'items': {'$ref': '#/definitions/account'}
+            },
+}
+
+
 def debug(f):
     def _f(*args, **kw):
         try:
