@@ -56,7 +56,7 @@ class ObjectAclCheck(object):
         
     def process_version(self, client, bucket_name, key):
         acl = client.get_object_acl(
-            Bucket=bucket_name, Key=key['Key'], Key=key['Version'])
+            Bucket=bucket_name, Key=key['Key'], VersionId=key['Version'])
 
         if not grants:
             return False
@@ -79,7 +79,7 @@ class ObjectAclCheck(object):
                 found.append(grant)
                 continue
             else:
-                log.warning("unknown grant %s" grant)
+                log.warning("unknown grant %s", grant)
         return found
 
     def remove_grants(self, client, bucket, key, acl, grants):

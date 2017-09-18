@@ -370,11 +370,21 @@ def process_bucket_set(account_info, buckets):
 
             log.info("processing bucket %s", info)
             connection.hset('bucket-starts', bid, time.time())
+            dispatch_object_source(s3, bid, info)
 
-            if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
-                invoke(process_bucket_partitions, bid)
-            else:
-                invoke(process_bucket_iterator, bid)
+
+
+def dispatch_object_source(client, account_info, bid, bucket_info):
+    """Select and dispatch an object source for a bucket.
+
+    Choices are bucket partition, inventory, or direct pagination.
+    """
+
+    if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
+        invoke(process_bucket_partitions, bid)
+    else:
+        invoke(process_bucket_iterator, bid)
+
 
 
 class CharSet(object):

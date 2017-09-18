@@ -16,6 +16,7 @@ import json
 import os
 import random
 import tempfile
+import time
 
 import boto3
 import click
@@ -28,18 +29,18 @@ from c7n_salactus.worker import connection, CONN_CACHE
 def load_manifest_file(client, bucket, versioned, key_info):
     """Given an inventory csv file, return an iterator over keys
     """
-    yield None
-    # Temp hack due to bad prefix
-    #parts = key_info['key'].split('/', 2)
-    #parts[1] = '%s/' % parts[1]
-    #key_info['key'] = '/'.join(parts)
-
+    # to avoid thundering herd downloads
+    #yield None
+    size = 0
     with tempfile.NamedTemporaryFile() as fh:
+        print "download files", key_info
         inventory_data = client.download_fileobj(
             Bucket=bucket, Key=key_info['key'], Fileobj=fh)
         fh.seek(0)
         reader = csv.reader(gzip.GzipFile(fileobj=fh, mode='r'))
         for key_set in chunks(reader, 1000):
+            import pdb; pdb.set_trace()
+            size += len(key_set)
             if versioned:
                 keys = []
                 for kr in key_set:
@@ -50,6 +51,8 @@ def load_manifest_file(client, bucket, versioned, key_info):
             else:
                 keys = [kr[1] for kr in key_set]
             yield keys
+
+    print key_info, size
 
 
 def load_bucket_inventory(
@@ -76,6 +79,10 @@ def load_bucket_inventory(
 
 
 def random_chain(generators):
+    """Generator to generate a set of keys from
+    from a set of generators, each generator is selected
+    at random and consumed to exhaustion.
+    """
     while generators:
         g = random.choice(generators)
         try:
@@ -131,12 +138,17 @@ def process_bucket_inventory(bid):
 @click.option('--bucket')
 def main(bucket):
     count = 0
+    key_count = 0
+    start_time = time.time()
     for key_set in process_bucket_inventory(":%s" % bucket):
         count += 1
+        key_count += len(key_set)
         if count % 1000 == 0:
             print count
-    
-    print key_set
+    print "inventory"
+    print count
+    print key_count
+    print time.time() - start_time
 
 if __name__ == '__main__':
     try:

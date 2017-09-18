@@ -59,7 +59,7 @@ from dateutil.parser import parse as parse_date
 
 from c7n.actions import ActionRegistry, BaseAction, AutoTagUser, PutMetric
 from c7n.filters import (
-    FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter)
+    FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter, ValueFilter)
 from c7n.manager import resources
 from c7n import query
 from c7n.tags import RemoveTag, Tag, TagActionFilter, TagDelayedAction
@@ -1920,6 +1920,44 @@ class RemoveBucketTag(RemoveTag):
     def process_resource_set(self, resource_set, tags):
         modify_bucket_tags(
             self.manager.session_factory, resource_set, remove_tags=tags)
+
+
+
+@filters.register('inventory')
+class Inventory(ValueFilter):
+    """Filter inventories for a bucket"""
+    schema = type_schema('inventory', rinherit=ValueFilter.schema)
+
+    permissions = ('s3:GetInventoryConfiguration',)
+
+    def process(self, buckets, event=None):
+        results = []
+        with self.executor_factory(max_workers=2) as w:
+            futures = {}
+            for b in buckets:
+                futures[w.submit(self.process_bucket, b)] = b
+
+            for f in as_completed(futures):
+                b = futures[f]
+                if f.exception():
+                    self.log.error(
+                        "Error processing bucket: %s error: %s",
+                        b['Name'], f.exception())
+                    continue
+                if f.result():
+                    results.append(b)
+        return results
+
+    def process_bucket(self, b):
+        if not 'c7n:inventories' in b:
+            client = bucket_client(local_session(self.manager.session_factory), b)
+            inventories = client.list_bucket_inventory_configurations(
+                Bucket=b['Name']).get('InventoryConfigurationList', [])
+            b['c7n:inventories'] = inventories
+
+        for i in b['c7n:inventories']:
+            if self.match(i):
+                return True
 
 
 @actions.register('set-inventory')

@@ -24,6 +24,7 @@ import operator
 import time
 
 import click
+import jsonschema
 
 from rq.job import Job
 from rq.registry import FinishedJobRegistry, StartedJobRegistry
@@ -55,10 +56,29 @@ CONFIG_SCHEMA = {
             'properties': {
                 'type': {'type': 'string', 'enum': ['encrypt-keys']},
                 'report-only': {'type': 'boolean'},
-                'glacier' {'type': 'boolean'},
+                'glacier': {'type': 'boolean'},
                 'key-id': {'type': 'string'},
                 'crypto': {'type': 'string', 'enum': ['AES256', 'aws:kms']}
                 }
+        },
+
+        'inventory': {
+            'type': 'object',
+            'properties': {
+                'role': {
+                    'description': "".join([
+                        'The role to assume when loading inventory data ',
+                        'if omitted, the master role for salactus will be used ',
+                        'assuming centralized inventory collection. If an empty ',
+                        'it will use the salactus role in the account, else assume ',
+                        'the role arn specified from the target account role.']),
+                    'type': 'string'},
+                'id-selector': {
+                    'description': (
+                        'Only use inventories with the given id.'),
+                        'default': 'salactus',
+                    'type': 'string'},
+            }
         },
 
         'object-acl': {
@@ -76,16 +96,19 @@ CONFIG_SCHEMA = {
         'visitor': {
             'type': 'object',
             'oneOf': [
+                {'$ref': '#/definitions/object-acl'},
                 {'$ref': '#/definitions/encrypt-keys'}
             ],
         },
+
         'account': {
             'type': 'object',
             'additionalProperties': False,
-            'required': ['role', 'account_id', 'name'],
+            'required': ['role', 'account-id', 'name'],
             'properties': {
                 'name': {'type': 'string'},
-                'account_id': {'type': 'string'},
+                'account-id': {'type': 'string'},
+                'canonical-id': {'type': 'string'},
                 'role': {'type': 'string'},
                 'tags': {'type': 'array', 'items': {'type': 'string'}}
             },
@@ -98,10 +121,13 @@ CONFIG_SCHEMA = {
         'visitors': {
             'type': 'array',
             'items': {'$ref': '#/definitions/visitor'}
+        },
+
         'accounts': {
             'type': 'array',
             'items': {'$ref': '#/definitions/account'}
-            },
+        },
+    }
 }
 
 
@@ -125,7 +151,16 @@ def cli():
 
 
 @cli.command()
-@click.option('--config', help='config file for accounts/buckets')
+@click.option('--config', help='config file for accounts/buckets', type=click.Path())
+def validate(config):
+    """Validate a configuration file."""
+    with open(config) as fh:
+        data = utils.yaml_load(fh.read())
+        jsonschema.validate(data, CONFIG_SCHEMA)
+
+
+@cli.command()
+@click.option('--config', help='config file for accounts/buckets', type=click.Path())
 @click.option('--tag', help='filter accounts by tag')
 @click.option('--account', '-a',
               help='scan only the given accounts', multiple=True)
@@ -167,7 +202,7 @@ def run(config, tag, bucket, account, debug, region):
 
 
 @cli.command()
-@click.option('--dbpath', help='path to json file')
+@click.option('--dbpath', help='path to json file', type=click.Path())
 def save(dbpath):
     """Save the current state to a json file
     """
@@ -179,7 +214,7 @@ def save(dbpath):
 # todo check redis version if >=4 support this
 #@click.option('--async/--sync', default=False)
 def reset(async=None):
-    """Save the current state to a json file
+    """Delete all persistent cluster state.
     """
     click.echo('Delete db? Are you Sure? [yn] ', nl=False)
     c = click.getchar()
@@ -195,6 +230,7 @@ def reset(async=None):
 
 @cli.command()
 def workers():
+    """Show information on salactus workers. (slow)"""
     counter = Counter()
     for w in Worker.all(connection=worker.connection):
         for q in w.queues:
@@ -483,17 +519,20 @@ def watch(limit):
                      keys=['bucket_id', 'scanned', 'gkrate', 'lrate', 'krate'])
 
 
-@cli.command(name='reset-stats')
-def reset_stats():
-    """reset stats"""
-    d = db.db()
-    d.reset_stats()
-
 
 @cli.command(name='inspect-partitions')
 @click.option('-b', '--bucket', required=True)
 def inspect_partitions(bucket):
-    """Disocver the partitions on a bucket via introspection."""
+    """Discover the partitions on a bucket via introspection.
+
+    For large buckets which lack s3 inventories, salactus will attempt
+    to process objects in parallel on the bucket by breaking the bucket
+    into a separate keyspace partitions. It does this with a heurestic
+    that attempts to sample the keyspace and determine appropriate subparts.
+
+    This command provides additional visibility into the partitioning of
+    a bucket by showing how salactus would partition a given bucket.
+    """
 
     logging.basicConfig(
         level=logging.INFO,
@@ -543,7 +582,7 @@ def inspect_partitions(bucket):
 @cli.command(name='inspect-bucket')
 @click.option('-b', '--bucket', required=True)
 def inspect_bucket(bucket):
-
+    """Show all information known on a bucket."""
     state = db.db()
     found = None
     for b in state.buckets():
@@ -682,9 +721,4 @@ def failures():
 
 
 if __name__ == '__main__':
-    try:
-        cli()
-    except:
-        import traceback, sys, pdb
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
+    cli()
