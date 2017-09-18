@@ -67,8 +67,12 @@ from botocore.exceptions import (
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from c7n.credentials import assumed_session
+from c7n.executor import MainThreadExecutor
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks
+
+from c7n_salactus.objectacl import ObjectAclCheck
+from c7n_salactus.inventory import load_bucket_inventory, get_bucket_inventory
 
 
 def patch_ssl():
@@ -370,7 +374,7 @@ def process_bucket_set(account_info, buckets):
 
             log.info("processing bucket %s", info)
             connection.hset('bucket-starts', bid, time.time())
-            dispatch_object_source(s3, bid, info)
+            dispatch_object_source(s3, account_info, bid, info)
 
 
 
@@ -380,7 +384,16 @@ def dispatch_object_source(client, account_info, bid, bucket_info):
     Choices are bucket partition, inventory, or direct pagination.
     """
 
-    if info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
+    if account_info.get('inventory') and bucket_info['keycount'] > PARTITION_QUEUE_THRESHOLD:
+        inventory_info = get_bucket_inventory(
+            client,
+            bucket_info['name'],
+            account_info['inventory'].get('id-selector', '*'))
+        if inventory_info is not None:
+            invoke(
+                process_bucket_inventory, bid,
+                inventory_info['bucket'], inventory_info['prefix'])
+    elif bucket_info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
         invoke(process_bucket_partitions, bid)
     else:
         invoke(process_bucket_iterator, bid)
@@ -680,6 +693,22 @@ def process_bucket_partitions(
             invoke(process_keyset, bid, page)
 
 
+@job('bucket-inventory', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
+     connection=connection, result_ttl=0)
+def process_bucket_inventory(bid, inventory_bucket, inventory_prefix):
+    """Load last inventory dump and feed as key source.
+    """
+    log.info("Loading bucket %s keys from inventory s3://%s/%s",
+                 bid, inventory_bucket, inventory_prefix)
+    account, bucket = bid.split(':', 1)
+    region = connection.hget('bucket-regions', bid)
+    versioned = bool(int(connection.hget('bucket-versions', bid)))
+    session = boto3.Session()
+    s3 = session.client('s3', region_name=region, config=s3config)
+    for page in load_bucket_inventory(s3, inventory_bucket, inventory_prefix):
+        invoke(process_keyset, bid, page)
+
+
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
      connection=connection, result_ttl=0)
 def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
@@ -730,39 +759,48 @@ def process_bucket_iterator(bid, prefix="", delimiter="", **continuation):
                 p.execute()
 
 
+def get_key_visitors(account_info):
+    if not account_info.get('visitors'):
+        return [EncryptExtantKeys(keyconfig)]
+    visitors = []
+    for v in account_info.get('visitors'):
+        if v['type'] == 'encrypt-keys':
+            visitors.append(EncryptExtantKeys(v))
+        elif v['type'] == 'object-acl':
+            visitors.append(ObjectAclCheck(v))
+    return visitors
+
+
 @job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
      connection=connection, result_ttl=0)
 def process_keyset(bid, key_set):
     account, bucket = bid.split(':', 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
-    session = get_session(
-        json.loads(connection.hget('bucket-accounts', account)))
+    account_info = json.loads(connection.hget('bucket-accounts', account))
+
+    visitors = get_key_visitors(account_info)
+    session = get_session(account_info)
 
     patch_ssl()
     s3 = session.client('s3', region_name=region, config=s3config)
-    processor = EncryptExtantKeys(keyconfig)
 
     error_count = sesserr = connerr = enderr = missing_count = 0
     throttle_count = denied_count = remediation_count = 0
-
-    # contents_key, _, _ = BUCKET_OBJ_DESC[versioned]
-    # key_count = len(key_set.get(contents_key, []))
     key_count = len(key_set)
-    processor = (versioned and processor.process_version
-                 or processor.process_key)
-
-    # log.info("processing page size: %d on %s",
-    #         len(key_set.get(contents_key, ())), bid)
-
     start_time = time.time()
 
     with bucket_ops(bid, 'key'):
+        #MainThreadExecutor.async = False
+        #with MainThreadExecutor(max_workers=10) as w:
         with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
             for kchunk in chunks(key_set, 100):
-                futures[w.submit(
-                    process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
+                for v in visitors:
+                    processor = (versioned and v.process_version
+                                     or v.process_key)
+                    futures[w.submit(
+                        process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
 
             for f in as_completed(futures):
                 if f.exception():

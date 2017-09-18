@@ -40,7 +40,7 @@ class ObjectAclCheck(object):
 
     def __init__(self, data):
         self.data = data
-        self.whitelist_accounts = set(data.get('whitelist-accounts'))
+        self.whitelist_accounts = set(data.get('whitelist-accounts', ()))
 
     def process_key(self, client, bucket_name, key):
         acl = client.get_object_acl(Bucket=bucket_name, Key=key['Key'])
@@ -67,15 +67,18 @@ class ObjectAclCheck(object):
         return key['Key'], key['VersionId']
 
     def check_grants(self, acl):
-        owner = acl['Owner']['Id']
+        owner = acl['Owner']['ID']
         found = []
         for grant in acl.get('Grants', ()):
-            if 'URI' in grant:
+            grantee = grant['Grantee']
+            if 'URI' in grantee:
                 if self.data['allow-log'] and grant['URI'] == Groups.LogDelivery:
                     continue
                 found.append(grant)
                 continue
-            elif 'ID' in grant and grant['ID'] not in self.whitelist_accounts:
+            elif 'ID' in grantee and grantee['ID'] == owner:
+                continue
+            elif 'ID' in grantee and grantee['ID'] not in self.whitelist_accounts:
                 found.append(grant)
                 continue
             else:

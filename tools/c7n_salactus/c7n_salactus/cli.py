@@ -179,26 +179,39 @@ def run(config, tag, bucket, account, debug, region):
 
     if debug:
         def invoke(f, *args, **kw):
-            if f.func_name == 'process_keyset':
-                key_count = (len(args[-1].get('Contents', ()))
-                             + len(args[-1].get('Versions', ())))
-                print("debug skip keyset %d" % key_count)
-                return
+            #if f.func_name == 'process_keyset':
+            #    key_count = len(args[-1])
+            #    print("debug skip keyset %d" % key_count)
+            #    return
             return f(*args, **kw)
         worker.invoke = invoke
 
     with open(config) as fh:
-        data = json.load(fh)
-        for account_info in data:
+        data = utils.yaml_load(fh.read())
+        for account_info in data.get('accounts', ()):
             if tag and tag not in account_info.get('tags', ()):
                 continue
             if account and account_info['name'] not in account:
                 continue
+            if 'inventory' in data and 'inventory' not in account_info:
+                account_info['inventory'] = data['inventory']
+            if 'visitors' in data and 'visitors' not in account_info:
+                account_info['visitors'] = data['visitors']
             if bucket:
                 account_info['buckets'] = bucket
             if region:
                 account_info['regions'] = region
-            worker.invoke(worker.process_account, account_info)
+
+
+            try:
+                worker.invoke(worker.process_account, account_info)
+            except:
+                if not debug:
+                    raise
+                import pdb, traceback, sys
+                traceback.print_exc()
+                pdb.post_mortem(sys.exc_info()[-1])
+                raise
 
 
 @cli.command()
