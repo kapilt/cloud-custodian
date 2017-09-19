@@ -98,8 +98,7 @@ def get_bucket_inventory(client, bucket, inventory_id):
     inventories = {i['Id']: i for i in inventories}
     found = fnmatch.filter(inventories, inventory_id)
     if not found:
-        raise ValueError("Bucket:%s no inventories found %s" % (
-            bucket, ', '.join(inventories)))
+        return None
 
     i = inventories[found.pop()]
     s3_info = i['Destination']['S3BucketDestination']

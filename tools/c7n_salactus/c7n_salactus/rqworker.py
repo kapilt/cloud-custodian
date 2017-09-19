@@ -6,6 +6,7 @@ rq worker customizations
 import datetime
 import msgpack
 import cPickle
+import logging
 
 from lz4.frame import compress, decompress
 from rq.worker import Worker
@@ -16,6 +17,11 @@ PackObj_ExtType = 43
 
 job_default_load = job.loads
 
+log = logging.getLogger('salactus')
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 def decode_ext(code, data):
     if code == PackDate_ExtType:

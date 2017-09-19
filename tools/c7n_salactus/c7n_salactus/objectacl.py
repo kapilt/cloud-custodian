@@ -56,7 +56,8 @@ class ObjectAclCheck(object):
         
     def process_version(self, client, bucket_name, key):
         acl = client.get_object_acl(
-            Bucket=bucket_name, Key=key['Key'], VersionId=key['Version'])
+            Bucket=bucket_name, Key=key['Key'], VersionId=key['VersionId'])
+        grants = self.check_grants(acl)
 
         if not grants:
             return False

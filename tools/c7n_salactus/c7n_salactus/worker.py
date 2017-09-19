@@ -393,7 +393,8 @@ def dispatch_object_source(client, account_info, bid, bucket_info):
             invoke(
                 process_bucket_inventory, bid,
                 inventory_info['bucket'], inventory_info['prefix'])
-    elif bucket_info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
+
+    if bucket_info['keycount'] > PARTITION_BUCKET_SIZE_THRESHOLD:
         invoke(process_bucket_partitions, bid)
     else:
         invoke(process_bucket_iterator, bid)
@@ -801,6 +802,8 @@ def process_keyset(bid, key_set):
     objects['objects_denied'] = []
 
     with bucket_ops(bid, 'key'):
+        #MainThreadExecutor.async = False
+        #with MainThreadExecutor(max_workers=10) as w:
         with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
             for kchunk in chunks(key_set, 100):
@@ -859,7 +862,6 @@ def process_keyset(bid, key_set):
     # trigger some mem collection
     if getattr(sys, 'pypy_version_info', None):
         gc.collect()
-    log.info("processed keyset")
 
 def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
     stats = collections.defaultdict(lambda: 0)
