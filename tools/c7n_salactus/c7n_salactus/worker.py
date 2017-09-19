@@ -69,7 +69,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from c7n.credentials import assumed_session
 from c7n.executor import MainThreadExecutor
 from c7n.resources.s3 import EncryptExtantKeys
-from c7n.utils import chunks
+from c7n.utils import chunks, dumps
 
 from c7n_salactus.objectacl import ObjectAclCheck
 from c7n_salactus.inventory import load_bucket_inventory, get_bucket_inventory
@@ -705,8 +705,10 @@ def process_bucket_inventory(bid, inventory_bucket, inventory_prefix):
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = boto3.Session()
     s3 = session.client('s3', region_name=region, config=s3config)
-    for page in load_bucket_inventory(s3, inventory_bucket, inventory_prefix):
-        invoke(process_keyset, bid, page)
+    with bucket_ops(bid, 'inventory'):
+        for page in load_bucket_inventory(
+                s3, inventory_bucket, inventory_prefix, versioned):
+            invoke(process_keyset, bid, page)
 
 
 @job('bucket-page-iterator', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
@@ -765,9 +767,13 @@ def get_key_visitors(account_info):
     visitors = []
     for v in account_info.get('visitors'):
         if v['type'] == 'encrypt-keys':
-            visitors.append(EncryptExtantKeys(v))
+            vi = EncryptExtantKeys(v)
+            vi.name = 'encrypt-keys'
+            visitors.append(vi)
         elif v['type'] == 'object-acl':
-            visitors.append(ObjectAclCheck(v))
+            vi = ObjectAclCheck(v)
+            vi.name = 'object-acl'
+            visitors.append(vi)
     return visitors
 
 
@@ -780,6 +786,7 @@ def process_keyset(bid, key_set):
     account_info = json.loads(connection.hget('bucket-accounts', account))
 
     visitors = get_key_visitors(account_info)
+    object_reporting = account_info.get('object-reporting')
     session = get_session(account_info)
 
     patch_ssl()
@@ -790,9 +797,10 @@ def process_keyset(bid, key_set):
     key_count = len(key_set)
     start_time = time.time()
 
+    objects = {v.name: [] for v in visitors}
+    objects['objects_denied'] = []
+
     with bucket_ops(bid, 'key'):
-        #MainThreadExecutor.async = False
-        #with MainThreadExecutor(max_workers=10) as w:
         with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
             for kchunk in chunks(key_set, 100):
@@ -800,7 +808,8 @@ def process_keyset(bid, key_set):
                     processor = (versioned and v.process_version
                                      or v.process_key)
                     futures[w.submit(
-                        process_key_chunk, s3, bucket, kchunk, processor)] = kchunk
+                        process_key_chunk, s3, bucket, kchunk,
+                        processor, bool(object_reporting))] = v.name
 
             for f in as_completed(futures):
                 if f.exception():
@@ -814,6 +823,10 @@ def process_keyset(bid, key_set):
                 throttle_count += stats['missing']
                 sesserr += stats['session']
                 connerr += stats['connection']
+                if object_reporting:
+                    vname = futures[f]
+                    objects[vname].extend(stats['objects'])
+                    objects['objects_denied'].extend(stats['objects_denied'])
 
         with connection.pipeline() as p:
             if remediation_count:
@@ -839,13 +852,21 @@ def process_keyset(bid, key_set):
             p.hincrby('keys-time', bid, int(time.time()-start_time))
             p.execute()
 
+    # write out object level info
+    if object_reporting:
+        publish_object_records(bid, objects, object_reporting)
+
     # trigger some mem collection
     if getattr(sys, 'pypy_version_info', None):
         gc.collect()
+    log.info("processed keyset")
 
-
-def process_key_chunk(s3, bucket, kchunk, processor):
+def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
     stats = collections.defaultdict(lambda: 0)
+    if object_reporting:
+        stats['objects'] = []
+        stats['objects_denied'] = []
+
     for k in kchunk:
         if isinstance(k, str):
             k = {'Key': k}
@@ -864,6 +885,8 @@ def process_key_chunk(s3, bucket, kchunk, processor):
             code = e.response['Error']['Code']
             if code == '403':  # Permission Denied
                 stats['denied'] += 1
+                if object_reporting:
+                    stats['objects_denied'].append(k)
             elif code == '404':  # Not Found
                 stats['missing'] += 1
             elif code in ('503', '500'):  # Slow down, or throttle
@@ -877,4 +900,29 @@ def process_key_chunk(s3, bucket, kchunk, processor):
         else:
             if result:
                 stats['remediated'] += 1
+            if result and object_reporting:
+                stats['objects'].append(result)
     return stats
+
+
+def publish_object_records(bid, objects, reporting):
+    found = False
+    for k in objects.keys():
+        if objects[k]:
+            found = True
+    if not found:
+        return
+
+    client = get_session({'name': 'object-records'}).client('s3')
+    bucket = reporting.get('bucket')
+    record_prefix = reporting.get('record-prefix')
+    key = "%s/%s/%s/%s.json" % (
+        reporting.get('prefix').strip('/'),
+        record_prefix, bid, str(uuid4()))
+    client.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=dumps(objects),
+        ACL="bucket-owner-full-control",
+        ServerSideEncryption="AES256")
+

@@ -17,6 +17,7 @@ from __future__ import print_function
 
 from collections import Counter
 import csv
+from datetime import datetime
 import functools
 import json
 import logging
@@ -69,7 +70,7 @@ CONFIG_SCHEMA = {
                     'description': "".join([
                         'The role to assume when loading inventory data ',
                         'if omitted, the master role for salactus will be used ',
-                        'assuming centralized inventory collection. If an empty ',
+                        'assuming centralized inventory collection. If empty ',
                         'it will use the salactus role in the account, else assume ',
                         'the role arn specified from the target account role.']),
                     'type': 'string'},
@@ -78,6 +79,16 @@ CONFIG_SCHEMA = {
                         'Only use inventories with the given id.'),
                         'default': 'salactus',
                     'type': 'string'},
+            }
+        },
+
+        'object-reporting': {
+            'type': 'object',
+            'required': ['bucket'],
+            'properties': {
+                'bucket': {'type': 'string'},
+                'prefix': {'type': 'string'},
+                'role': {'type': 'string'}
             }
         },
 
@@ -92,6 +103,7 @@ CONFIG_SCHEMA = {
                 'whitelist-accounts': {'type': 'array', 'item': {'type': 'string'}}
             }
         },
+
 
         'visitor': {
             'type': 'object',
@@ -197,11 +209,13 @@ def run(config, tag, bucket, account, debug, region):
                 account_info['inventory'] = data['inventory']
             if 'visitors' in data and 'visitors' not in account_info:
                 account_info['visitors'] = data['visitors']
+            if 'object-reporting' in data and 'object-reporting' not in account_info:
+                account_info['object-reporting'] = data['object-reporting']
+                account_info['object-reporting']['record-prefix'] = datetime.utcnow().strftime('%Y/%m/%d')
             if bucket:
                 account_info['buckets'] = bucket
             if region:
                 account_info['regions'] = region
-
 
             try:
                 worker.invoke(worker.process_account, account_info)
@@ -352,13 +366,16 @@ def accounts(dbpath, output, format, account,
     formatter(accounts, output)
 
 
-def format_plain(buckets, fh, keys=()):
+def format_plain(buckets, fh, keys=(), explicit_only=False):
     field_names = [
         'account', 'name', 'region', 'percent_scanned', 'matched',
         'scanned', 'size', 'keys_denied', 'error_count', 'partitions']
 
-    for k in keys:
-        field_names.insert(0, k)
+    if explicit_only:
+        field_names = keys
+    else:
+        for k in keys:
+            field_names.insert(0, k)
 
     def _repr(b):
         return [getattr(b, k) for k in field_names]
@@ -496,6 +513,7 @@ def watch(limit):
         cur.data['gkrate'] = {}
         progress = []
         prev_buckets = {b.bucket_id: b for b in prev.buckets()}
+
         totals = {'scanned': 0, 'krate': 0, 'lrate': 0, 'bucket_id': 'totals'}
 
         for b in cur.buckets():
@@ -528,8 +546,10 @@ def watch(limit):
             progress = progress[:limit]
 
         progress.insert(0, utils.Bag(totals))
-        format_plain(progress, None,
-                     keys=['bucket_id', 'scanned', 'gkrate', 'lrate', 'krate'])
+        format_plain(
+            progress, None,
+            explicit_only=True,
+            keys=['bucket_id', 'scanned', 'gkrate', 'lrate', 'krate'])
 
 
 

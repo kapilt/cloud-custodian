@@ -25,12 +25,11 @@ from dateutil.parser import parse
 
 from six.moves.urllib_parse import unquote_plus
 
-def load_manifest_file(client, bucket, schema, key_info):
+def load_manifest_file(client, bucket, schema, versioned, key_info):
     """Given an inventory csv file, return an iterator over keys
     """
     # to avoid thundering herd downloads
     yield None
-    versioned = 'IsLatest' in schema
 
     with tempfile.NamedTemporaryFile() as fh:
         inventory_data = client.download_fileobj(
@@ -53,7 +52,7 @@ def load_manifest_file(client, bucket, schema, key_info):
             yield keys
 
 
-def load_bucket_inventory(client, inventory_bucket, inventory_prefix):
+def load_bucket_inventory(client, inventory_bucket, inventory_prefix, versioned):
     """Given an inventory location for a bucket, return an iterator over keys
 
     on the most recent delivered manifest.
@@ -71,7 +70,7 @@ def load_bucket_inventory(client, inventory_bucket, inventory_prefix):
     schema = [n.strip() for n in manifest_data['fileSchema'].split(',')]
 
     processor = functools.partial(
-        load_manifest_file, client, inventory_bucket, schema)
+        load_manifest_file, client, inventory_bucket, schema, versioned)
     generators = map(processor, manifest_data.get('files', ()))
     return random_chain(generators)
 

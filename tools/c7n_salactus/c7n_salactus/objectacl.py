@@ -49,10 +49,10 @@ class ObjectAclCheck(object):
         if not grants:
             return False
         if self.data.get('report-only'):
-            return key['Key']
+            return {'key': key['Key'], 'grants': grants}
         
         self.remove_grants(client, bucket_name, key, acl, grants)
-        return key['Key']
+        return {'key': key['Key'], 'grants': grants}
         
     def process_version(self, client, bucket_name, key):
         acl = client.get_object_acl(
@@ -61,22 +61,22 @@ class ObjectAclCheck(object):
         if not grants:
             return False
         if self.data.get('report-only'):
-            return key['Key'], key['VersionId']
+            return {'key': key['Key'], 'version': key['VersionId'], 'grants': grants}
 
         self.remove_grants(client, bucket_name, key, acl, grants)
-        return key['Key'], key['VersionId']
+        return {'key': key['Key'], 'version': key['VersionId'], 'grants': grants}
 
     def check_grants(self, acl):
         owner = acl['Owner']['ID']
         found = []
         for grant in acl.get('Grants', ()):
             grantee = grant['Grantee']
-            if 'URI' in grantee:
+            if 'ID' in grantee and grantee['ID'] == owner:
+                continue
+            elif 'URI' in grantee:
                 if self.data['allow-log'] and grant['URI'] == Groups.LogDelivery:
                     continue
                 found.append(grant)
-                continue
-            elif 'ID' in grantee and grantee['ID'] == owner:
                 continue
             elif 'ID' in grantee and grantee['ID'] not in self.whitelist_accounts:
                 found.append(grant)
