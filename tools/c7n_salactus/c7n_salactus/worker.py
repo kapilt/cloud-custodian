@@ -823,8 +823,9 @@ def process_keyset(bid, key_set):
                 remediation_count += stats['remediated']
                 denied_count += stats['denied']
                 missing_count += stats['missing']
-                throttle_count += stats['missing']
+                throttle_count += stats['throttle']
                 sesserr += stats['session']
+                enderr += stats['endpoint']
                 connerr += stats['connection']
                 if object_reporting:
                     vname = futures[f]

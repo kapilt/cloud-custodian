@@ -44,6 +44,7 @@ class ObjectAclCheck(object):
 
     def process_key(self, client, bucket_name, key):
         acl = client.get_object_acl(Bucket=bucket_name, Key=key['Key'])
+        acl.pop('ResponseMetadata')
         grants = self.check_grants(acl)
 
         if not grants:
@@ -57,6 +58,7 @@ class ObjectAclCheck(object):
     def process_version(self, client, bucket_name, key):
         acl = client.get_object_acl(
             Bucket=bucket_name, Key=key['Key'], VersionId=key['VersionId'])
+        acl.pop('ResponseMetadata')
         grants = self.check_grants(acl)
 
         if not grants:
@@ -75,7 +77,7 @@ class ObjectAclCheck(object):
             if 'ID' in grantee and grantee['ID'] == owner:
                 continue
             elif 'URI' in grantee:
-                if self.data['allow-log'] and grant['URI'] == Groups.LogDelivery:
+                if self.data['allow-log'] and grantee['URI'] == Groups.LogDelivery:
                     continue
                 found.append(grant)
                 continue
@@ -90,6 +92,7 @@ class ObjectAclCheck(object):
 
     def remove_grants(self, client, bucket, key, acl, grants):
         params = {'Bucket': bucket, 'Key': 'Key'}
+
         if 'VersionId' in key:
             params['VersionId'] = key['VersionId']
         for g in grants:
