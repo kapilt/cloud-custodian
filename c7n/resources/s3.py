@@ -1921,17 +1921,10 @@ class RemoveBucketTag(RemoveTag):
         modify_bucket_tags(
             self.manager.session_factory, resource_set, remove_tags=tags)
 
-@filters.register('data-events')
-class DataEvents(Filter):
 
-    schema = type_schema('data-events', state={'enum': ['present', 'absent']})
-    permissions = (
-        'cloudtrail:DescribeTrails',
-        'cloudtrail:GetEventSelectors')
+class TrailEventsBase(object):
 
-    def process(self, resources, event=None):
-        trails = self.manager.get_resource_manager('cloudtrail').resources()
-        client = local_session(self.manager.session_factory).client('cloudtrail')
+    def get_event_buckets(self, client, trails):
         event_buckets = {}
         for t in trails:
             for events in client.get_event_selectors(
@@ -1943,6 +1936,42 @@ class DataEvents(Filter):
                         continue
                     for b in data_events['Values']:
                         event_buckets[b.rsplit(':')[-1].strip('/')] = t['Name']
+        return event_buckets
+
+@actions.register('set-data-events')
+class SetDataEvents(BaseAction, TrailEventsBase):
+
+    schema = type_schema(
+        'set-data-events',
+        trail_prefix={'type': 'string'},
+        state={'enum': ['present', 'absent']})
+
+    permissions = (
+        'cloudtrail:DescribeTrails',
+        'cloudtrail:GetEventSelectors',
+        'cloudtrail:CreateTrail',
+        'cloudtrail:PutEventSelectors')
+
+
+    def process(self, resources):
+        trails = self.manager.get_resource_manager('cloudtrail').resources()
+        client = local_session(self.manager.session_factory).client('cloudtrail')
+        event_buckets = self.get_event_buckets(client, trails)
+        trail_counters = None
+        
+        
+@filters.register('data-events')
+class DataEvents(Filter, TrailEventsBase):
+
+    schema = type_schema('data-events', state={'enum': ['present', 'absent']})
+    permissions = (
+        'cloudtrail:DescribeTrails',
+        'cloudtrail:GetEventSelectors')
+
+    def process(self, resources, event=None):
+        trails = self.manager.get_resource_manager('cloudtrail').resources()
+        client = local_session(self.manager.session_factory).client('cloudtrail')
+        event_buckets =  self.get_event_buckets(client, trails)
 
         op_in = lambda x: x['Name'] in event_buckets
         op_out = lambda x: x['Name'] not in event_buckets

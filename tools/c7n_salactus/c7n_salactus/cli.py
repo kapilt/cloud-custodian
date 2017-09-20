@@ -342,7 +342,7 @@ def accounts(dbpath, output, format, account,
         account_map = {account.name: account for account in accounts}
 
         with open(config) as fh:
-            account_data = json.load(fh)
+            account_data = json.load(fh).get('accounts')
         tag_groups = {}
         for a in account_data:
             if tag is not None and tag not in a['tags']:
@@ -459,7 +459,7 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
 
     if config and tagprefix:
         with open(config) as fh:
-            data = json.load(fh)
+            data = json.load(fh).get('accounts')
             account_data = {}
             for a in data:
                 for t in a['tags']:
