@@ -83,7 +83,7 @@ class ObjectAclCheck(object):
             elif 'ID' in grantee:
                 if '*' in self.whitelist_accounts:
                    continue
-                if grantee['ID'] not in self.whitelist_accounts):
+                if grantee['ID'] not in self.whitelist_accounts:
                     found.append(grant)
             else:
                 log.warning("unknown grant %s", grant)
