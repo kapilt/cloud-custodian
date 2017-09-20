@@ -1921,7 +1921,40 @@ class RemoveBucketTag(RemoveTag):
         modify_bucket_tags(
             self.manager.session_factory, resource_set, remove_tags=tags)
 
+@filters.register('data-events')
+class DataEvents(Filter):
 
+    schema = type_schema('data-events', state={'enum': ['present', 'absent']})
+    permissions = (
+        'cloudtrail:DescribeTrails',
+        'cloudtrail:GetEventSelectors')
+
+    def process(self, resources, event=None):
+        trails = self.manager.get_resource_manager('cloudtrail').resources()
+        client = local_session(self.manager.session_factory).client('cloudtrail')
+        event_buckets = {}
+        for t in trails:
+            for events in client.get_event_selectors(
+                    TrailName=t['Name']).get('EventSelectors', ()):
+                if 'DataResources' not in events:
+                    continue
+                for data_events in events['DataResources']:
+                    if data_events['Type'] != 'AWS::S3::Object':
+                        continue
+                    for b in data_events['Values']:
+                        event_buckets[b.rsplit(':')[-1].strip('/')] = t['Name']
+
+        op_in = lambda x: x['Name'] in event_buckets
+        op_out = lambda x: x['Name'] not in event_buckets
+        op = (self.data.get('state') == 'present'
+                  and op_in or op_out)
+
+        results = []
+        for b in resources:
+            if op(b):
+                results.append(b)
+        return results
+            
 
 @filters.register('inventory')
 class Inventory(ValueFilter):
