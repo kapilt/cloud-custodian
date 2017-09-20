@@ -887,13 +887,13 @@ def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
         except ClientError as e:
             #  https://goo.gl/HZLv9b
             code = e.response['Error']['Code']
-            if code == '403':  # Permission Denied
+            if code in ('403', 'AccessDenied'):  # Permission Denied
                 stats['denied'] += 1
                 if object_reporting:
                     stats['objects_denied'].append(k)
             elif code == '404':  # Not Found
                 stats['missing'] += 1
-            elif code in ('503', '500'):  # Slow down, or throttle
+            elif code in ('503', '500', 'SlowDown'):  # Slow down, or throttle
                 time.sleep(3)
                 stats['throttle'] += 1
             elif code in ('400',):  # token err, typically

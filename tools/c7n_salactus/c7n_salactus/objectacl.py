@@ -80,12 +80,11 @@ class ObjectAclCheck(object):
                 if self.data['allow-log'] and grantee['URI'] == Groups.LogDelivery:
                     continue
                 found.append(grant)
-                continue
-            elif (not '*' in self.whitelist_accounts
-                      and 'ID' in grantee
-                      and grantee['ID'] not in self.whitelist_accounts):
-                found.append(grant)
-                continue
+            elif 'ID' in grantee:
+                if '*' in self.whitelist_accounts:
+                   continue
+                if grantee['ID'] not in self.whitelist_accounts):
+                    found.append(grant)
             else:
                 log.warning("unknown grant %s", grant)
         return found
