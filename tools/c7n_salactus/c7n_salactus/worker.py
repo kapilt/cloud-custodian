@@ -863,6 +863,7 @@ def process_keyset(bid, key_set):
     if getattr(sys, 'pypy_version_info', None):
         gc.collect()
 
+
 def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
     stats = collections.defaultdict(lambda: 0)
     if object_reporting:
@@ -905,6 +906,7 @@ def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
             if result and object_reporting:
                 stats['objects'].append(result)
     return stats
+
 
 
 def publish_object_records(bid, objects, reporting):

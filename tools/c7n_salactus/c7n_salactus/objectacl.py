@@ -79,7 +79,9 @@ class ObjectAclCheck(object):
                     continue
                 found.append(grant)
                 continue
-            elif 'ID' in grantee and grantee['ID'] not in self.whitelist_accounts:
+            elif (not '*' in self.whitelist_accounts
+                      and 'ID' in grantee
+                      and grantee['ID'] not in self.whitelist_accounts):
                 found.append(grant)
                 continue
             else:
