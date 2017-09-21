@@ -1959,6 +1959,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         'cloudtrail:DescribeTrails',
         'cloudtrail:GetEventSelectors',
         'cloudtrail:CreateTrail',
+        'cloudtrail:StartLogging',
         'cloudtrail:PutEventSelectors')
 
     TRAIL_MAX_CARDINALITY = 5
@@ -2058,7 +2059,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         for n in range(trails_needed):
             name = "%s-%d" % (self.data['trail_prefix'], seq)
             client.create_trail(
-                TrailName=name,
+                Name=name,
                 S3BucketName=self.data['trail_bucket'],
                 SnsTopicName=self.data['trail_topic'],
                 IsMultiRegion=True,
@@ -2066,6 +2067,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                 IncludeGlobalServiceEvents=True)
             seq += 1
             added.append(name)
+            client.start_logging(Name=name)
         return added
 
 
