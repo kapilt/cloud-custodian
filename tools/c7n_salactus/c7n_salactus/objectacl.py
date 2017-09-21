@@ -38,9 +38,10 @@ class Permissions(object):
 
 class ObjectAclCheck(object):
 
-    def __init__(self, data):
+    def __init__(self, data, record_users=False):
         self.data = data
         self.whitelist_accounts = set(data.get('whitelist-accounts', ()))
+        self.record_users = record_users
 
     def process_key(self, client, bucket_name, key):
         acl = client.get_object_acl(Bucket=bucket_name, Key=key['Key'])
@@ -68,6 +69,16 @@ class ObjectAclCheck(object):
 
         self.remove_grants(client, bucket_name, key, acl, grants)
         return {'key': key['Key'], 'version': key['VersionId'], 'grants': grants}
+
+    def record_users(self, acl):
+        users = {}
+        users[acl['Owner']['DisplayName']] = acl['Owner']['ID']
+        for g in acl.get('Grants'):
+            grantee = g['Grantee']
+            if 'ID' in grantee:
+                users[grantee['DisplayName']] = grantee['ID']
+        from c7n_salactus.worker import connection
+        connection.hmset('bucket-user', users)
 
     def check_grants(self, acl):
         owner = acl['Owner']['ID']
