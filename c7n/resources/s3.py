@@ -1960,7 +1960,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                         'title': 'Should we create trails as needed for events?',
                         'type': 'boolean'},
                     'name-prefix': {
-                        'title': 'The name prefix we should use for event trails',
+                        'title': 'The name prefix to use for event trails',
                         'type': 'string'},
                     'topic': {
                         'title': 'The sns topic for the trail to send updates',
@@ -1995,13 +1995,14 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         else:
             client = session.client('cloudtrail')
         trails, all_trails = self.get_trails(client)
-        s3 = session.client('s3')
         modified_trails, added_trails = set(), None
 
         # Fetch a list of all buckets to facilitate garbage collection
-        all_buckets = set([b['Name'] for b in s3.list_buckets().get('Buckets', ())])
         policy_buckets = set([b['Name'] for b in resources])
-        data_buckets = self.data.get('sync-all') and all_buckets or policy_buckets
+        data_buckets = policy_buckets
+        if self.data.get('sync-all'):
+            all_buckets = self.get_buckets(session, resources)
+            data_buckets = all_buckets
 
         # Get mapping and counters for current trail events
         event_buckets = self.get_event_buckets(client, trails)
@@ -2028,7 +2029,8 @@ class SetDataEvents(BaseAction, TrailEventsBase):
             trail_events_sum += count
         trail_events_sum += len(buckets_add)
         if trail_events_sum > (len(trail_counters) * self.TRAIL_MAX_EVENTS):
-            added_trails = self.add_data_trails(trails, all_trails, trail_events_sum)
+            added_trails = self.add_data_trails(
+                client, trails, all_trails, trail_events_sum)
             for a in added_trails:
                 trail_counters[a] = 0
 
@@ -2049,6 +2051,13 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                 'BucketsAdded': list(buckets_add),
                 'BucketsRemoved': list(buckets_remove),
                 'TrailsAdded': list(added_trails)}
+
+    def get_buckets(self, session, resources):
+        s3 = session.client('s3')
+        all_buckets = set([b['Name'] for b in s3.list_buckets().get(
+            'Buckets', ())])
+        # TODO multi region location filtering
+        return all_buckets
 
     def get_trails(self, client):
         # we skip using the resource manager as we're potentially changing the set
@@ -2090,18 +2099,17 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         seq = data_trails and int(data_trails[0].rsplit('-', 1)) + 1 or 1
         added = []
 
-        params = dict(S3BucketName=trail_cfg['s3-bucket'])
+        params = dict(
+            S3BucketName=trail_cfg['s3-bucket'], EnableLogFileValidation=True)
 
         if 'key-id' in trail_cfg:
             params['KmsKeyId'] = trail_cfg['key-id']
         if 's3-prefix' in trail_cfg:
-            params['S3Prefix'] = trail_cfg['s3-prefix']
+            params['S3KeyPrefix'] = trail_cfg['s3-prefix']
         if 'topic' in trail_cfg:
             params['SnsTopicName'] = trail_cfg['topic']
         if 'multi-region' in trail_cfg:
-            params['IsMultiRegionTrail'] = True,
-            params['EnableLogFileValidation'] = True
-            params['IncludeGlobalServiceEvents'] = True
+            params['IsMultiRegionTrail'] = True
 
         for n in range(trails_needed):
             name = "%s-%d" % (trail_cfg['name-prefix'], seq)
