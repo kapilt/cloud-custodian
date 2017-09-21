@@ -1938,12 +1938,20 @@ class TrailEventsBase(object):
                         event_buckets[b.rsplit(':')[-1].strip('/')] = t['Name']
         return event_buckets
 
+
 @actions.register('set-data-events')
 class SetDataEvents(BaseAction, TrailEventsBase):
+    """Set a bucket to send cloud trail data events
 
+    https://goo.gl/g1iQtX
+    """
     schema = type_schema(
         'set-data-events',
         trail_prefix={'type': 'string'},
+        all_buckets={'type': 'boolean'},
+        create_trails={'type': 'boolean'},
+        trail_topic={'type': 'string'},
+        trail_bucket={'type': 'string'},
         state={'enum': ['present', 'absent']})
 
     permissions = (
@@ -1952,14 +1960,103 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         'cloudtrail:CreateTrail',
         'cloudtrail:PutEventSelectors')
 
+    TRAIL_MAX_CARDINALITY = 5
+    TRAIL_MAX_EVENTS = 250
 
     def process(self, resources):
-        trails = self.manager.get_resource_manager('cloudtrail').resources()
-        client = local_session(self.manager.session_factory).client('cloudtrail')
+        session = local_session(self.manager.session_factory)
+        client = session.client('cloudtrail')
+        trails, all_trails = self.get_trails(client)
+        s3 = session.client('s3')
+        modified_trails = set()
+
+        # Fetch a list of all buckets to facilitate garbage collection
+        all_buckets = set([b['Name'] for b in s3.list_buckets().get('Buckets', ())])
+        policy_buckets = set([b['Name'] for b in resources])
+        data_buckets = self.data.get('all_buckets') and all_buckets or policy_buckets
+
+        # Get mapping and counters for current trail events
         event_buckets = self.get_event_buckets(client, trails)
-        trail_counters = None
-        
-        
+        trail_counters = Counter()
+        for b, t in event_buckets.items():
+            trail_counters[t] += 1
+
+        # Determine adds and removes
+        buckets_remove = set(event_buckets).difference(all_buckets)
+        buckets_add = set(data_buckets).difference(event_buckets)
+
+        # Garbage collect bookeeping
+        for b in buckets_remove:
+            t = event_buckets[b]
+            trail_counters[t] -= 1
+            modified_trails.add(t)
+            del event_buckets[b]
+
+        # Do we need to add more trails
+        trails_events_sum = 0
+        for t, count in trail_counters:
+            trail_events_sum += count
+        trail_events_sum += len(buckets_add)
+        if trail_events_sum > (len(trail_counters) * self.TRAIL_MAX_EVENTS):
+            added_trails = self.add_data_trails(trails, all_trails, trail_events_sum)
+            for a in added_trails:
+                trail_counters[a] = 0
+
+        # Map new buckets to trails
+        for b in buckets_add:
+            t, count = trail_counters.items()[-1]
+            event_buckets[b] = t
+            trail_counters[t] += 1
+            modified_trails.add(t)
+
+        self.update_trails(client, modified_trails, event_buckets)
+
+    def filter_trails(self, client):
+        # we skip using the resource manager as we're potentially changing the set
+        all_trails = [t for t in client.describe_trails().get('trailList', ())]
+        data_trails = [t for t in all_trails if t['Name'].startswith(self.data['trail_prefix'])]
+        return data_trails, all_trails
+
+    def update_trails(self, client, modified_trails, event_buckets):
+        tbuckets = {}
+        for b, t in event_buckets.items():
+            tbuckets.setdefault(t, []).append(b)
+
+        for t in modified_trails:
+            buckets = tbuckets[t]
+            buckets = ['arn:aws:s3:::{}/'.format(b) for b in buckets]
+            client.put_event_selectors(
+                TrailName=t,
+                EventSelectors=[{
+                    'IncludeManagementEvents': False,
+                    'ReadWriteType': 'All',
+                    'DataResources': [{
+                        'Type': 'AWS::S3::Object',
+                        'Values': buckets}]
+                }])
+
+    def add_data_trail(self, client, trails, all_trails, trail_events_sum):
+        trails_needed = int(math.floor(float(trail_events_sum) / self.TRAIL_MAX_CARDINALITY)) + 1
+        if len(all_trails) + trails_needed > self.TRAIL_MAX_CARDINALITY:
+            raise RuntimeError("Missing capacity for adding more trails")
+        data_trails = [t['Name'] for t in trails]
+        data_trails.sort()
+        seq = data_trails and int(data_trails[0].rsplit('-', 1)) + 1 or 1
+        added = []
+        for n in range(trails_needed):
+            name = "%s-%d" % (self.data['trail_prefix'], seq)
+            client.create_trail(
+                TrailName=name,
+                S3BucketName=self.data['trail_bucket'],
+                SnsTopicName=self.data['trail_topic'],
+                IsMultiRegion=True,
+                EnableLogFileValidation=True,
+                IncludeGlobalServiceEvents=True)
+            seq += 1
+            added.append(name)
+        return added
+
+
 @filters.register('data-events')
 class DataEvents(Filter, TrailEventsBase):
 
