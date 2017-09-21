@@ -2008,7 +2008,6 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         # Determine adds and removes
         if self.data.get('sync-all'):
             buckets_remove = set(event_buckets).difference(all_buckets)
-  
         buckets_add = set(data_buckets).difference(event_buckets)
 
         # Garbage collect bookeeping if syncing
@@ -2071,7 +2070,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                         'Values': buckets}]
                 }])
 
-    def add_data_trail(self, client, trails, all_trails, trail_events_sum):
+    def add_data_trails(self, client, trails, all_trails, trail_events_sum):
         # TODO: support non multi-region trails
         trail_cfg = self.data.get('data-trails', {})
         trails_needed = (
@@ -2095,7 +2094,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
             IncludeGlobalServiceEvents=True)
 
         if 'multi-region' in trail_cfg:
-            params['IsMultiRegion'] = True,
+            params['IsMultiRegionTrail'] = True,
             params['EnableLogFileValidation'] = True
             params['IncludeGlobalServiceEvents'] = True
 

@@ -93,6 +93,7 @@ def generateBucketContents(s3, bucket, contents=None):
             ContentType='text/plain')
 
 
+
 class BucketMetrics(BaseTest):
 
     def test_metrics(self):
