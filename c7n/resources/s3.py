@@ -2000,7 +2000,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
             trail_events_sum += count
         trail_events_sum += len(buckets_add)
         if trail_events_sum > (len(trail_counters) * self.TRAIL_MAX_EVENTS):
-            added_trails = self.add_data_trails(trails, all_trails, trail_events_sum)
+            added_trails = self.add_data_trail(trails, all_trails, trail_events_sum)
             for a in added_trails:
                 trail_counters[a] = 0
 
@@ -2065,7 +2065,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                 Name=name,
                 S3BucketName=self.data['trail_bucket'],
                 SnsTopicName=self.data['trail_topic'],
-                IsMultiRegion=True,
+                IsMultiRegionTrail=True,
                 EnableLogFileValidation=True,
                 IncludeGlobalServiceEvents=True)
             seq += 1
