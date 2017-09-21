@@ -39,6 +39,7 @@ Actions:
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import Counter
 import functools
 import json
 import itertools
@@ -1968,7 +1969,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         client = session.client('cloudtrail')
         trails, all_trails = self.get_trails(client)
         s3 = session.client('s3')
-        modified_trails = set()
+        modified_trails, added_trails = set(), None
 
         # Fetch a list of all buckets to facilitate garbage collection
         all_buckets = set([b['Name'] for b in s3.list_buckets().get('Buckets', ())])
@@ -1993,8 +1994,8 @@ class SetDataEvents(BaseAction, TrailEventsBase):
             del event_buckets[b]
 
         # Do we need to add more trails
-        trails_events_sum = 0
-        for t, count in trail_counters:
+        trail_events_sum = 0
+        for t, count in trail_counters.items():
             trail_events_sum += count
         trail_events_sum += len(buckets_add)
         if trail_events_sum > (len(trail_counters) * self.TRAIL_MAX_EVENTS):
@@ -2011,7 +2012,13 @@ class SetDataEvents(BaseAction, TrailEventsBase):
 
         self.update_trails(client, modified_trails, event_buckets)
 
-    def filter_trails(self, client):
+        if buckets_remove or buckets_add or added_trails:
+            return {
+                'BucketsAdded': list(buckets_add),
+                'BucketsRemoved': list(buckets_remove),
+                'TrailsAdded': list(added_trails)}
+
+    def get_trails(self, client):
         # we skip using the resource manager as we're potentially changing the set
         all_trails = [t for t in client.describe_trails().get('trailList', ())]
         data_trails = [t for t in all_trails if t['Name'].startswith(self.data['trail_prefix'])]
@@ -2021,7 +2028,6 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         tbuckets = {}
         for b, t in event_buckets.items():
             tbuckets.setdefault(t, []).append(b)
-
         for t in modified_trails:
             buckets = tbuckets[t]
             buckets = ['arn:aws:s3:::{}/'.format(b) for b in buckets]
@@ -2036,9 +2042,15 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                 }])
 
     def add_data_trail(self, client, trails, all_trails, trail_events_sum):
-        trails_needed = int(math.floor(float(trail_events_sum) / self.TRAIL_MAX_CARDINALITY)) + 1
-        if len(all_trails) + trails_needed > self.TRAIL_MAX_CARDINALITY:
-            raise RuntimeError("Missing capacity for adding more trails")
+        # TODO: support non multi-region trails
+        trails_needed = (
+            int(math.floor(float(trail_events_sum) /
+                self.TRAIL_MAX_CARDINALITY)) + 1 - len(trails))
+        if (len(all_trails) + trails_needed >
+                self.TRAIL_MAX_CARDINALITY) or self.data.get('create_trails'):
+            raise RuntimeError(
+                "Missing capacity for adding more trails add:%d current:%d max:%d" % (
+                    trails_needed, len(all_trails), self.TRAIL_MAX_CARDINALITY))
         data_trails = [t['Name'] for t in trails]
         data_trails.sort()
         seq = data_trails and int(data_trails[0].rsplit('-', 1)) + 1 or 1
@@ -2068,19 +2080,18 @@ class DataEvents(Filter, TrailEventsBase):
     def process(self, resources, event=None):
         trails = self.manager.get_resource_manager('cloudtrail').resources()
         client = local_session(self.manager.session_factory).client('cloudtrail')
-        event_buckets =  self.get_event_buckets(client, trails)
+        event_buckets = self.get_event_buckets(client, trails)
+        ops = {
+            'present': lambda x: x['Name'] in event_buckets,
+            'absent': lambda x: x['Name'] not in event_buckets}
 
-        op_in = lambda x: x['Name'] in event_buckets
-        op_out = lambda x: x['Name'] not in event_buckets
-        op = (self.data.get('state') == 'present'
-                  and op_in or op_out)
-
+        op = ops[self.data['state']]
         results = []
         for b in resources:
             if op(b):
                 results.append(b)
         return results
-            
+
 
 @filters.register('inventory')
 class Inventory(ValueFilter):
@@ -2108,7 +2119,7 @@ class Inventory(ValueFilter):
         return results
 
     def process_bucket(self, b):
-        if not 'c7n:inventories' in b:
+        if 'c7n:inventories' not in b:
             client = bucket_client(local_session(self.manager.session_factory), b)
             inventories = client.list_bucket_inventory_configurations(
                 Bucket=b['Name']).get('InventoryConfigurationList', [])
