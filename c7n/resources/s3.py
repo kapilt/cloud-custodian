@@ -2065,7 +2065,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
                 Name=name,
                 S3BucketName=self.data['trail_bucket'],
                 SnsTopicName=self.data['trail_topic'],
-                IsMultiRegion=True,
+                IsMultiRegionTrail=True,
                 EnableLogFileValidation=True,
                 IncludeGlobalServiceEvents=True)
             seq += 1
