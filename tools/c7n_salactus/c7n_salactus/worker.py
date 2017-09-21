@@ -707,8 +707,14 @@ def process_bucket_inventory(bid, inventory_bucket, inventory_prefix):
     session = boto3.Session()
     s3 = session.client('s3', region_name=region, config=s3config)
     with bucket_ops(bid, 'inventory'):
-        for page in load_bucket_inventory(
-                s3, inventory_bucket, inventory_prefix, versioned):
+        page_iterator = load_bucket_inventory(
+            s3, inventory_bucket, inventory_prefix, versioned)
+        if page_inventory is None:
+            # case: inventory configured but not delivered yet
+            # action: dispatch to bucket partition (assumes 100k+ for inventory)
+            # - todo consider max inventory age/staleness for usage
+            invoke(process_bucket_partitions, bid)
+        for page in page_iterator:
             invoke(process_keyset, bid, page)
 
 

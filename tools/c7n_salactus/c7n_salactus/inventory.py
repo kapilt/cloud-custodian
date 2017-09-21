@@ -63,6 +63,9 @@ def load_bucket_inventory(client, inventory_bucket, inventory_prefix, versioned)
         Bucket=inventory_bucket, Prefix=key_prefix).get('Contents', [])
     keys = [k['Key'] for k in keys if k['Key'].endswith('.json')]
     keys.sort()
+    if not keys:
+        # no manifest delivery
+        return None
     latest_manifest = keys[-1]
     manifest = client.get_object(Bucket=inventory_bucket, Key=latest_manifest)
     manifest_data = json.load(manifest['Body'])
