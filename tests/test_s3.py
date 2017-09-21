@@ -107,7 +107,7 @@ class BucketDataEvents(BaseTest):
                  'state': 'absent'}],
             'actions': [
                 {'type': 'set-data-events',
-                 'sync-all': 'true',
+                 'sync-all': True,
                  'data-trails': {
                      'create': True,
                      'name-prefix': 'S3-DataEvent',
