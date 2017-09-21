@@ -2086,11 +2086,7 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         seq = data_trails and int(data_trails[0].rsplit('-', 1)) + 1 or 1
         added = []
 
-        params = dict(
-            S3BucketName=trail_cfg['s3-bucket'],
-            IsMultiRegion=True,
-            EnableLogFileValidation=True,
-            IncludeGlobalServiceEvents=True)
+        params = dict(S3BucketName=trail_cfg['s3-bucket'])
 
         if 'key-id' in trail_cfg:
             params['KmsKeyId'] = trail_cfg['key-id']
