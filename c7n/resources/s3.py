@@ -1989,7 +1989,11 @@ class SetDataEvents(BaseAction, TrailEventsBase):
 
     def process(self, resources):
         session = local_session(self.manager.session_factory)
-        client = session.client('cloudtrail')
+        region = self.data['data-trails'].get('multi-region')
+        if region:
+            client = session.client('cloudtrail', region_name=region)
+        else:
+            client = session.client('cloudtrail')
         trails, all_trails = self.get_trails(client)
         s3 = session.client('s3')
         modified_trails, added_trails = set(), None
