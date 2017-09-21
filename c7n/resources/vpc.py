@@ -47,6 +47,7 @@ class Vpc(QueryResourceManager):
         config_type = 'AWS::EC2::VPC'
         id_prefix = "vpc-"
 
+
 @Vpc.filter_registry.register('vpc-attribute')
 class VpcAttribute(Filter):
 
@@ -54,6 +55,8 @@ class VpcAttribute(Filter):
         'vpc-attribute',
         name={'enum': ['enableDnsSupport', 'enableDnsHostnames']},
         value={'type': 'boolean'})
+
+    permissions = ('ec2:DescribeVpcAttribute',)
 
     def process(self, resources, event=None):
 
