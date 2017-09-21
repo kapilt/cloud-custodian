@@ -2088,11 +2088,16 @@ class SetDataEvents(BaseAction, TrailEventsBase):
 
         params = dict(
             S3BucketName=trail_cfg['s3-bucket'],
-            SnsTopicName=trail_cfg['s3-prefix'],
             IsMultiRegion=True,
             EnableLogFileValidation=True,
             IncludeGlobalServiceEvents=True)
 
+        if 'key-id' in trail_cfg:
+            params['KmsKeyId'] = trail_cfg['key-id']
+        if 's3-prefix' in trail_cfg:
+            params['S3Prefix'] = trail_cfg['s3-prefix']
+        if 'topic' in trail_cfg:
+            params['SnsTopicName'] = trail_cfg['topic']
         if 'multi-region' in trail_cfg:
             params['IsMultiRegionTrail'] = True,
             params['EnableLogFileValidation'] = True
