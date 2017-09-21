@@ -2014,6 +2014,9 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         self.update_trails(client, modified_trails, event_buckets)
 
         if buckets_remove or buckets_add or added_trails:
+            self.log.info(
+                "s3 data events buckets add:%d remove:%d trails added:%d",
+                len(buckets_add), len(buckets_remove), len(added_trails))
             return {
                 'BucketsAdded': list(buckets_add),
                 'BucketsRemoved': list(buckets_remove),
