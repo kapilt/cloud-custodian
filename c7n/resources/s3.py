@@ -58,7 +58,7 @@ from botocore.vendored.requests.exceptions import SSLError
 from concurrent.futures import as_completed
 from dateutil.parser import parse as parse_date
 
-from c7n.actions import ActionRegistry, BaseAction, AutoTagUser, PutMetric
+from c7n.actions import ActionRegistry, BaseAction, AutoTagUser, PutMetric, RemovePolicyBase
 from c7n.filters import (
     FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter, ValueFilter)
 from c7n.manager import resources
@@ -811,7 +811,7 @@ class NoOp(BucketActionBase):
 
 
 @actions.register('remove-statements')
-class RemovePolicyStatement(BucketActionBase):
+class RemovePolicyStatement(RemovePolicyBase):
     """Action to remove policy statements from S3 buckets
 
     :example:
@@ -831,12 +831,6 @@ class RemovePolicyStatement(BucketActionBase):
                       - RequiredEncryptedPutObject
     """
 
-    schema = type_schema(
-        'remove-statements',
-        required=['statement_ids'],
-        statement_ids={'oneOf': [
-            {'enum': ['matched']},
-            {'type': 'array', 'items': {'type': 'string'}}]})
     permissions = ("s3:PutBucketPolicy", "s3:DeleteBucketPolicy")
 
     def process(self, buckets):
@@ -849,35 +843,24 @@ class RemovePolicyStatement(BucketActionBase):
                 if f.exception():
                     self.log.error('error modifying bucket:%s\n%s',
                                    b['Name'], f.exception())
-                elif f.result():
-                    results.append(b)
+                results += filter(None, [f.result()])
             return results
 
     def process_bucket(self, bucket):
         p = bucket.get('Policy')
         if p is None:
             return
-        else:
-            p = json.loads(p)
 
-        found = []
-        statement_ids = self.data.get('statement_ids')
-        statements = p.get('Statement', [])
-        resource_statements = bucket.get(
-            CrossAccountAccessFilter.annotation_key, ())
+        p = json.loads(p)
 
-        for s in list(statements):
-            if statement_ids == 'matched':
-                if s in resource_statements:
-                    found.append(s)
-                    statements.remove(s)
-            elif s['Sid'] in self.data['statement_ids']:
-                found.append(s)
-                statements.remove(s)
+        statements, found = self.process_policy(
+            p, bucket, CrossAccountAccessFilter.annotation_key)
+
         if not found:
             return
 
         s3 = bucket_client(local_session(self.manager.session_factory), bucket)
+
         if not statements:
             s3.delete_bucket_policy(Bucket=bucket['Name'])
         else:
@@ -1512,10 +1495,12 @@ class EncryptExtantKeys(ScanBucket):
         if info.get('ServerSideEncryption') == 'AES256' and not self.kms_id:
             return False
 
-        # If the data is already encrypted with KMS and the same key is provided
-        # then we don't need to do anything
-        if info.get('ServerSideEncryption') == 'aws:kms' and self.kms_id:
-            # Test using `in` because SSEKMSKeyId is the full ARN
+        if info.get('ServerSideEncryption') == 'aws:kms':
+            # If we're not looking for a specific key any key will do.
+            if not self.kms_id:
+                return False
+            # If we're configured to use a specific key and the key matches
+            # note this is not a strict equality match.
             if self.kms_id in info.get('SSEKMSKeyId', ''):
                 return False
 
