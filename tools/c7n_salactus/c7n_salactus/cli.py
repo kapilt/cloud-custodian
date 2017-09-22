@@ -443,12 +443,14 @@ def format_csv(buckets, fh, keys=()):
               help="filter to buckets in region", multiple=True)
 @click.option('--config', type=click.Path(),
               help="config file for accounts")
+@click.option('--sort',
+              help="sort output by column")
 @click.option('--tagprefix',
               help="include account tag value by prefix")
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
             format=None, incomplete=False, oversize=False, region=(),
-            not_region=(), output=None, config=None, tagprefix=None):
+            not_region=(), output=None, config=None, sort=None, tagprefix=None):
     """Report on stats by bucket"""
 
     d = db.db(dbpath)
@@ -493,6 +495,9 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
             setattr(b, tagprefix[:-1], account_data[b.account])
         buckets.append(b)
 
+    if sort:
+        key = operator.attrgetter(sort)
+        buckets = reversed(sorted(buckets, key=key))
     formatter = format == 'csv' and format_csv or format_plain
     keys = tagprefix and (tagprefix[:-1],) or ()
     formatter(buckets, output, keys=keys)
