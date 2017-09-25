@@ -497,7 +497,7 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
 
     if sort:
         key = operator.attrgetter(sort)
-        buckets = reversed(sorted(buckets, key=key))
+        buckets = list(reversed(sorted(buckets, key=key)))
     formatter = format == 'csv' and format_csv or format_plain
     keys = tagprefix and (tagprefix[:-1],) or ()
     formatter(buckets, output, keys=keys)
