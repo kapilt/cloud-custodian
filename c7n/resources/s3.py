@@ -2028,6 +2028,9 @@ class SetDataEvents(BaseAction, TrailEventsBase):
 
         self.update_trails(client, modified_trails, event_buckets)
 
+        if added_trails:
+            self.activate_trails(client, added_trails)
+
         if buckets_remove or buckets_add or added_trails:
             self.log.info(
                 "s3 data events buckets add:%d remove:%d trails added:%d",
@@ -2050,6 +2053,10 @@ class SetDataEvents(BaseAction, TrailEventsBase):
         data_trails = [t for t in all_trails if t['Name'].startswith(
             self.data['data-trails']['name-prefix'])]
         return data_trails, all_trails
+
+    def activate_trails(self, client, added_trails):
+        for t in added_trails:
+            client.start_logging(Name=t)
 
     def update_trails(self, client, modified_trails, event_buckets):
         tbuckets = {}
@@ -2102,7 +2109,6 @@ class SetDataEvents(BaseAction, TrailEventsBase):
             client.create_trail(**params)
             seq += 1
             added.append(name)
-            client.start_logging(Name=name)
         return added
 
 
