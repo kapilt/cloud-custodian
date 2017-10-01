@@ -320,8 +320,11 @@ def format_accounts_plain(accounts, fh):
 @click.option('--not-region',
               help="only consider buckets not from the given region",
               multiple=True)
+@click.option('--exclude',
+              help="Exclude bucket", multiple=True)
 def accounts(dbpath, output, format, account,
-             config=None, tag=None, tagprefix=None, region=(), not_region=()):
+             config=None, tag=None, tagprefix=None, region=(),
+             not_region=(), exclude=None):
     """Report on stats by account"""
     d = db.db(dbpath)
     accounts = d.accounts()
@@ -330,14 +333,17 @@ def accounts(dbpath, output, format, account,
 
     if region:
         for a in accounts:
-            a.buckets = [b for b in a.buckets if b if b.region in region]
+            a.buckets = [b for b in a.buckets if b.region in region]
         accounts = [a for a in accounts if a.bucket_count]
 
     if not_region:
         for a in accounts:
-            a.buckets = [b for b in a.buckets if b if b.region not in not_region]
+            a.buckets = [b for b in a.buckets if b.region not in not_region]
         accounts = [a for a in accounts if a.bucket_count]
 
+    if exclude:
+        for a in accounts:
+            a.buckets = [b for b in a.buckets if b.name not in exclude]
     if config and tagprefix:
         account_map = {account.name: account for account in accounts}
 
@@ -447,10 +453,13 @@ def format_csv(buckets, fh, keys=()):
               help="sort output by column")
 @click.option('--tagprefix',
               help="include account tag value by prefix")
+@click.option('--exclude',
+              help="Exclude bucket", multiple=True)
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
             format=None, incomplete=False, oversize=False, region=(),
-            not_region=(), output=None, config=None, sort=None, tagprefix=None):
+            not_region=(), output=None, config=None, sort=None, tagprefix=None,
+            exclude=None):
     """Report on stats by bucket"""
 
     d = db.db(dbpath)
@@ -472,6 +481,8 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
     for b in sorted(d.buckets(account),
                     key=operator.attrgetter('bucket_id')):
         if bucket and b.name not in bucket:
+            continue
+        if exclude and b.name in exclude:
             continue
         if matched and not b.matched:
             continue
