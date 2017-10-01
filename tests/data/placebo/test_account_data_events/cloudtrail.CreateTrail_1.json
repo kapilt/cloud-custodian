@@ -1,0 +1,23 @@
+{
+    "status_code": 200, 
+    "data": {
+        "IncludeGlobalServiceEvents": true, 
+        "Name": "S3-DataEvents", 
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 200, 
+            "RequestId": "7d9840e9-a6de-11e7-b3f7-6dfa83891d93", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "7d9840e9-a6de-11e7-b3f7-6dfa83891d93", 
+                "date": "Sun, 01 Oct 2017 19:26:57 GMT", 
+                "content-length": "258", 
+                "content-type": "application/x-amz-json-1.1"
+            }
+        }, 
+        "S3KeyPrefix": "DataEvents", 
+        "TrailARN": "arn:aws:cloudtrail:us-east-1:644160558196:trail/S3-DataEvents", 
+        "LogFileValidationEnabled": true, 
+        "IsMultiRegionTrail": true, 
+        "S3BucketName": "custodian-skunk-trails"
+    }
+}

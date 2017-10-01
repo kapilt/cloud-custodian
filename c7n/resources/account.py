@@ -764,7 +764,8 @@ class EnableDataEvents(BaseAction):
     (https://goo.gl/1ux7RG).
 
     This trail should NOT be used for api management events, the
-    configuration here is soley for data events.
+    configuration here is soley for data events. If directed to create
+    a trail this will do so without management events.
 
     :example:
 
@@ -782,7 +783,7 @@ class EnableDataEvents(BaseAction):
     """
 
     schema = type_schema(
-        'enable-data-events', required=['data-trails'], **{
+        'enable-data-events', required=['data-trail'], **{
             'data-trail': {
                 'type': 'object',
                 'additionalProperties': False,
@@ -810,6 +811,12 @@ class EnableDataEvents(BaseAction):
                         'title': 'If creating, use this region for all data trails',
                         'type': 'string'}}}})
 
+    def validate(self):
+        if self.data['data-trail'].get('create'):
+            if 's3-bucket' not in self.data['data-trail']:
+                raise FilterValidationError(
+                    "If creating data trails, an s3-bucket is required")
+        return self
 
     def get_permissions(self):
         perms = [
@@ -822,7 +829,10 @@ class EnableDataEvents(BaseAction):
                 'cloudtrail:CreateTrail', 'cloudtrail:StartLogging'])
         return perms
 
-    def add_trail(self, client, trail_cfg):
+    def add_data_trail(self, client, trail_cfg):
+        if not trail_cfg.get('create'):
+            raise ValueError(
+                "s3 data event trail missing and not configured to create")
         params = dict(
             Name=trail_cfg['name'],
             S3BucketName=trail_cfg['s3-bucket'],
@@ -838,51 +848,65 @@ class EnableDataEvents(BaseAction):
             params['IsMultiRegionTrail'] = True
 
         client.create_trail(**params)
-        client.start_logging(Name=trail_cfg['name'])
         return {'Name': trail_cfg['name']}
 
     def process(self, resources):
         session = local_session(self.manager.session_factory)
-        region = self.data['data-trails'].get('multi-region')
+        region = self.data['data-trail'].get('multi-region')
+
         if region:
             client = session.client('cloudtrail', region_name=region)
         else:
             client = session.client('cloudtrail')
 
+        added = False
         tconfig = self.data['data-trail']
         trails = client.describe_trails(
             trailNameList=[tconfig['name']]).get('trailList', ())
         if not trails:
             trail = self.add_data_trail(client, tconfig)
+            added = True
         else:
             trail = trails[0]
 
         events = client.get_event_selectors(
-            TrailName=trail['Name']).get('EventSelectors', {})
-        if 'DataResources' not in events:
-            data_selectors = []
-        else:
+            TrailName=trail['Name']).get('EventSelectors', [])
+
+        for e in events:
             found = False
-            for data_events in events['DataResources']:
+            if not e.get('DataResources'):
+                continue
+            for data_events in e['DataResources']:
                 if data_events['Type'] != 'AWS::S3::Object':
-                    data_selectors.append(data_event)
                     continue
                 for b in data_events['Values']:
-                    if b.rsplit(':')[-2].strip('/') == '':
+                    if b.rsplit(':')[-1].strip('/') == '':
                         found = True
                         break
             if found:
+                resources[0]['c7n_data_trail'] = trail
                 return
+
+        # Opinionated choice, separate api and data events.
+        event_count = len(events)
+        events = [e for e in events if not e.get('IncludeManagementEvents')]
+        if len(events) != event_count:
+            self.log.warning("removing api trail from data trail")
 
         # future proof'd for other data events, for s3 this trail
         # encompasses all the buckets in the account.
-        data_selectors.append({
-            'Type': 'AWS::S3::Object',
-            'Values': ['arn:aws:s3:::']})
 
+        events.append({
+            'IncludeManagementEvents': False,
+            'ReadWriteType': tconfig.get('type', 'All'),
+            'DataResources': [{
+                'Type': 'AWS::S3::Object',
+                'Values': ['arn:aws:s3:::']}]})
         client.put_event_selectors(
             TrailName=trail['Name'],
-            EventSelectors=[{
-                'IncludeManagementEvents': False,
-                'ReadWriteType': tconfig.get('type', 'All'),
-                'DataResources': data_selectors}])
+            EventSelectors=events)
+
+        if added:
+            client.start_logging(Name=tconfig['name'])
+
+        resources[0]['c7n_data_trail'] = trail
