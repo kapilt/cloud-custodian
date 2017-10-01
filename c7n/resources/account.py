@@ -753,3 +753,135 @@ class HasVirtualMFA(Filter):
 
     def process(self, resources, event=None):
         return list(filter(self.account_has_virtual_mfa, resources))
+
+
+@actions.register('enable-data-events')
+class EnableDataEvents(BaseAction):
+    """Ensure all buckets in account are setup to log data events.
+
+    Note this works via a single trail for data events per
+    (https://goo.gl/1ux7RG).
+
+    This trail should NOT be used for api management events, the
+    configuration here is soley for data events.
+
+    :example:
+
+      If you have an existing trail bucket
+      .. code-block: yaml
+
+        policies:
+          - name: s3-remove-owner-tag
+            resource: actions
+            actions:
+              - type: enable-data-events
+                data-trail:
+                  name: s3-events
+                  multi-region: us-east-1
+    """
+
+    schema = type_schema(
+        'enable-data-events', required=['data-trails'], **{
+            'data-trail': {
+                'type': 'object',
+                'additionalProperties': False,
+                'required': ['name'],
+                'properties': {
+                    'create': {
+                        'title': 'Should we create trail if needed for events?',
+                        'type': 'boolean'},
+                    'type': {'enum': ['ReadOnly', 'WriteOnly', 'All']},
+                    'name': {
+                        'title': 'The name of the event trail',
+                        'type': 'string'},
+                    'topic': {
+                        'title': 'If creating, the sns topic for the trail to send updates',
+                        'type': 'string'},
+                    's3-bucket': {
+                        'title': 'If creating, the bucket to store trail event data',
+                        'type': 'string'},
+                    's3-prefix': {'type': 'string'},
+                    'key-id': {
+                        'title': 'If creating, Enable kms on the trail',
+                        'type': 'string'},
+                    # region that we're aggregating via trails.
+                    'multi-region': {
+                        'title': 'If creating, use this region for all data trails',
+                        'type': 'string'}}}})
+
+
+    def get_permissions(self):
+        perms = [
+            'cloudtrail:DescribeTrails',
+            'cloudtrail:GetEventSelectors',
+            'cloudtrail:PutEventSelectors']
+
+        if self.data.get('data-trail', {}).get('create'):
+            perms.extend([
+                'cloudtrail:CreateTrail', 'cloudtrail:StartLogging'])
+        return perms
+
+    def add_trail(self, client, trail_cfg):
+        params = dict(
+            Name=trail_cfg['name'],
+            S3BucketName=trail_cfg['s3-bucket'],
+            EnableLogFileValidation=True)
+
+        if 'key-id' in trail_cfg:
+            params['KmsKeyId'] = trail_cfg['key-id']
+        if 's3-prefix' in trail_cfg:
+            params['S3KeyPrefix'] = trail_cfg['s3-prefix']
+        if 'topic' in trail_cfg:
+            params['SnsTopicName'] = trail_cfg['topic']
+        if 'multi-region' in trail_cfg:
+            params['IsMultiRegionTrail'] = True
+
+        client.create_trail(**params)
+        client.start_logging(Name=trail_cfg['name'])
+        return {'Name': trail_cfg['name']}
+
+    def process(self, resources):
+        session = local_session(self.manager.session_factory)
+        region = self.data['data-trails'].get('multi-region')
+        if region:
+            client = session.client('cloudtrail', region_name=region)
+        else:
+            client = session.client('cloudtrail')
+
+        tconfig = self.data['data-trail']
+        trails = client.describe_trails(
+            trailNameList=[tconfig['name']]).get('trailList', ())
+        if not trails:
+            trail = self.add_data_trail(client, tconfig)
+        else:
+            trail = trails[0]
+
+        events = client.get_event_selectors(
+            TrailName=trail['Name']).get('EventSelectors', {})
+        if 'DataResources' not in events:
+            data_selectors = []
+        else:
+            found = False
+            for data_events in events['DataResources']:
+                if data_events['Type'] != 'AWS::S3::Object':
+                    data_selectors.append(data_event)
+                    continue
+                for b in data_events['Values']:
+                    if b.rsplit(':')[-2].strip('/') == '':
+                        found = True
+                        break
+            if found:
+                return
+
+        # future proof'd for other data events, for s3 this trail
+        # encompasses all the buckets in the account.
+        data_selectors.append({
+            'Type': 'AWS::S3::Object',
+            'Values': ['arn:aws:s3:::']})
+
+        client.put_event_selectors(
+            TrailName=trail['Name'],
+            EventSelectors=[{
+                'IncludeManagementEvents': False,
+                'ReadWriteType': tconfig.get('type', 'All'),
+                'DataResources': data_selectors}])
