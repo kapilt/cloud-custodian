@@ -14,6 +14,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from .common import BaseTest
+from c7n.executor import MainThreadExecutor
 from c7n.utils import local_session
 from c7n.filters import FilterValidationError
 from jsonschema.exceptions import ValidationError
@@ -21,7 +22,6 @@ from jsonschema.exceptions import ValidationError
 
 import datetime
 from dateutil import parser
-import time
 
 from .test_offhours import mock_datetime_now
 from .common import Config, functional
@@ -525,6 +525,8 @@ class AccountDataEvents(BaseTest):
         self.assertFalse(
             'S3-DataEvents' in {t['Name'] for t in
                                 client.describe_trails().get('trailList')})
+        self.addCleanup(client.delete_trail, Name='S3-DataEvents')
+
         p = self.load_policy({
             'name': 's3-data-events',
             'resource': 'account',
@@ -546,3 +548,17 @@ class AccountDataEvents(BaseTest):
              'IncludeManagementEvents': False,
              'ReadWriteType': 'All'})
 
+        # Check s3 filter for data events reports them correctly
+        from c7n.resources import s3
+        self.patch(s3.S3, 'executor_factory', MainThreadExecutor)
+        self.patch(s3, 'S3_AUGMENT_TABLE', [])
+        p = self.load_policy({
+            'name': 's3-data-check',
+            'resource': 's3',
+            'filters': [
+                {'Name': 'custodian-skunk-trails'},
+                {'type': 'data-events',
+                 'state': 'present'}]},
+            session_factory=session_factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
