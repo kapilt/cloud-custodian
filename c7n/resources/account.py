@@ -769,17 +769,16 @@ class EnableDataEvents(BaseAction):
 
     :example:
 
-      If you have an existing trail bucket
-      .. code-block: yaml
+        .. code-block: yaml
 
-        policies:
-          - name: s3-remove-owner-tag
-            resource: actions
-            actions:
-              - type: enable-data-events
-                data-trail:
-                  name: s3-events
-                  multi-region: us-east-1
+            policies:
+              - name: s3-remove-owner-tag
+                resource: actions
+                actions:
+                 - type: enable-data-events
+                   data-trail:
+                     name: s3-events
+                     multi-region: us-east-1
     """
 
     schema = type_schema(

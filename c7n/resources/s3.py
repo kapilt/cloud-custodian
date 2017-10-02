@@ -115,15 +115,6 @@ class S3(query.QueryResourceManager):
         perms.extend([n[0] for n in S3_AUGMENT_TABLE])
         return perms
 
-    def augment(self, buckets):
-        with self.executor_factory(
-                max_workers=min((10, len(buckets) + 1))) as w:
-            results = w.map(
-                assemble_bucket,
-                zip(itertools.repeat(self.session_factory), buckets))
-            results = list(filter(None, results))
-            return results
-
 
 class DescribeS3(query.DescribeSource):
 
@@ -190,7 +181,7 @@ class ConfigS3(query.ConfigSource):
                 'owner']['displayName']
         resource['Acl']['Grants'] = grants = []
 
-        for g in item_value['grantList']:
+        for g in (item_value.get('grantList') or ()):
             if 'id' not in g['grantee']:
                 assert g['grantee'] in self.GRANTEE_MAP, "unknown grantee %s" % g
                 rg = {'Type': 'Group', 'URI': self.GRANTEE_MAP[g['grantee']]}
@@ -261,7 +252,7 @@ class ConfigS3(query.ConfigSource):
             rr['ID'] = r['id']
             if r.get('prefix'):
                 rr['Prefix'] = r['prefix']
-            if 'filter' not in r:
+            if 'filter' not in r or not r['filter']:
                 continue
 
             rr['Filter'] = self.convertLifePredicate(r['filter']['predicate'])
@@ -304,8 +295,9 @@ class ConfigS3(query.ConfigSource):
             ninfo['Id'] = nid
             ninfo['Events'] = n['events']
             rules = []
-            for r in n['filter'].get('s3KeyFilter', {}).get('filterRules', []):
-                rules.append({'Name': r['name'], 'Value': r['value']})
+            if n['filter']:
+                for r in n['filter'].get('s3KeyFilter', {}).get('filterRules', []):
+                    rules.append({'Name': r['name'], 'Value': r['value']})
             if rules:
                 ninfo['Filter'] = {'Key': {'FilterRules': rules}}
         resource['Notification'] = d
