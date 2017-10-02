@@ -48,32 +48,6 @@ class Vpc(QueryResourceManager):
         id_prefix = "vpc-"
 
 
-@Vpc.filter_registry.register('vpc-attribute')
-class VpcAttribute(Filter):
-
-    schema = type_schema(
-        'vpc-attribute',
-        name={'enum': ['enableDnsSupport', 'enableDnsHostnames']},
-        value={'type': 'boolean'})
-
-    permissions = ('ec2:DescribeVpcAttribute',)
-
-    def process(self, resources, event=None):
-
-        client = local_session(self.manager.session_factory).client('ec2')
-
-        results = []
-        value = self.data.get('value')
-        for r in resources:
-            attr_name = self.data['name']
-            attr_key = "%s%s" % (attr_name[0].upper(), attr_name[1:])
-            if client.describe_vpc_attribute(
-                    VpcId=r['VpcId'],
-                    Attribute=attr_name)[attr_key].get('Value') == value:
-                results.append(r)
-        return results
-
-
 @Vpc.filter_registry.register('flow-logs')
 class FlowLogFilter(Filter):
     """Are flow logs enabled on the resource.

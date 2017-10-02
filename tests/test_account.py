@@ -520,7 +520,7 @@ class AccountDataEvents(BaseTest):
 
     @functional
     def test_data_events(self):
-        session_factory = self.record_flight_data('test_account_data_events')
+        session_factory = self.replay_flight_data('test_account_data_events')
         client = session_factory().client('cloudtrail')
         self.assertFalse(
             'S3-DataEvents' in {t['Name'] for t in

@@ -39,7 +39,6 @@ Actions:
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import Counter
 import functools
 import json
 import itertools
@@ -58,9 +57,11 @@ from botocore.vendored.requests.exceptions import SSLError
 from concurrent.futures import as_completed
 from dateutil.parser import parse as parse_date
 
-from c7n.actions import ActionRegistry, BaseAction, AutoTagUser, PutMetric, RemovePolicyBase
+from c7n.actions import (
+    ActionRegistry, BaseAction, AutoTagUser, PutMetric, RemovePolicyBase)
 from c7n.filters import (
-    FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter, ValueFilter)
+    FilterRegistry, Filter, CrossAccountAccessFilter, MetricsFilter,
+    ValueFilter)
 from c7n.manager import resources
 from c7n import query
 from c7n.tags import RemoveTag, Tag, TagActionFilter, TagDelayedAction
@@ -1908,9 +1909,19 @@ class RemoveBucketTag(RemoveTag):
             self.manager.session_factory, resource_set, remove_tags=tags)
 
 
-class TrailEventsBase(object):
+@filters.register('data-events')
+class DataEvents(Filter):
+
+    schema = type_schema('data-events', state={'enum': ['present', 'absent']})
+    permissions = (
+        'cloudtrail:DescribeTrails',
+        'cloudtrail:GetEventSelectors')
 
     def get_event_buckets(self, client, trails):
+        """Return a mapping of bucket name to cloudtrail.
+
+        For wildcard trails the bucket name is ''.
+        """
         event_buckets = {}
         for t in trails:
             for events in client.get_event_selectors(
@@ -1924,203 +1935,17 @@ class TrailEventsBase(object):
                         event_buckets[b.rsplit(':')[-1].strip('/')] = t['Name']
         return event_buckets
 
-
-@actions.register('set-data-events')
-class SetDataEvents(BaseAction, TrailEventsBase):
-    """Set a bucket to send cloud trail data events
-
-    https://goo.gl/g1iQtX
-    """
-    schema = type_schema(
-        'set-data-events', required=['data-trails'], **{
-            'sync-all': {
-                'type': 'boolean',
-                'title': 'Should we sync all buckets to events?'},
-            'data-trails': {
-                'type': 'object',
-                'additionalProperties': False,
-                'required': ['name-prefix'],
-                'properties': {
-                    'create': {
-                        'title': 'Should we create trails as needed for events?',
-                        'type': 'boolean'},
-                    'name-prefix': {
-                        'title': 'The name prefix to use for event trails',
-                        'type': 'string'},
-                    'topic': {
-                        'title': 'The sns topic for the trail to send updates',
-                        'type': 'string'},
-                    's3-bucket': {
-                        'title': 'The bucket to store trail event data',
-                        'type': 'string'},
-                    's3-prefix': {'type': 'string'},
-                    'key-id': {
-                        'title': 'Enable kms on the trail',
-                        'type': 'string'},
-                    # region that we're aggregating via trails.
-                    'multi-region': {
-                        'title': 'If set use this region for all data trails',
-                        'type': 'string'}}}})
-
-    permissions = (
-        'cloudtrail:DescribeTrails',
-        'cloudtrail:GetEventSelectors',
-        'cloudtrail:CreateTrail',
-        'cloudtrail:StartLogging',
-        'cloudtrail:PutEventSelectors')
-
-    TRAIL_MAX_CARDINALITY = 5
-    TRAIL_MAX_EVENTS = 250
-
-    def process(self, resources):
-        session = local_session(self.manager.session_factory)
-        region = self.data['data-trails'].get('multi-region')
-        if region:
-            client = session.client('cloudtrail', region_name=region)
-        else:
-            client = session.client('cloudtrail')
-        trails, all_trails = self.get_trails(client)
-        modified_trails, added_trails = set(), None
-
-        # Fetch a list of all buckets to facilitate garbage collection
-        policy_buckets = set([b['Name'] for b in resources])
-        data_buckets = policy_buckets
-        if self.data.get('sync-all'):
-            all_buckets = self.get_buckets(session, resources)
-            data_buckets = all_buckets
-
-        # Get mapping and counters for current trail events
-        event_buckets = self.get_event_buckets(client, trails)
-        trail_counters = Counter()
-        for b, t in event_buckets.items():
-            trail_counters[t] += 1
-
-        # Determine adds and removes
-        if self.data.get('sync-all'):
-            buckets_remove = set(event_buckets).difference(all_buckets)
-        buckets_add = set(data_buckets).difference(event_buckets)
-
-        # Garbage collect bookeeping if syncing
-        if self.data.get('sync-all'):
-            for b in buckets_remove:
-                t = event_buckets[b]
-                trail_counters[t] -= 1
-                modified_trails.add(t)
-                del event_buckets[b]
-
-        # Do we need to add more trails
-        trail_events_sum = 0
-        for t, count in trail_counters.items():
-            trail_events_sum += count
-        trail_events_sum += len(buckets_add)
-        if trail_events_sum > (len(trail_counters) * self.TRAIL_MAX_EVENTS):
-            added_trails = self.add_data_trails(
-                client, trails, all_trails, trail_events_sum)
-            for a in added_trails:
-                trail_counters[a] = 0
-
-        # Map new buckets to trails
-        for b in buckets_add:
-            t, count = trail_counters.items()[-1]
-            event_buckets[b] = t
-            trail_counters[t] += 1
-            modified_trails.add(t)
-
-        self.update_trails(client, modified_trails, event_buckets)
-
-        if buckets_remove or buckets_add or added_trails:
-            self.log.info(
-                "s3 data events buckets add:%d remove:%d trails added:%d",
-                len(buckets_add), len(buckets_remove), len(added_trails))
-            return {
-                'BucketsAdded': list(buckets_add),
-                'BucketsRemoved': list(buckets_remove),
-                'TrailsAdded': list(added_trails)}
-
-    def get_buckets(self, session, resources):
-        s3 = session.client('s3')
-        all_buckets = set([b['Name'] for b in s3.list_buckets().get(
-            'Buckets', ())])
-        # TODO multi region location filtering
-        return all_buckets
-
-    def get_trails(self, client):
-        # we skip using the resource manager as we're potentially changing the set
-        all_trails = [t for t in client.describe_trails().get('trailList', ())]
-        data_trails = [t for t in all_trails if t['Name'].startswith(
-            self.data['data-trails']['name-prefix'])]
-        return data_trails, all_trails
-
-    def update_trails(self, client, modified_trails, event_buckets):
-        tbuckets = {}
-        for b, t in event_buckets.items():
-            tbuckets.setdefault(t, []).append(b)
-        for t in modified_trails:
-            buckets = tbuckets[t]
-            buckets = ['arn:aws:s3:::{}/'.format(b) for b in buckets]
-            client.put_event_selectors(
-                TrailName=t,
-                EventSelectors=[{
-                    'IncludeManagementEvents': False,
-                    'ReadWriteType': 'All',
-                    'DataResources': [{
-                        'Type': 'AWS::S3::Object',
-                        'Values': buckets}]
-                }])
-
-    def add_data_trails(self, client, trails, all_trails, trail_events_sum):
-        # TODO: support non multi-region trails
-        trail_cfg = self.data.get('data-trails', {})
-        trails_needed = (
-            int(math.floor(float(trail_events_sum) /
-                self.TRAIL_MAX_CARDINALITY)) + 1 - len(trails))
-        if (len(all_trails) + trails_needed >
-                self.TRAIL_MAX_CARDINALITY) or not trail_cfg.get('create'):
-            raise RuntimeError(
-                "Missing capacity for adding more trails add:%d current:%d max:%d" % (
-                    trails_needed, len(all_trails), self.TRAIL_MAX_CARDINALITY))
-        data_trails = [t['Name'] for t in trails]
-        data_trails.sort()
-        seq = data_trails and int(data_trails[0].rsplit('-', 1)) + 1 or 1
-        added = []
-
-        params = dict(
-            S3BucketName=trail_cfg['s3-bucket'], EnableLogFileValidation=True)
-
-        if 'key-id' in trail_cfg:
-            params['KmsKeyId'] = trail_cfg['key-id']
-        if 's3-prefix' in trail_cfg:
-            params['S3KeyPrefix'] = trail_cfg['s3-prefix']
-        if 'topic' in trail_cfg:
-            params['SnsTopicName'] = trail_cfg['topic']
-        if 'multi-region' in trail_cfg:
-            params['IsMultiRegionTrail'] = True
-
-        for n in range(trails_needed):
-            name = "%s-%d" % (trail_cfg['name-prefix'], seq)
-            params['Name'] = name
-            client.create_trail(**params)
-            seq += 1
-            added.append(name)
-            client.start_logging(Name=name)
-        return added
-
-
-@filters.register('data-events')
-class DataEvents(Filter, TrailEventsBase):
-
-    schema = type_schema('data-events', state={'enum': ['present', 'absent']})
-    permissions = (
-        'cloudtrail:DescribeTrails',
-        'cloudtrail:GetEventSelectors')
-
     def process(self, resources, event=None):
         trails = self.manager.get_resource_manager('cloudtrail').resources()
-        client = local_session(self.manager.session_factory).client('cloudtrail')
+        client = local_session(
+            self.manager.session_factory).client('cloudtrail')
         event_buckets = self.get_event_buckets(client, trails)
         ops = {
-            'present': lambda x: x['Name'] in event_buckets,
-            'absent': lambda x: x['Name'] not in event_buckets}
+            'present': lambda x: (
+                x['Name'] in event_buckets or '' in event_buckets),
+            'absent': (
+                lambda x: x['Name'] not in event_buckets and ''
+                not in event_buckets)}
 
         op = ops[self.data['state']]
         results = []
