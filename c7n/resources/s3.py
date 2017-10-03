@@ -124,7 +124,7 @@ class DescribeS3(query.DescribeSource):
             results = w.map(
                 assemble_bucket,
                 zip(itertools.repeat(self.manager.session_factory), buckets))
-            results = filter(None, results)
+            results = list(filter(None, results))
             return results
 
 
