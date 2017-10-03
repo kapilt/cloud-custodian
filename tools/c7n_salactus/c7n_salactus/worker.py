@@ -700,16 +700,22 @@ def process_bucket_inventory(bid, inventory_bucket, inventory_prefix):
     """Load last inventory dump and feed as key source.
     """
     log.info("Loading bucket %s keys from inventory s3://%s/%s",
-                 bid, inventory_bucket, inventory_prefix)
+             bid, inventory_bucket, inventory_prefix)
     account, bucket = bid.split(':', 1)
     region = connection.hget('bucket-regions', bid)
     versioned = bool(int(connection.hget('bucket-versions', bid)))
     session = boto3.Session()
     s3 = session.client('s3', region_name=region, config=s3config)
+
+    # find any key visitors with inventory filtering
+    account_info = json.loads(connection.hget('bucket-accounts', account))
+    ifilters = [v.inventory_filter for v
+                in get_key_visitors(account_info) if v.inventory_filter]
+
     with bucket_ops(bid, 'inventory'):
         page_iterator = load_bucket_inventory(
-            s3, inventory_bucket, inventory_prefix, versioned)
-        if page_inventory is None:
+            s3, inventory_bucket, inventory_prefix, versioned, ifilters)
+        if page_iterator is None:
             # case: inventory configured but not delivered yet
             # action: dispatch to bucket partition (assumes 100k+ for inventory)
             # - todo consider max inventory age/staleness for usage
@@ -776,12 +782,20 @@ def get_key_visitors(account_info):
         if v['type'] == 'encrypt-keys':
             vi = EncryptExtantKeys(v)
             vi.name = 'encrypt-keys'
+            vi.inventory_filter = filter_encrypted
             visitors.append(vi)
         elif v['type'] == 'object-acl':
             vi = ObjectAclCheck(v)
             vi.name = 'object-acl'
+            vi.inventory_filter = None
             visitors.append(vi)
     return visitors
+
+
+def filter_encrypted(ischema, kr):
+    if 'EncryptionStatus' not in ischema:
+        return False
+    return kr[ischema['EncryptionStatus']] == 'true'
 
 
 @job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
