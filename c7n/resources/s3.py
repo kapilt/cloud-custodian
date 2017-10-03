@@ -120,7 +120,7 @@ class DescribeS3(query.DescribeSource):
 
     def augment(self, buckets):
         with self.manager.executor_factory(
-                max_workers=min((10, len(buckets)+1))) as w:
+                max_workers=min((10, len(buckets) + 1))) as w:
             results = w.map(
                 assemble_bucket,
                 zip(itertools.repeat(self.manager.session_factory), buckets))
