@@ -795,7 +795,7 @@ def get_key_visitors(account_info):
 def filter_encrypted(ischema, kr):
     if 'EncryptionStatus' not in ischema:
         return False
-    return kr[ischema['EncryptionStatus']] == 'true'
+    return kr[ischema['EncryptionStatus']].startswith('SSE')
 
 
 @job('bucket-keyset-scan', timeout=DEFAULT_TTL, ttl=DEFAULT_TTL,
