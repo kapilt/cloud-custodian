@@ -365,7 +365,7 @@ class QueryResourceManager(ResourceManager):
         if query is None:
             query = {}
 
-        resources = self.source.augment(self.source.resources(query))
+        resources = self.augment(self.source.resources(query))
         self._cache.save(key, resources)
         return self.filter_resources(resources)
 
