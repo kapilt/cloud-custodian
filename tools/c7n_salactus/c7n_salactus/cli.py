@@ -448,7 +448,7 @@ def format_csv(buckets, fh, keys=()):
 @click.option('--not-region',
               help="filter to buckets in region", multiple=True)
 @click.option('--inventory',
-              help="filter to buckets using inventory")
+              help="filter to buckets using inventory", is_flag=True)
 @click.option('--config', type=click.Path(),
               help="config file for accounts")
 @click.option('--sort',
