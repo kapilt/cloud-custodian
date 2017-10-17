@@ -50,11 +50,14 @@ class ResourceQuery(object):
             m = resource_type
         return m
 
-    def _invoke_client_enum(self, client, enum_op, params, path):
+    def _invoke_client_enum(self, client, enum_op, params, path, retry=None):
         if client.can_paginate(enum_op):
             p = client.get_paginator(enum_op)
             results = p.paginate(**params)
-            data = results.build_full_result()
+            if retry:
+                data = pager(results, retry)
+            else:
+                data = results.build_full_result()
         else:
             op = getattr(client, enum_op)
             data = op(**params)
@@ -65,15 +68,17 @@ class ResourceQuery(object):
 
         return data
 
-    def filter(self, resource_type, **params):
+    def filter(self, resource_manager, **params):
         """Query a set of resources."""
-        m = self.resolve(resource_type)
+        m = self.resolve(resource_manager)
         client = local_session(self.session_factory).client(
             m.service)
         enum_op, path, extra_args = m.enum_spec
         if extra_args:
             params.update(extra_args)
-        return self._invoke_client_enum(client, enum_op, params, path) or []
+        return self._invoke_client_enum(
+            client, enum_op, params, path,
+            getattr(resource_manager, 'retry', None)) or []
 
     def get(self, resource_type, identities):
         """Get resources by identities
@@ -201,12 +206,7 @@ class DescribeSource(object):
         return self.query.get(self.manager.resource_type, ids)
 
     def resources(self, query):
-        if self.manager.retry:
-            resources = self.manager.retry(
-                self.query.filter, self.manager.resource_type, **query)
-        else:
-            resources = self.query.filter(self.manager.resource_type, **query)
-        return resources
+        return self.query.filter(self.manager.resource_type, **query)
 
     def get_permissions(self):
         m = self.manager.get_model()
