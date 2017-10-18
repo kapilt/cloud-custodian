@@ -880,7 +880,22 @@ class UserDelete(BaseAction):
 
     """
     schema = type_schema('delete')
-    permissions = ('iam:DeleteUser',)
+    permissions = (
+        'iam:ListAttachedUserPolicies',
+        'iam:ListAccessKeys',
+        'iam:ListGroupsForUser',
+        'iam:ListMFADevices',
+        'iam:ListServiceSpecificCredentials',
+        'iam:ListSigningCertificates',
+        'iam:ListSSHPublicKeys',
+        'iam:DeactivateMFADevice',
+        'iam:DeleteAccessKey',
+        'iam:DeleteLoginProfile',
+        'iam:DeleteSigningCertificate',
+        'iam:DeleteSSHPublicKey',
+        'iam:DeleteUser',
+        'iam:DetachUserPolicy',
+        'iam:RemoveUserFromGroup')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('iam')
