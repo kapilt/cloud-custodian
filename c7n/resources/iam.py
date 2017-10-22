@@ -95,7 +95,7 @@ class Policy(QueryResourceManager):
         dimension = None
         config_type = "AWS::IAM::Policy"
         filter_name = None
-        policy = "Policy"
+        shape = "Policy"
 
     arn_path_prefix = "aws:policy/"
 

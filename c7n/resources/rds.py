@@ -852,6 +852,7 @@ class RDSSubscription(QueryResourceManager):
         # filter_type = 'scalar'
         filter_name = None
         filter_type = None
+        shape = "EventSubscription"
 
 
 @resources.register('rds-snapshot')

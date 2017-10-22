@@ -545,6 +545,7 @@ class RedshiftSubnetGroup(QueryResourceManager):
         dimension = None
         date = None
         config_type = "AWS::Redshift::ClusterSubnetGroup"
+        shape = "ClusterSubnetGroup"
 
 
 @resources.register('redshift-snapshot')
