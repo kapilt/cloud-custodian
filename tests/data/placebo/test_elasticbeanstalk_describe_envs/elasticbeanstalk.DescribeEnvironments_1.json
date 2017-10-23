@@ -22,24 +22,24 @@
                 }, 
                 "Health": "Green", 
                 "DateUpdated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 49, 
-                    "microsecond": 689000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 20, 
-                    "minute": 29
+                    "minute": 0 
                 }, 
                 "DateCreated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 31, 
-                    "microsecond": 284000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 19, 
-                    "minute": 25
+                    "minute": 0 
                 }
             }, 
             {
@@ -62,24 +62,24 @@
                 }, 
                 "Health": "Green", 
                 "DateUpdated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 49, 
-                    "microsecond": 689000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 20, 
-                    "minute": 29
+                    "minute": 0 
                 }, 
                 "DateCreated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 31, 
-                    "microsecond": 284000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 19, 
-                    "minute": 25
+                    "minute": 0 
                 }
             }, 
             {
@@ -102,24 +102,24 @@
                 }, 
                 "Health": "", 
                 "DateUpdated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 49, 
-                    "microsecond": 689000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 18, 
-                    "minute": 29
+                    "minute": 0 
                 }, 
                 "DateCreated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 31, 
-                    "microsecond": 284000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 17, 
-                    "minute": 25
+                    "minute": 0 
                 }
             }, 
             {
@@ -142,24 +142,24 @@
                 }, 
                 "Health": "Green", 
                 "DateUpdated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 49, 
-                    "microsecond": 689000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 18, 
-                    "minute": 29
+                    "minute": 0 
                 }, 
                 "DateCreated": {
-                    "hour": 15, 
+                    "hour": 0, 
                     "__class__": "datetime", 
                     "month": 10, 
-                    "second": 31, 
-                    "microsecond": 284000, 
+                    "second": 0, 
+                    "microsecond": 0, 
                     "year": 2017, 
                     "day": 17, 
-                    "minute": 25
+                    "minute": 0 
                 }
             } 
         ]
