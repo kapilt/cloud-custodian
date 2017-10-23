@@ -56,8 +56,10 @@ class ElasticBeanstalkEnvironment(BaseTest):
             'resource': 'elasticbeanstalk-environment',
             'filters': [
                 {
-                    'type': 'environment-uptime',
-                    'days': 2,
+                    'type': 'value',
+                    'key': 'DateCreated',
+                    'value': 1,
+                    'value_type': 'age',
                     'op': 'greater-than',
                     }
                 ],
