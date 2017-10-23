@@ -14,12 +14,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from .common import BaseTest, Config
-from mock import *
-from datetime import datetime, timedelta
-import time
+from freezegun import freeze_time
 
-mock_time = Mock()
-mock_time.return_value = time.mktime(datetime(2017, 10, 19).timetuple())
 
 class ElasticBeanstalkEnvironment(BaseTest):
 
@@ -51,7 +47,7 @@ class ElasticBeanstalkEnvironment(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 2)
 
-    @patch('time.time', mock_time)
+    @freeze_time('2017-10-20')
     def test_eb_env_uptime(self):
         config = Config.empty(account_id='012345678901')
         factory = self.replay_flight_data('test_elasticbeanstalk_describe_envs')
