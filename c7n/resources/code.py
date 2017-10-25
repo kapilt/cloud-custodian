@@ -49,7 +49,7 @@ class CodeBuildProject(QueryResourceManager):
         dimension = None
         filter_name = None
         config_type = 'AWS::CodeBuild::Project'
-        shape = ''
+        shape = 'Project'
 
 
 @resources.register('codepipeline')
