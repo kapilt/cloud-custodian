@@ -13,8 +13,11 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import datetime
+from dateutil.parser import parse as date_parse
+
 from .common import BaseTest, Config
-from freezegun import freeze_time
+from .test_offhours import mock_datetime_now
 
 
 class ElasticBeanstalkEnvironment(BaseTest):
@@ -47,7 +50,6 @@ class ElasticBeanstalkEnvironment(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 2)
 
-    @freeze_time('2017-10-20')
     def test_eb_env_uptime(self):
         config = Config.empty(account_id='012345678901')
         factory = self.replay_flight_data('test_elasticbeanstalk_describe_envs')
@@ -64,6 +66,7 @@ class ElasticBeanstalkEnvironment(BaseTest):
                     }
                 ],
             }, session_factory=factory)
-        resources = p.run()
+        with mock_datetime_now(date_parse('2017-10-19'), datetime):
+            resources = p.run()
         self.assertEqual(len(resources), 2)
 
