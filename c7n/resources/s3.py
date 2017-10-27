@@ -2001,7 +2001,15 @@ class SetInventory(BucketActionBase):
 
     def process(self, buckets):
         with self.executor_factory(max_workers=2) as w:
-            list(w.map(self.process_bucket, buckets))
+            futures = {}
+            for b in buckets:
+                futures[w.submit(self.process_bucket, b)] = b
+            for f in as_completed(futures):
+                b = futures[f]
+                if f.exception():
+                    self.log.error(
+                        'Bucket:%s error on set inventory: %s',
+                        b, f.exception())
 
     def process_bucket(self, b):
         inventory_name = self.data.get('name')
