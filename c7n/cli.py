@@ -27,7 +27,6 @@ import traceback
 from datetime import datetime
 from dateutil.parser import parse as date_parse
 
-from botocore.exceptions import ClientError
 try:
     from setproctitle import setproctitle
 except ImportError:
@@ -124,7 +123,7 @@ def _default_region(options):
 
     try:
         options.regions = [utils.get_profile_session(options).region_name]
-    except ClientError:
+    except Exception:
         log.warning('Could not determine default region')
         options.regions = [None]
 
@@ -146,7 +145,7 @@ def _default_account_id(options):
     try:
         session = utils.get_profile_session(options)
         options.account_id = get_account_id_from_sts(session)
-    except ClientError:
+    except Exception:
         options.account_id = None
 
 
