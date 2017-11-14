@@ -395,7 +395,10 @@ def size(config, accounts=(), day=None, group=None, human=True):
         paginator = client.get_paginator('list_objects_v2')
         count = 0
         size = 0
-        session = get_session(account['role'])
+        try:
+            session = get_session(account['role'])
+        except:
+            return 0, 0
         account_id = session.client('sts').get_caller_identity()['Account']
         prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
         prefix = "%s/%s/%s" % (prefix, group, day.strftime("%Y/%m/%d"))
@@ -453,7 +456,11 @@ def sync(config, group, accounts=(), dryrun=False):
         if accounts and account['name'] not in accounts:
             continue
 
-        session = get_session(account['role'])
+        try:
+            session = get_session(account['role'])
+        except Exception as e:
+            log.error('could not acquire session %s' % account['name'])
+            continue
         account_id = session.client('sts').get_caller_identity()['Account']
         prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
         prefix = "%s/%s" % (prefix, group)
@@ -518,6 +525,8 @@ def sync(config, group, accounts=(), dryrun=False):
 
     accounts_report = []
     for a in config.get('accounts'):
+        if 'sync' not in a:
+            continue
         if accounts and a['name'] not in accounts:
             continue
         if isinstance(a['sync'], tuple):

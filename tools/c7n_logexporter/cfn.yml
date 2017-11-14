@@ -3,8 +3,8 @@ Transform: 'AWS::Serverless-2016-10-31'
 Resources:
   LogExporter:
     Type: 'AWS::Serverless::Function'
-    FunctionName: "c7n-log-exporter"
-    Description: "CloudWatch Logs S3 Exporter"
+    FunctionName: "c7n-flow-log-archiver"
+    Description: "CloudWatch Logs S3 Archiver"
     MemorySize: 1024
     Timeout: 600
     Properties:
@@ -13,10 +13,12 @@ Resources:
       CodeUri: './stage'
       Role: "arn:aws:iam::644160558196:role/custodian-mu"
       Events:
-        Timer:
-          Type: Schedule
-          Properties:
-            Schedule: rate(1 day)
+        Stream:
+	  Type: Kinesis
+	  Properties:
+            Stream: arn:aws:kinesis:us-east-1:123456789012:stream/my-stream
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 100
 
 Outputs:
   Function:
