@@ -102,6 +102,126 @@ def _account(arn):
     return arn.split(':', 5)[4]
 
 
+class PolicyChecker(object):
+
+    def __init__(self, policy, allowed, conditions, check_actions, everyone_only):
+        self.policy = policy
+        self.allowed = conditions
+        self.check_actions = check_actions
+        self.everyone_only = everyone_only
+
+    def check(self):
+        violations = []
+        for s in self.policy['Statement']:
+            if self.handle_statement(s):
+                violations.append(s)
+        return violations
+
+    def handle_statement(self, s):
+        if (self.handle_principal(s) or
+            self.handle_effect(s) or
+            self.handle_action(s)) and not self.handle_condition(s):
+            return s
+
+    def handle_action(self, s):
+        if self.check_actions:
+            actions = s.get('Action')
+            actions = isinstance(actions, six.string_types) and (actions,) or actions
+            found = False
+            for a in actions:
+                if fnmatch.filter(self.check_actions, a):
+                    return True
+
+    def handle_effect(self, s):
+        if s['Effect'] != 'Allow':
+            return True
+
+    def handle_principal(self, s):
+        if 'NotPrincipal' in s:
+            return True
+        if 'Principal' not in s:
+            return True
+        # Skip service principals
+        if 'Service' in s['Principal']:
+            s['Principal'].pop('Service')
+            if not s['Principal']:
+                return False
+
+        if isinstance(s['Principal'], six.string_types):
+            p = s['Principal']
+        else:
+            p = s['Principal']['AWS']
+
+        principal_ok = True
+        p = isinstance(p, six.string_types) and (p,) or p
+        for pid in p:
+            if pid == '*':
+                principal_ok = False
+            elif self.everyone_only:
+                continue
+            elif pid.startswith('arn:aws:iam::cloudfront:user'):
+                continue
+            else:
+                account_id = _account(pid)
+                if account_id not in self.allowed_accounts:
+                    principal_ok = False
+        return not principal_ok
+
+    def handle_condition(self, s):
+        op, key, value = self.normalize_condition(s)
+        if not op:
+            return False
+        if key in self.whitelist_conditions:
+            return True
+        handler = getattr(self, key.replace('-', '_').replace(':', '_'), None)
+        if handler is None:
+            print("no handler op:%s key:%s value:%s" % (op, key, value))
+            return
+        return handler(s, op, key, value)
+
+    def normalize_condition(self, s):
+        conditions = (
+            'StringEquals',
+            'StringEqualsIgnoreCase',
+            'StringLike',
+            'ArnEquals',
+            'ArnLike')
+        set_conditions = ('ForAllValues', 'ForAnyValues')
+
+        assert len(s.get('Condition').keys()) == 1, "Multiple conditions present in iam statement"
+        s_cond_op = s['Condition'].keys()[0]
+
+        # Handle IP Address
+        if s_cond_op not in conditions:
+            for s in set_conditions:
+                if not s_cond_op.startswith(s_cond_op):
+                    return None, None, None
+
+        assert len(s['Condition'][s_cond_op]) == 1, "Multiple keys on condition"
+        s_cond_key = s['Condition'][s_cond_op].keys()[0]
+
+        s_cond_value = s['Condition'][s_cond_op][s_cond_key]
+        s_cond_value = (
+            isinstance(s_cond_value, six.string_types) and (s_cond_value,) or s_cond_value)
+
+        return s_cond_op, s_cond_key.lower(), s_cond_value
+
+    def handle_aws_sourceowner(self, s, op, key, value):
+        pass
+
+    def handle_aws_sourcearn(self, s, op, key, value):
+        pass
+
+    def handle_ipaddress(self, s, op, key, value):
+        pass
+
+    def handle_notipaddress(self, s, op, key, value):
+        pass
+
+    def handle_kms_calleraccount(self, s, op, key, value):
+        pass
+
+
 def check_cross_account(policy_text, allowed_accounts, everyone_only,
                         conditions, check_actions):
     """Find cross account access policy grant not explicitly allowed
