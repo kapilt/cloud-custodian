@@ -112,12 +112,12 @@ class Bucket(object):
     @property
     def using_inventory(self):
         # boolean
-        return bool(self.data['buckets-inventory'].get(self.bucket_id))
+        return bool(self.data.get('buckets-inventory', {}).get(self.bucket_id))
 
     @property
     def inventory(self):
         # formatted...
-        return bool(self.data['buckets-inventory'].get(self.bucket_id)) and 'yes' or 'no'
+        return bool(self.data.get('buckets-inventory', {}).get(self.bucket_id)) and 'yes' or 'no'
 
     @property
     def account(self):

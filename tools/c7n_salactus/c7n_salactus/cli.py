@@ -312,6 +312,7 @@ def format_accounts_plain(accounts, fh):
               help="stats on a particular account", multiple=True)
 @click.option('--config', '-c',
               help="config file for accounts")
+@click.option('--matched', help="filter to only matched buckets", is_flag=True)
 @click.option('--tag', help="filter tags by account")
 @click.option('--tagprefix', help="group accounts by tag prefix")
 @click.option('--region', '-r',
@@ -323,7 +324,7 @@ def format_accounts_plain(accounts, fh):
 @click.option('--exclude',
               help="Exclude bucket", multiple=True)
 def accounts(dbpath, output, format, account,
-             config=None, tag=None, tagprefix=None, region=(),
+             config=None, matched=None, tag=None, tagprefix=None, region=(),
              not_region=(), exclude=None):
     """Report on stats by account"""
     d = db.db(dbpath)
@@ -333,17 +334,22 @@ def accounts(dbpath, output, format, account,
 
     if region:
         for a in accounts:
-            a.buckets = [b for b in a.buckets if b.region in region]
-        accounts = [a for a in accounts if a.bucket_count]
+            a.buckets = [b for b in a.buckets if b.region in region ]
 
     if not_region:
         for a in accounts:
             a.buckets = [b for b in a.buckets if b.region not in not_region]
-        accounts = [a for a in accounts if a.bucket_count]
+
+    if matched:
+        for a in accounts:
+            a.buckets = [b for b in a.buckets if b.matched]
 
     if exclude:
         for a in accounts:
             a.buckets = [b for b in a.buckets if b.name not in exclude]
+
+    accounts = [a for a in accounts if a.bucket_count]
+
     if config and tagprefix:
         account_map = {account.name: account for account in accounts}
 
