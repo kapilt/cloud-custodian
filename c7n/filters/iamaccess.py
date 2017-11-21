@@ -94,7 +94,7 @@ class PolicyChecker(object):
         return violations
 
     def handle_statement(self, s):
-        if (any((self.handle_principal(s),
+        if (all((self.handle_principal(s),
                  self.handle_effect(s),
                  self.handle_action(s))) and not self.handle_condition(s)):
             return s
