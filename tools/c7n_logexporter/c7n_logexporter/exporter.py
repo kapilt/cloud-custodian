@@ -158,13 +158,13 @@ def subscribe(config, accounts, force, debug):
     def converge_destination_policy(client, config):
         destination_name = subscription['destination-arn'].rsplit(':', 1)[-1]
         try:
-            client.get_get_destinations(
+            dest_info = client.describe_destinations(
                 DestinationNamePrefix=destination_name)
         except ClientError:
             log.error("Log group destination not found: %s",
                       subscription['destination-arn'])
             sys.exit(1)
-        account_ids = [a['role'].split(':')[4] for a in config.get('accounts')]
+        account_ids = [a['role'].split(':')[4] for a in config.get('accounts', ())]
         client.put_destination_policy(
             destinationName=destination_name,
             accessPolicy=json.dumps({
@@ -182,6 +182,7 @@ def subscribe(config, accounts, force, debug):
         for g in account.get('groups'):
             client.put_subscription_filter(
                 logGroupName=g,
+                destinationArn=subscription['destination-arn'],
                 filterName=subscription.get('name', 'FlowLogStream'),
                 filterPattern="",
                 distribution=subscription.get('distribution', 'ByLogStream'))
