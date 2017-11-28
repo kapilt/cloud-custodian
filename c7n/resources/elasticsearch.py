@@ -86,7 +86,7 @@ class Subnet(SubnetFilter):
     RelatedIdsExpression = "VPCOptions.SubnetIds"
 
 
-@ElasticSearchDomain.filter_registry('security-group')
+@ElasticSearchDomain.filter_registry.register('security-group')
 class SecurityGroup(SecurityGroupFilter):
 
     RelatedIdsExpression = "VPCOptions.SecurityGroupIds"

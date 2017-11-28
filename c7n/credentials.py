@@ -31,6 +31,7 @@ class SessionFactory(object):
         self.profile = profile
         self.assume_role = assume_role
         self.external_id = external_id
+        self.observers = []
 
     def __call__(self, assume=True, region=None):
         if self.assume_role and assume:
@@ -44,7 +45,13 @@ class SessionFactory(object):
 
         session._session.user_agent_name = "CloudCustodian"
         session._session.user_agent_version = version
+        if self.observers:
+            for o in self.observers:
+                o(session)
         return session
+
+    def set_observers(self, observers):
+        self.observers = observers
 
 
 def assumed_session(role_arn, session_name, session=None, region=None, external_id=None):
