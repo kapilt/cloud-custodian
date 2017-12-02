@@ -37,7 +37,7 @@ class Table(query.QueryResourceManager):
         type = 'table'
         enum_spec = ('list_tables', 'TableNames', None)
         detail_spec = ("describe_table", "TableName", None, "Table")
-        id = 'Table'
+        id = 'TableId'
         filter_name = None
         name = 'TableName'
         date = 'CreationDateTime'
