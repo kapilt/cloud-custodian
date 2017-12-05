@@ -849,6 +849,9 @@ class CloudWatchEventSource(object):
         if event_type == 'cloudtrail':
             if 'signin.amazonaws.com' in payload['detail']['eventSource']:
                 payload['detail-type'] = ['AWS Console Sign In via CloudTrail']
+        elif event_type == 'guard-duty':
+            payload['source'] =  ['aws.guardduty']
+            payload['detail-type'] = 'GuardDuty Finding'
         elif event_type == "ec2-instance-state":
             payload['source'] = ['aws.ec2']
             payload['detail-type'] = [
