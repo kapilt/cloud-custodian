@@ -4,6 +4,7 @@ import operator
 from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 import click
+from tabulate import tabulate
 
 from c7n.credentials import assumed_session
 from c7n.utils import format_event
@@ -23,8 +24,44 @@ def cli():
 
 
 @cli.command()
-def check():
+@click.option('-c', '--config', required=True, help="Accounts config file", type=click.Path())
+@click.option('-t', '--tags', multiple=True, default=None)
+@click.option('-a', '--accounts', multiple=True, default=None)
+@click.option('--master', help='Master account id or name')
+@click.option('--debug', help='Run single-threaded', is_flag=True)
+def report(config, tags, accounts, master, debug):
     """report on guard duty enablement by account"""
+    accounts_config, master_info, executor = guardian_init(
+        config, debug, master, accounts, tags)
+
+    session = assumed_session(master_info['role'], 'c7n-guardian')
+    client = session.client('guardduty')
+    detector_id = get_or_create_detector_id(client)
+
+    members = {m['AccountId']: m for m in
+               client.list_members(DetectorId=detector_id).get('Members')}
+
+    accounts_report = []
+    for a in accounts_config['accounts']:
+        ar = dict(a)
+        accounts_report.append(ar)
+        ar.pop('tags', None)
+        ar.pop('role')
+        ar.pop('regions', None)
+        if a['account_id'] not in members:
+            ar['member'] = False
+            ar['status'] = None
+            ar['invited'] = None
+            ar['updated'] = None
+            continue
+        m = members[a['account_id']]
+        ar['status'] = m['RelationshipStatus']
+        ar['member'] = True
+        ar['joined'] = m['InvitedAt']
+        ar['updated'] = m['UpdatedAt']
+
+    accounts_report.sort(key=operator.itemgetter('updated'), reverse=True)
+    print(tabulate(accounts_report, headers=('keys')))
 
 
 @cli.command()
@@ -48,10 +85,12 @@ def suspend(config, tags, accounts, master, debug, stop_master, suspend_member):
         detector_id = get_or_create_detector_id(master_client)
         unprocessed = master_client.stop_monitoring_members(
             DetectorId=detector_id,
-            MemberIds=[a['account_id'] for a in accounts_config['accounts']])
+            AccountIds=[a['account_id'] for a in accounts_config['accounts']]
+        ).get('UnprocessedAccounts', ())
+
         if unprocessed:
             log.warning("Following accounts where unprocessed\n %s" % format_event(unprocessed))
-        log.info("Stopped monitoring %d accounts in master" % len(accounts))
+        log.info("Stopped monitoring %d accounts in master" % len(accounts_config['accounts']))
 
 
 @cli.command()
@@ -86,15 +125,31 @@ def enable(config, master, tags, accounts, debug, message, region):
     extant_members = master_client.list_members(DetectorId=detector_id).get('Members', ())
     extant_ids = {m['AccountId'] for m in extant_members}
 
+    # Find extant members not currently enabled
+    suspended_ids = {m['AccountId'] for m in extant_members
+                     if m['RelationshipStatus'] == 'Disabled'}
+    # Filter by accounts under consideration per config and cli flags
+    suspended_ids = {a['account_id'] for a in accounts_config['accounts']
+                     if a['account_id'] in suspended_ids}
+    if suspended_ids:
+        unprocessed = master_client.start_monitoring_members(
+            DetectorId=detector_id,
+            AccountIds=list(suspended_ids)).get('UnprocessedAccounts')
+        if unprocessed:
+            log.warning(
+                "Unprocessed accounts on re-start monitoring %s" % (format_event(unprocessed)))
+        log.info("Restarted monitoring on %d accounts" % (len(suspended_ids)))
+
     members = [{'AccountId': account['account_id'], 'Email': account['email']}
                for account in accounts_config['accounts']
                if account['account_id'] not in extant_ids]
 
     if not members:
-        log.info("All accounts already enabled")
+        if not suspended_ids:
+            log.info("All accounts already enabled")
         return
 
-    if len(members) > 100:
+    if (len(members) + len(extant_ids)) > 100:
         raise ValueError(
             "Guard Duty only supports 100 member accounts per master account")
 
@@ -135,7 +190,6 @@ def enable(config, master, tags, accounts, debug, message, region):
 def enable_account(account, master_account_id, region):
     member_session = assumed_session(
         account['role'], 'c7n-guardian', region=region)
-    import pdb; pdb.set_trace()
     member_client = member_session.client('guardduty')
     m_detector_id = get_or_create_detector_id(member_client)
     invitations = [
