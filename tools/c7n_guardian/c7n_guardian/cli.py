@@ -1,7 +1,6 @@
 import logging
 import operator
 
-from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 import click
 from tabulate import tabulate
@@ -91,6 +90,7 @@ def suspend(config, tags, accounts, master, debug, stop_master, suspend_member):
         if unprocessed:
             log.warning("Following accounts where unprocessed\n %s" % format_event(unprocessed))
         log.info("Stopped monitoring %d accounts in master" % len(accounts_config['accounts']))
+        return
 
 
 @cli.command()
@@ -168,7 +168,7 @@ def enable(config, master, tags, accounts, debug, message, region):
     unprocessed = master_client.invite_members(**params).get('UnprocessedAccounts')
     if unprocessed:
         log.warning("Following accounts where unprocessed\n %s" % format_event(unprocessed))
-                
+
     log.info("Accepting invitations")
     with executor(max_workers=WORKER_COUNT) as w:
         futures = {}
@@ -228,7 +228,7 @@ def get_master_info(accounts_config, master):
         raise ValueError("Master account: %s not found in accounts config" % (
             master))
     return master_info
-    
+
 
 def guardian_init(config, debug, master, accounts, tags):
     accounts_config, custodian_config, executor = init(
@@ -236,6 +236,3 @@ def guardian_init(config, debug, master, accounts, tags):
     master_info = get_master_info(accounts_config, master)
     filter_accounts(accounts_config, tags, accounts, not_accounts=[master_info['name']])
     return accounts_config, master_info, executor
-
-
-    
