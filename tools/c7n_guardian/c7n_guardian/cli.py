@@ -1,6 +1,7 @@
 import logging
 import operator
 
+from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 import click
 from tabulate import tabulate
@@ -69,40 +70,70 @@ def report(config, tags, accounts, master, debug):
 @click.option('-a', '--accounts', multiple=True, default=None)
 @click.option('--master', help='Master account id or name')
 @click.option('--debug', help='Run single-threaded', is_flag=True)
-@click.option('--stop-master', help='Stop monitoring in master', is_flag=True)
-@click.option('--suspend-member', help='Suspend in member', is_flag=True)
-def suspend(config, tags, accounts, master, debug, stop_master, suspend_member):
+@click.option('--suspend', help='Suspend monitoring in master', is_flag=True)
+@click.option('--disable-detector', help='Disable detector in member account',
+              is_flag=True)
+@click.option('--delete-detector', help='Disable detector in member account',
+              is_flag=True)
+@click.option('--dissociate', help='Disassociate member account',
+              is_flag=True)
+def disable(config, tags, accounts, master, debug,
+            suspend, disable_detector, delete_detector, dissociate):
     """suspend guard duty in the given accounts."""
     accounts_config, master_info, executor = guardian_init(
         config, debug, master, accounts, tags)
-    if (stop_master and suspend_member) or (not stop_master and not suspend_member):
-        raise ValueError("One and only of suspend master or suspend member must be specified")
 
-    if stop_master:
-        master_session = assumed_session(master_info['role'], 'c7n-guardian')
-        master_client = master_session.client('guardduty')
-        detector_id = get_or_create_detector_id(master_client)
+    if sum(map(int, (suspend, disable_detector, dissociate))) != 1:
+        raise ValueError((
+            "One and only of suspend, disable-detector, dissociate"
+            "can be specified."))
+
+    master_session = assumed_session(master_info['role'], 'c7n-guardian')
+    master_client = master_session.client('guardduty')
+    detector_id = get_or_create_detector_id(master_client)
+
+    if suspend:        
         unprocessed = master_client.stop_monitoring_members(
             DetectorId=detector_id,
             AccountIds=[a['account_id'] for a in accounts_config['accounts']]
         ).get('UnprocessedAccounts', ())
 
         if unprocessed:
-            log.warning("Following accounts where unprocessed\n %s" % format_event(unprocessed))
-        log.info("Stopped monitoring %d accounts in master" % len(accounts_config['accounts']))
+            log.warning(
+                "Following accounts where unprocessed\n %s",
+                format_event(unprocessed))
+        log.info("Stopped monitoring %d accounts in master",
+                 len(accounts_config['accounts']))
         return
 
+    if dissociate:
+        master_client.disassociate_members(
+            DetectorId=detector_id,
+            AccountIds=[a['account_id'] for a in accounts_config['accounts']])
 
-@cli.command()
-@click.option('-c', '--config', required=True, help="Accounts config file", type=click.Path())
-@click.option('-t', '--tags', multiple=True, default=None)
-@click.option('-a', '--accounts', multiple=True, default=None)
-@click.option('--master', help='Master account id or name')
-@click.option('--debug', help='Run single-threaded', is_flag=True)
-def disable(config, tags, accounts, master, debug):
-    """disable and delete guard duty in the given accounts."""
-    accounts_config, master_info, executor = guardian_init(
-        config, debug, master, accounts, tags)
+    # Seems like there's a couple of ways to disable an account
+    # delete the detector (member), disable the detector (master or member),
+    # or disassociate members, or from member disassociate from master.
+    for a in accounts_config['accounts']:
+        member_session = assumed_session(master_info['role'], 'c7n-guardian')
+        member_client = member_session.client('guardduty')
+        m_detector_id = get_or_create_detector_id(member_client)
+        if disable_detector:
+            member_client.update_detector(
+                DetectorId=m_detector_id, Enable=False)
+            log.info("Disabled detector in account:%s", a['name'])
+        if dissociate:
+            try:
+                log.info("Disassociated member account:%s", a['name'])
+                result = member_client.disassociate_from_master_account(
+                    DetectorId=m_detector_id)
+                log.info("Result %s", format_event(result))
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'InvalidInputException':
+                    continue
+        if delete_detector:
+            member_client.delete_detector(DetectorId=m_detector_id)
+            log.info("Deleted detector in account:%s", a['name'])
 
 
 @cli.command()
@@ -236,3 +267,11 @@ def guardian_init(config, debug, master, accounts, tags):
     master_info = get_master_info(accounts_config, master)
     filter_accounts(accounts_config, tags, accounts, not_accounts=[master_info['name']])
     return accounts_config, master_info, executor
+
+# AccountSet
+#
+#  get master invitation
+#  get detectors
+#  delete detector
+#  disassociate from master
+
