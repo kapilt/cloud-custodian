@@ -28,7 +28,7 @@ from botocore.exceptions import ClientError
 from c7n.actions import BaseAction
 from c7n.filters import ValueFilter, Filter, OPERATORS
 from c7n.manager import resources
-from c7n.query import QueryResourceManager
+from c7n.query import QueryResourceManager, DescribeSource
 from c7n.utils import local_session, type_schema, chunks
 
 
@@ -71,12 +71,31 @@ class User(QueryResourceManager):
         service = 'iam'
         type = 'user'
         enum_spec = ('list_users', 'Users', None)
-        id = 'UserId'
         filter_name = None
-        name = 'UserName'
+        id = name = 'UserName'
         date = 'CreateDate'
         dimension = None
         config_type = "AWS::IAM::User"
+
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeUser(self)
+        return super(User, self).get_source(source_type)
+
+
+class DescribeUser(DescribeSource):
+
+    def get_resources(self, resource_ids, cache=True):
+        client = local_session(self.manager.session_factory).client('iam')
+        resources = []
+        for rid in resource_ids:
+            try:
+                resources.append(client.get_user(UserName=rid).get('User'))
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'NoSuchEntityException':
+                    continue
+                raise
+        return resources
 
 
 @resources.register('iam-policy')
@@ -95,15 +114,24 @@ class Policy(QueryResourceManager):
 
     arn_path_prefix = "aws:policy/"
 
-    def get_resources(self, resource_ids):
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribePolicy(self)
+        return super(User, self).get_source(source_type)
+
+
+class DescribePolicy(DescribeSource):
+
+    def get_resources(self, resource_ids, cache=True):
         client = local_session(self.session_factory).client('iam')
         results = []
-        try:
-            for r in resource_ids:
+
+        for r in resource_ids:
+            try:
                 results.append(client.get_policy(PolicyArn=r)['Policy'])
-        except Exception as e:
-            self.log.warning("unable to resolve ids %s, err: %s",
-                             resource_ids, e)
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'NoSuchEntityException':
+                    continue
         return results
 
 

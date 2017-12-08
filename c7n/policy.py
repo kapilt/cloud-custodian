@@ -553,8 +553,8 @@ class GuardDutyMode(LambdaMode):
 
     id_exprs = {
         'account': jmespath.compile('account'),
-        'ec2': jmespath.compile('resources[].InstanceId'),
-        'iam-user': jmespath.compile('resources[].UserId')}
+        'ec2': jmespath.compile('detail.resource.InstanceDetails.instanceId'),
+        'iam-user': jmespath.compile('detail.resource.accessKeyDetails.userName')}
 
     def resolve_resources(self, event):
         ids = self.id_exprs[self.policy.resource_type].search(event)

@@ -1,9 +1,12 @@
 
 # Automated Setup for AWS Guard Duty
 
-A cli tool for automating multi-account of aws guard duty. Given a
-config file holding a set of account information, this cli will setup
-one as a master account, and the remainder as member accounts.
+Amazon Guard Duty provides for machine learning based threat
+intelligence and detection on resources in your aws accounts. This
+project provides a cli tool for automating multi-account of aws guard
+duty. Given a config file holding a set of account information, this
+cli will setup one as a master account, and the remainder as member
+accounts.
 
 ie. to enable 
 ```
@@ -23,6 +26,7 @@ addition to credential sourcing supported by the aws sdk.
 
 # Using custodian policies for remediation
 
+
 ```
 policies:
   - name: ec2-port-scanner
@@ -30,4 +34,4 @@ policies:
       type: guard-duty
     filters:
       - type: event
-```      
+```
