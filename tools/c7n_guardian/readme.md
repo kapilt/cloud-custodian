@@ -58,6 +58,12 @@ policies:
    mode:
      role: arn:aws:iam::{account_id}:role/CustodianPolicyExecution
      type: guard-duty
+   filters:
+     # Filter for medium and high severity events
+     - type: event
+       key: detail.severity
+       op: gte
+       value: 4.5
    actions:
      - stop
 
@@ -66,6 +72,11 @@ policies:
    mode:
      role: arn:aws:iam::{account_id}:role/CustodianPolicyExecution
      type: guard-duty
+   filters:
+     # Only a particular type of event, go ahead and remove keys
+     - type: event
+       key: detail.type
+       value: "UnauthorizedAccess:IAMUser/TorIPCaller"
    actions:
      - remove-keys
 ```
