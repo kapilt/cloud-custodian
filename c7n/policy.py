@@ -558,14 +558,25 @@ class GuardDutyMode(LambdaMode):
 
     def resolve_resources(self, event):
         ids = self.id_exprs[self.policy.resource_type].search(event)
-        # todo for iam-user annotate access key
-        return self.policy.resource_manager.get_resources(ids)
+        resources = self.policy.resource_manager.get_resources(ids)
+        # For iam users annotate with the access key specified in the finding event
+        if resources and self.policy.resource_type == 'iam-user':
+            resources[0]['c7n:AccessKeys'] = {
+                'AccessKeyId': event['detail']['resource']['accessKeyDetails']['accessKeyId']}
+        return resources
 
     def validate(self):
         if self.policy.data['resource'] not in self.supported_resources:
             raise ValueError(
                 "Policy:%s resource:%s Guard duty mode only supported for %s" % (
                     self.data['name'], self.data['resource'], self.supported_resources))
+
+    def provision(self):
+        if self.policy.data['resource'] == 'ec2':
+            self.policy.data['mode']['resource-filter'] = 'Instance'
+        elif self.policy.data['resource'] == 'iam':
+            self.policy.data['mode']['resource-filter'] = 'AccessKey'
+        return super(GuardDutyMode, self).provision()
 
 
 class ConfigRuleMode(LambdaMode):
