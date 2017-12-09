@@ -27,11 +27,29 @@ addition to credential sourcing supported by the aws sdk.
 # Using custodian policies for remediation
 
 
+Here's some example policies that will provision a custodian lambda that
+receives the guard duty notifications and performs some basic remediation
+on the alerted resources, respectively stopping an ec2 instance, and removing
+an access key. You have the full access to custodian's actions and filters
+for doing additional activities in response to events.
+
 ```
+
 policies:
-  - name: ec2-port-scanner
-    mode:
-      type: guard-duty
-    filters:
-      - type: event
+
+ - name: ec2-guard-remediate
+   resource: ec2
+   mode:
+     role: arn:aws:iam::{account_id}:role/CustodianPolicyExecution
+     type: guard-duty
+   actions:
+     - stop
+
+ - name: iam-guard-remediate
+   resource: iam-user
+   mode:
+     role: arn:aws:iam::{account_id}:role/CustodianPolicyExecution
+     type: guard-duty
+   actions:
+     - remove-keys
 ```

@@ -553,12 +553,12 @@ class GuardDutyMode(LambdaMode):
 
     id_exprs = {
         'account': jmespath.compile('account'),
-        'ec2': jmespath.compile('detail.resource.InstanceDetails.instanceId'),
+        'ec2': jmespath.compile('detail.resource.instanceDetails.instanceId'),
         'iam-user': jmespath.compile('detail.resource.accessKeyDetails.userName')}
 
     def resolve_resources(self, event):
-        ids = self.id_exprs[self.policy.resource_type].search(event)
-        resources = self.policy.resource_manager.get_resources(ids)
+        rid = self.id_exprs[self.policy.resource_type].search(event)
+        resources = self.policy.resource_manager.get_resources([rid])
         # For iam users annotate with the access key specified in the finding event
         if resources and self.policy.resource_type == 'iam-user':
             resources[0]['c7n:AccessKeys'] = {
@@ -569,7 +569,9 @@ class GuardDutyMode(LambdaMode):
         if self.policy.data['resource'] not in self.supported_resources:
             raise ValueError(
                 "Policy:%s resource:%s Guard duty mode only supported for %s" % (
-                    self.data['name'], self.data['resource'], self.supported_resources))
+                    self.policy.data['name'],
+                    self.policy.data['resource'],
+                    self.supported_resources))
 
     def provision(self):
         if self.policy.data['resource'] == 'ec2':
