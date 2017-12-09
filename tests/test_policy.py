@@ -548,7 +548,7 @@ class GuardModeTest(BaseTest):
         publish.side_effect = assert_publish
         p = self.load_policy(
             {'name': 'iam-user-guard',
-             'resource': 'iam',
+             'resource': 'iam-user',
              'mode': {'type': 'guard-duty'}})
         p.run()
 
