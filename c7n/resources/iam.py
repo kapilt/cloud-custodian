@@ -123,7 +123,7 @@ class Policy(QueryResourceManager):
 class DescribePolicy(DescribeSource):
 
     def get_resources(self, resource_ids, cache=True):
-        client = local_session(self.session_factory).client('iam')
+        client = local_session(self.manager.session_factory).client('iam')
         results = []
 
         for r in resource_ids:

@@ -520,11 +520,11 @@ class GuardModeTest(BaseTest):
         def assert_publish(policy_lambda, alias, role):
             events = policy_lambda.get_events(mock.MagicMock())
             self.assertEqual(len(events), 1)
-            self.assertEqual(
-                json.loads(events[0].render_event_pattern()),
-                {"source": ["aws.guardduty"],
-                 "detail": {"resource": {"resourceType": ["Instance"]}},
-                 "detail-type": ["GuardDuty Finding"]})
+            pattern = json.loads(events[0].render_event_pattern())
+            expected = {"source": ["aws.guardduty"],
+                "detail": {"resource": {"resourceType": ["Instance"]}},
+                "detail-type": ["GuardDuty Finding"]}
+            self.assertEqual(pattern, expected)
 
         publish.side_effect = assert_publish
         p = self.load_policy(
@@ -539,11 +539,11 @@ class GuardModeTest(BaseTest):
         def assert_publish(policy_lambda, alias, role):
             events = policy_lambda.get_events(mock.MagicMock())
             self.assertEqual(len(events), 1)
-            self.assertEqual(
-                json.loads(events[0].render_event_pattern()),
-                {"source": ["aws.guardduty"],
-                 "detail": {"resource": {"resourceType": ["AccessKey"]}},
-                 "detail-type": ["GuardDuty Finding"]})
+            pattern = json.loads(events[0].render_event_pattern())
+            expected = {"source": ["aws.guardduty"],
+                "detail": {"resource": {"resourceType": ["AccessKey"]}},
+                "detail-type": ["GuardDuty Finding"]}
+            self.assertEqual(pattern, expected)
 
         publish.side_effect = assert_publish
         p = self.load_policy(

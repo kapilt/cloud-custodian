@@ -576,7 +576,7 @@ class GuardDutyMode(LambdaMode):
     def provision(self):
         if self.policy.data['resource'] == 'ec2':
             self.policy.data['mode']['resource-filter'] = 'Instance'
-        elif self.policy.data['resource'] == 'iam':
+        elif self.policy.data['resource'] == 'iam-user':
             self.policy.data['mode']['resource-filter'] = 'AccessKey'
         return super(GuardDutyMode, self).provision()
 
