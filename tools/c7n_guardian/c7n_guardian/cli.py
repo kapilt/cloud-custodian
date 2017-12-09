@@ -106,7 +106,7 @@ def disable(config, tags, accounts, master, debug,
     master_client = master_session.client('guardduty')
     detector_id = get_or_create_detector_id(master_client)
 
-    if suspend:        
+    if suspend:
         unprocessed = master_client.stop_monitoring_members(
             DetectorId=detector_id,
             AccountIds=[a['account_id'] for a in accounts_config['accounts']]

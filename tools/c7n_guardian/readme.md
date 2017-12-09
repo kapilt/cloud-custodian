@@ -8,12 +8,37 @@ duty. Given a config file holding a set of account information, this
 cli will setup one as a master account, and the remainder as member
 accounts.
 
-ie. to enable 
+The following cli will enable guard duty on all accounts tagged
+dev. The master guard duty account can be specified by name or account
+id. Running enable multiple times will idempotently converge.
+
 ```
- c7n-guardian enable --config accounts.json --master 120312301231 --tags dev
+$ c7n-guardian enable --config accounts.yml --master 120312301231 --tags dev
 ```
 
-Running enable multiple times will idempotently converge.
+The accounts config file is similiar to c7n-org, with the addition of the
+account email.
+
+```
+$ cat accounts.yml
+
+accounts:
+  - name: guard-duty-master
+    email: guard-duty-master@example.com
+    account_id: "2020202020202"
+    role: "arn:aws:iam::2020202020202:role/CustodianGuardDuty"
+    tags:
+      - prod
+
+  - name: cicd
+    email: cicd@example.com
+    account_id: "1010101010101"
+    role: "arn:aws:iam::1010101010101:role/CustodianGuardDuty"
+    tags:
+      - dev
+      - cicd
+
+```
 
 The cli also has support for disabling and reporting on accounts
 
