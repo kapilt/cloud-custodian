@@ -15,6 +15,23 @@ ie. to enable
 
 Running enable multiple times will idempotently converge.
 
+The cli also has support for disabling and reporting on accounts
+
+```
+$ c7n-guardian --help
+Usage: c7n-guardian [OPTIONS] COMMAND [ARGS]...
+
+  Automate Guard Duty Setup.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  disable  suspend guard duty in the given accounts.
+  enable   enable guard duty on a set of accounts
+  report   report on guard duty enablement by account
+
+```
 
 # Accounts Credentials
 
@@ -25,7 +42,6 @@ addition to credential sourcing supported by the aws sdk.
 
 
 # Using custodian policies for remediation
-
 
 Here's some example policies that will provision a custodian lambda that
 receives the guard duty notifications and performs some basic remediation
