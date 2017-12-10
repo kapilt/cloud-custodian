@@ -134,7 +134,7 @@ def validate(config):
 @click.option('--end')
 @click.option('-a', '--accounts', multiple=True)
 @click.option('--debug', is_flag=True, default=False)
-def run(config, start, end, accounts):
+def run(config, start, end, accounts, debug=False):
     """run export across accounts and log groups specified in config."""
     config = validate.callback(config)
     destination = config.get('destination')
@@ -553,8 +553,11 @@ def status(config, group, accounts=()):
     for account in config.get('accounts', ()):
         if accounts and account['name'] not in accounts:
             continue
-
-        session = get_session(account['role'])
+        try:
+            session = get_session(account['role'])
+        except ClientError:
+            log.warning("Access denied on %s" % account['name'])
+            continue
         account_id = session.client('sts').get_caller_identity()['Account']
         prefix = destination.get('prefix', '').rstrip('/') + '/%s' % account_id
         prefix = "%s/flow-log" % prefix
@@ -581,7 +584,8 @@ def status(config, group, accounts=()):
             last_export = parse(tags['LastExport'])
             account['export'] = last_export.strftime('%Y/%m/%d')
 
-    accounts = [a for a in config.get('accounts') if a in accounts or not accounts]
+    accounts = [a for a in config.get('accounts')
+                if 'export' in a and (a in accounts or not accounts)]
     accounts.sort(key=operator.itemgetter('export'), reverse=True)
     print(tabulate(accounts, headers='keys'))
 
