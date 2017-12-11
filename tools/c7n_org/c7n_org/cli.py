@@ -81,7 +81,6 @@ CONFIG_SCHEMA = {
 }
 
 
-
 @click.group()
 def cli():
     """custodian organization multi-account runner."""
@@ -117,8 +116,19 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None):
         filtered_policies.append(p)
     custodian_config['policies'] = filtered_policies
 
+    filter_accounts(accounts_config, tags, accounts)
+
+    load_resources()
+    MainThreadExecutor.async = False
+    executor = debug and MainThreadExecutor or ProcessPoolExecutor
+    return accounts_config, custodian_config, executor
+
+
+def filter_accounts(accounts_config, tags, accounts, not_accounts=None):
     filtered_accounts = []
     for a in accounts_config.get('accounts', ()):
+        if not_accounts and a['name'] in not_accounts:
+            continue
         if accounts and a['name'] not in accounts:
             continue
         if tags:
@@ -130,10 +140,6 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None):
                 continue
         filtered_accounts.append(a)
     accounts_config['accounts'] = filtered_accounts
-    load_resources()
-    MainThreadExecutor.async = False
-    executor = debug and MainThreadExecutor or ProcessPoolExecutor
-    return accounts_config, custodian_config, executor
 
 
 def report_account(account, region, policies_config, output_path, debug):
@@ -156,7 +162,7 @@ def report_account(account, region, policies_config, output_path, debug):
             r['policy'] = p.name
             r['region'] = p.options.region
             r['account'] = account['name']
-            for t in account['tags']:
+            for t in account.get('tags', ()):
                 if ':' in t:
                     k, v = t.split(':', 1)
                     r[k] = v
@@ -171,6 +177,7 @@ def report_account(account, region, policies_config, output_path, debug):
 @click.option('-s', '--output-dir', required=True, type=click.Path())
 @click.option('-a', '--accounts', multiple=True, default=None)
 @click.option('--field', multiple=True)
+@click.option('--no-default-fields', default=False, is_flag=True)
 @click.option('-t', '--tags', multiple=True, default=None)
 @click.option('-r', '--region', default=['us-east-1', 'us-west-2'], multiple=True)
 @click.option('--debug', default=False, is_flag=True)
@@ -178,7 +185,7 @@ def report_account(account, region, policies_config, output_path, debug):
 @click.option('-p', '--policy', multiple=True)
 @click.option('--format', default='csv', type=click.Choice(['csv', 'json']))
 @click.option('--resource', default=None)
-def report(config, output, use, output_dir, accounts, field, tags, region, debug, verbose, policy, format, resource):
+def report(config, output, use, output_dir, accounts, field, no_default_fields, tags, region, debug, verbose, policy, format, resource):
     """report on a cross account policy execution."""
     accounts_config, custodian_config, executor = init(
         config, use, debug, verbose, accounts, tags, policy, resource=resource)
@@ -229,7 +236,7 @@ def report(config, output, use, output_dir, accounts, field, tags, region, debug
     formatter = Formatter(
         factory.resource_type,
         extra_fields=field,
-        include_default_fields=True,
+        include_default_fields=not(no_default_fields),
         include_region=False,
         include_policy=False,
         fields=prefix_fields)
