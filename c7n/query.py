@@ -32,7 +32,7 @@ from c7n.actions import ActionRegistry
 from c7n.filters import FilterRegistry, MetricsFilter
 from c7n.tags import register_ec2_tags, register_universal_tags
 from c7n.utils import (
-    local_session, generate_arn, get_retry, chunks, camelResource)
+    local_session, generate_arn, get_retry, chunks, camelResource, dumps)
 from c7n.registry import PluginRegistry
 from c7n.manager import ResourceManager
 
@@ -309,6 +309,94 @@ class ConfigSource(object):
 
     def augment(self, resources):
         return resources
+
+
+@sources.register('revisions')
+class ResourceRevisions(ConfigSource):
+    """Evaluate all revisions of specified resources ids.
+
+    This provides a useful way to evaluate the historical compliance
+    of a resource.
+
+    We require resource ids to be specified in the query to avoid
+    query explosion as we will load all revisions of those resources
+    and we include deleted resources.
+
+    TODO: Check behavior for resources deleted and recreated with the same
+    name, assumption is that all recorded revisions returned across instances.
+    """
+
+    def get_resources(self, ids, cache=True):
+        client = local_session(self.manager.session_factory).client('config')
+        results = []
+
+        m = self.manager.get_model()
+        s = self.manager.get_source('config')
+
+        for i in ids:
+            paginator = client.get_paginator('get_resource_config_history')
+            pages = paginator.paginate(
+                resourceId=i, resourceType=m.config_type)
+            history = pager(pages, self.retry)
+            for r in history.get('configurationItems', ()):
+                if r['configurationItemStatus'] in (
+                        'ResourceNotRecorded', 'ResourceDeleted'):
+                    if not len(history['configurationItems']) > 1:
+                        self.manager.log.warning(
+                            "Skipping %s resource %s %s",
+                            r['configurationItemStatus'],
+                            r['arn'],
+                            dumps(r, indent=2))
+                    continue
+                results.append(
+                    self.load_resource(r, s))
+        return results
+
+    def load_resource(self, item, config_source):
+        resource = config_source.load_resource(item)
+        item.pop('configuration')
+        item.pop('tags', None)
+        item.pop('supplementaryConfiguration', None)
+        resource['c7n:revision'] = item
+        return resource
+
+    def resources(self, query=None):
+        query = self.manager.data.get('query', [])
+        resource_ids = None
+        for q in query:
+            if 'resource-ids' in q:
+                resource_ids = q.get('resource-ids')
+        if not resource_ids:
+            raise ValueError("Revisions source requires id specification")
+
+        client = local_session(self.manager.session_factory).client('config')
+        results = []
+
+        with self.manager.executor_factory(max_workers=4) as w:
+            ridents = []
+            for resource_set in chunks(resource_ids, 20):
+                ridents.extend([
+                    r['resourceId'] for r in client.list_discovered_resources(
+                        resourceIds=resource_set,
+                        resourceType=self.manager.get_model().config_type,
+                        includeDeletedResources=True
+                    ).get('resourceIdentifiers', ())])
+            self.manager.log.debug(
+                "querying %d %s found resources of %d ids",
+                len(ridents),
+                self.manager.__class__.__name__.lower(),
+                len(resource_ids))
+
+            for resource_set in chunks(ridents, 50):
+                futures = []
+                futures.append(w.submit(self.get_resources, resource_set))
+                for f in as_completed(futures):
+                    if f.exception():
+                        self.manager.log.error(
+                            "Exception getting resources from config \n %s" % (
+                                f.exception()))
+                    results.extend(f.result())
+        return results
 
 
 def pager(p, retry):

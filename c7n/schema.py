@@ -35,6 +35,7 @@ from jsonschema import Draft4Validator as Validator
 from jsonschema.exceptions import best_match
 
 from c7n.manager import resources
+from c7n.query import sources
 from c7n.resources import load_resources
 from c7n.filters import ValueFilter, EventFilter, AgeFilter
 
@@ -161,7 +162,7 @@ def generate(resource_types=()):
                 'description': {'type': 'string'},
                 'tags': {'type': 'array', 'items': {'type': 'string'}},
                 'mode': {'$ref': '#/definitions/policy-mode'},
-                'source': {'enum': ['describe', 'config']},
+                'source': {'enum': list(sources.keys())},
                 'actions': {
                     'type': 'array',
                 },
