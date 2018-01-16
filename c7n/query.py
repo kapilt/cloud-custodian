@@ -311,6 +311,19 @@ class ConfigSource(object):
         return resources
 
 
+@sources.register('config-s3')
+class ConfigS3(ConfigSource):
+
+    def get_resources(self, ids, cache=True):
+        client = local_session(self.manager.session_factory).client('config')
+        pass
+
+    def load_resource(self, item, config_source):
+        pass
+
+    def resources(self, query=None):
+        pass
+    
 @sources.register('revisions')
 class ResourceRevisions(ConfigSource):
     """Evaluate all revisions of specified resources ids.

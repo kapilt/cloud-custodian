@@ -58,8 +58,9 @@ class FlowRecord(object):
         '_end_date'
     ]
 
-    def __init__(self, line, EPOCH_32_MAX=2147483647):
-        fields = line.split()
+    def __init__(self, line=None, EPOCH_32_MAX=2147483647, fields=None):
+        if fields is None:
+            fields = line.split()
         # if cwl export pop date
         if len(fields) == 15:
             fields.pop(0)

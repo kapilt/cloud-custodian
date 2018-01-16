@@ -174,6 +174,78 @@ def resource_config_iter(files, batch_size=10000):
             yield config_set
 
 
+def record_stream_filter(record_stream, record_filter, batch_size=5000):
+    batch = []
+    for record_set in record_stream:
+        for r in record_set:
+            if record_filter(r):
+                batch.append(r)
+            if len(batch) % batch_size == 0:
+                yield batch
+                batch = []
+    if batch:
+        yield batch
+
+
+EBS_SCHEMA = """
+create table if not exists ebs (
+   volume_id text primary key,
+   instance_id text,
+   account_id  text,
+   region      text,
+   app         text,
+   env         text,
+   contact     text,
+   start       text,
+   end         text
+)
+"""
+
+
+def index_ebs_files(db, record_stream):
+    stats = Counter()
+    t = time.time()
+    with sqlite3.connect(db) as conn:
+        cursor = conn.cursor()
+        cursor.execute(EBS_SCHEMA)
+        rows = []
+        deletes = {}
+        skipped = 0
+        for record_set in record_stream:
+            for cfg in record_set:
+                if cfg['configurationItemStatus'] in ('ResourceDeleted',):
+                    deletes[cfg['resourceId']] = cfg['configurationItemCaptureTime']
+                    continue
+                if not cfg['configuration'].get('attachments'):
+                    skipped += 1
+                    continue
+                rows.append((
+                    cfg['resourceId'],
+                    cfg['configuration']['attachments'][0]['instanceId'],
+                    cfg['awsAccountId'],
+                    cfg['awsRegion'],
+                    cfg['tags'].get(APP_TAG),
+                    cfg['tags'].get(ENV_TAG),
+                    cfg['tags'].get(CONTACT_TAG),
+                    cfg['resourceCreationTime'],
+                    None
+                    ))
+        if rows:
+            for idx, r in enumerate(rows):
+                if r[0] in deletes:
+                    rows[idx] = list(r)
+                    rows[idx][-1] = deletes[r[0]]
+            cursor.executemany(
+            '''insert or replace into ebs values (?, ?, ?, ?, ?, ?, ?, ?, ?)''', rows)
+            stats['RowCount'] += len(rows)
+
+        log.debug("ebs stored:%d", len(rows))
+
+    stats['RowCount'] += len(rows)
+    stats['IndexTime'] = int(time.time() - t)
+    return stats
+
+
 
 EC2_SCHEMA = """
 create table if not exists ec2 (
@@ -213,7 +285,7 @@ def index_ec2_files(db, record_stream):
                     cfg['awsRegion'],
                     cfg['configuration'].get('privateIpAddress', ''),
                     cfg['tags'].get(APP_TAG),
-                    cfg['tags'].get(OWNER_TAG),
+                    cfg['tags'].get(ENV_TAG),
                     cfg['tags'].get(CONTACT_TAG),
                     cfg['tags'].get('aws:autoscaling:groupName', ''),
                     cfg['resourceCreationTime'],
@@ -240,21 +312,131 @@ def index_ec2_files(db, record_stream):
     return stats
 
 
-def index_elb_files(db, files):
+S3_SCHEMA = """
+create table if not exists buckets (
+   name           text,
+   account_id     text,
+   region         text,
+   app            text,
+   env            text,
+   contact        text,
+   start      datetime,
+   end        datetime,
+   resource       text
+)"""
+
+import csv
+
+def get_bucket_ids():
+    with open(os.path.expanduser('~/s3-buckets.csv'), 'rU') as fh:
+        return {r['BucketName'] for r in csv.DictReader(fh)}
+
+
+def index_filtered_s3_files(db, record_stream):
+    bucket_ids = get_bucket_ids()
+    def filter_resources(r):
+        return r['resourceId'] in bucket_ids
+    return index_s3_files(db, record_stream_filter(record_stream, filter_resources))
+
+
+def index_s3_files(db, record_stream):
     stats = Counter()
     t = time.time()
     with sqlite3.connect(db) as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-        create table if not exists elb (
-          lb_name       text,
-          account_id    text,
-          scheme        text,
-          type          text,
-          start     datetime,
-          end       datetime
-        )''')
+        cursor.execute(S3_SCHEMA)
+        deletes = {}
+        rows = []
+        skipped = 0
 
+        for record_set in record_stream:
+            for cfg in record_set:
+                if cfg['configurationItemStatus'] == 'ResourceNotRecorded':
+                    continue
+                if cfg['configurationItemStatus'] in ('ResourceDeleted'):
+                    deletes[cfg['resourceId']] = cfg['configurationItemCaptureTime']
+                    rows.append((
+                        cfg['resourceId'], None, None, None, None, None, None,
+                        cfg['configurationItemCaptureTime'], None))
+                    continue
+                rows.append((
+                    cfg['resourceId'],
+                    cfg['awsAccountId'],
+                    cfg['awsRegion'],
+                    cfg['tags'].get(APP_TAG),
+                    cfg['tags'].get(ENV_TAG),
+                    cfg['tags'].get(CONTACT_TAG),
+                    cfg['resourceCreationTime'],
+                    None,
+                    json.dumps(cfg)
+                    ))
+
+            if len(rows) % 10000:
+                cursor.executemany(
+                '''insert or replace into buckets values (?, ?, ?, ?, ?, ?, ?, ?, ?)''', rows)
+                stats['RowCount'] += len(rows)
+
+        if rows:
+            cursor.executemany(
+            '''insert or replace into buckets values (?, ?, ?, ?, ?, ?, ?, ?, ?)''', rows)
+            stats['RowCount'] += len(rows)
+
+    stats['IndexTime'] = int(time.time() - t)
+    return stats
+
+
+ELB_SCHEMA = """
+create table if not exists elbs (
+           name           text primary key,
+           account_id     text,
+           region         text,
+           app            text,
+           env            text,
+           contact        text,
+           start      datetime,
+           end        datetime
+)"""
+
+
+
+def index_elb_files(db, record_stream):
+    stats = Counter()
+    t = time.time()
+    with sqlite3.connect(db) as conn:
+        cursor = conn.cursor()
+        cursor.execute(ELB_SCHEMA)
+        rows = []
+        deletes = {}
+        skipped = 0
+        for record_set in record_stream:
+            for cfg in record_set:
+                if cfg['configurationItemStatus'] in ('ResourceDeleted',):
+                    deletes[cfg['resourceId']] = cfg['configurationItemCaptureTime']
+                    continue
+                rows.append((
+                    cfg['resourceName'],
+                    cfg['awsAccountId'],
+                    cfg['awsRegion'],
+                    cfg['tags'].get(APP_TAG),
+                    cfg['tags'].get(ENV_TAG),
+                    cfg['tags'].get(CONTACT_TAG),
+                    cfg['resourceCreationTime'],
+                    None
+                    ))
+        if rows:
+            for idx, r in enumerate(rows):
+                if r[0] in deletes:
+                    rows[idx] = list(r)
+                    rows[idx][-1] = deletes[r[0]]
+            cursor.executemany(
+            '''insert or replace into elbs values (?, ?, ?, ?, ?, ?, ?, ?)''', rows)
+            stats['RowCount'] += len(rows)
+
+        log.debug("elbs stored:%d", len(rows))
+
+    stats['RowCount'] += len(rows)
+    stats['IndexTime'] = int(time.time() - t)
+    return stats
 
 
 def index_eni_files(db, record_stream):
@@ -288,7 +470,7 @@ def index_eni_files(db, record_stream):
                     skipped += 1
                     continue
 
-                rid, rtype = resource_info(eni)
+                rtype, rid = resource_info(eni)
                 rows.append((
                     eni['networkInterfaceId'],
                     eni['privateIpAddress'],
@@ -302,7 +484,6 @@ def index_eni_files(db, record_stream):
 
         log.debug("inserting %d deletes %d skipped: %d", len(rows), len(deletes), skipped)
         if rows:
-            stats['RowCount'] += len(rows)
             for idx, r in enumerate(rows):
                 if r[0] in deletes:
                     rows[idx] = list(r)
@@ -334,13 +515,17 @@ def chunks(iterable, size=50):
 RESOURCE_MAPPING = {
     'Instance': 'AWS::EC2::Instance',
     'LoadBalancer': 'AWS::ElasticLoadBalancing',
-    'NetworkInterface': 'AWS::EC2::NetworkInterface'
+    'NetworkInterface': 'AWS::EC2::NetworkInterface',
+    'Volume': 'AWS::EC2::Volume',
+    'Bucket': 'AWS::S3::Bucket'
 }
 
 RESOURCE_FILE_INDEXERS = {
     'Instance': index_ec2_files,
     'NetworkInterface': index_eni_files,
-    'LoadBalancer': index_elb_files
+    'LoadBalancer': index_elb_files,
+    'Volume': index_ebs_files,
+    'Bucket': index_filtered_s3_files
 }
 
 
@@ -349,6 +534,30 @@ def cli():
     """AWS Network Resource Database"""
 
 
+@cli.command('list-app-resources')
+@click.option('--app')
+@click.option('--env')
+@click.option('--cmdb')
+@click.option('--start')
+@click.option('--end')
+@click.option('--tz')
+@click.option(
+    '-r', '--resources', multiple=True,
+    type=click.Choice(['Instance', 'LoadBalancer', 'Volume']))
+def list_app_resources(
+        app, env, resources, cmdb, start, end, tz):
+    """Analyze flow log records for application and generate metrics per period"""
+    logging.basicConfig(level=logging.INFO)
+    start, end = get_dates(start, end, tz)
+
+    all_resources = []
+    for rtype_name in resources:
+        rtype = Resource.get_type(rtype_name)
+        resources = rtype.get_resources(cmdb, start, end, app, env)
+        all_resources.extend(resources)
+    print(json.dumps(all_resources, indent=2))
+
+    
 @cli.command('load-resources')
 @click.option('--bucket', required=True)
 @click.option('--prefix', required=True)
@@ -357,7 +566,8 @@ def cli():
 @click.option('-a', '--accounts', multiple=True)
 @click.option('--start')
 @click.option('--end')
-@click.option('-r', '--resources', multiple=True, type=click.Choice(['Instance', 'LoadBalancer', 'NetworkInterface']))
+@click.option('-r', '--resources', multiple=True,
+                  type=click.Choice(list(RESOURCE_FILE_INDEXERS.keys())))
 @click.option('--store', type=click.Path())
 @click.option('-f', '--db')
 @click.option('-v', '--verbose', is_flag=True)
@@ -370,13 +580,14 @@ def load_resources(bucket, prefix, region, account_config, accounts,
     start = date_parse(start)
     end = date_parse(end)
 
+    account_ids = []
     with open(account_config) as fh:
-        account_ids = [
-            a['accountNumber'] for a in json.load(fh)['accounts'].values()]
-
-    if accounts:
-        account_ids = [a for a in account_ids if a in accounts]
-
+        for name, a in json.load(fh)['accounts'].items():
+            if accounts:
+                if a['accountNumber'] in accounts or name in accounts:
+                    account_ids.append(a['accountNumber'])
+            else:
+                account_ids.append(a['accountNumber'])
 
     ip_count = 0
     executor = ProcessPoolExecutor

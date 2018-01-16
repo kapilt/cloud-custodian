@@ -22,6 +22,7 @@ from datetime import datetime
 import jmespath
 import logging
 import os
+import time
 import zlib
 
 import six
@@ -676,6 +677,15 @@ def add_auto_tag_user(registry, _):
 resources.subscribe(resources.EVENT_FINAL, add_auto_tag_user)
 
 
+def register_index_metrics(registry, _):
+    for resource in registry.keys():
+        klass = registry.get(resource)
+        if klass.filter_registry.get('metrics') and not klass.action_registry.get('index-metrics'):
+            klass.action_registry.register('index-metrics', IndexMetrics)
+
+resources.subscribe(resources.EVENT_FINAL, register_index_metrics)
+
+         
 class IndexMetrics(BaseAction):
     """Store resource cloud watch metrics into a data store.
     """
@@ -713,7 +723,6 @@ class IndexMetrics(BaseAction):
             from influxdb import InfluxDBClient
         except:
             raise FilterValidationError("missing python influxdb client library")
-        InfluxDBClient
         return self
 
     def process(self, resources):
@@ -734,6 +743,7 @@ class IndexMetrics(BaseAction):
             self.process_resource_set(sink, tags, resource_set)
 
     def process_resource_set(self, sink, tags, resource_set):
+        from requests.exceptions import ConnectionError
         points = []
         model = self.manager.resource_type
         for r in resource_set:
@@ -777,7 +787,20 @@ class IndexMetrics(BaseAction):
                     p['tags'].update(tags)
                     p['tags'].update(rtags)
                     points.append(p)
-        sink.write_points(points)
+
+        for point_set in utils.chunks(points, 10000):
+            errs = 0
+            while True:
+                try: 
+                    sink.write_points(point_set)
+                except ConnectionError:
+                    errs += 1
+                    if errs > 3:
+                        raise
+                    time.sleep(3)
+                    continue
+                else:
+                    break
 
 
 class PutMetric(BaseAction):

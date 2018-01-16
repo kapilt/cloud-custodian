@@ -18,6 +18,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from concurrent.futures import as_completed
 from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
+import math
 
 from c7n.filters.core import Filter, OPERATORS, FilterValidationError
 from c7n.utils import local_session, type_schema, chunks
@@ -61,12 +63,14 @@ class MetricsFilter(Filter):
            'statistics': {'type': 'string', 'enum': [
                'Average', 'Sum', 'Maximum', 'Minimum', 'SampleCount']},
            'days': {'type': 'number'},
+           'start': {'type': 'string'},
+           'end': {'type': 'string'},
            'op': {'type': 'string', 'enum': list(OPERATORS.keys())},
            'value': {'type': 'number'},
            'period': {'type': 'number'},
            'attr-multiplier': {'type': 'number'},
            'percent-attr': {'type': 'string'},
-           'required': ('value', 'name')})
+           'required': ('name',)})
 
     permissions = ("cloudwatch:GetMetricStatistics",)
 
@@ -105,15 +109,23 @@ class MetricsFilter(Filter):
     def process(self, resources, event=None):
         days = self.data.get('days', 14)
         duration = timedelta(days)
-
-        self.metric = self.data['name']
-        self.end = datetime.utcnow()
-        self.start = self.end - duration
+        if 'end' in self.data:
+            self.end = parse_date(self.data['end'])
+        else:
+            self.end = datetime.utcnow()
+        if 'start' in self.data:
+            self.start = parse_date(self.data['start'])
+        else:
+            self.start = self.end - duration
         self.period = int(self.data.get('period', duration.total_seconds()))
+
+        
+        self.metric = self.data['name']
+
         self.statistics = self.data.get('statistics', 'Average')
         self.model = self.manager.get_model()
         self.op = OPERATORS[self.data.get('op', 'less-than')]
-        self.value = self.data['value']
+        self.value = self.data.get('value')
 
         ns = self.data.get('namespace')
         if not ns:
@@ -122,7 +134,12 @@ class MetricsFilter(Filter):
                 ns = self.DEFAULT_NAMESPACE[self.model.service]
         self.namespace = ns
 
-        self.log.debug("Querying metrics for %d", len(resources))
+        self.log.debug("Querying metrics %s:%s for %d from %s %s",
+                           self.namespace,
+                           self.metric,
+                           len(resources),
+                           self.start,
+                           self.end)
         matched = []
         with self.executor_factory(max_workers=3) as w:
             futures = []
@@ -142,6 +159,19 @@ class MetricsFilter(Filter):
         return [{'Name': self.model.dimension,
                  'Value': resource[self.model.dimension]}]
 
+    def get_date_increments(self):
+        date_delta = (self.end - self.start)
+        increments = date_delta.total_seconds() / float(self.period)
+        if increments <= self.MAX_RESULT_POINTS:
+            yield (self.start, self.end)
+            return
+        parts = date_delta.total_seconds() / (self.MAX_RESULT_POINTS * self.period)
+        for i in range(int(math.ceil(parts))):
+            max_period = timedelta(seconds=(self.MAX_RESULT_POINTS * self.period))
+            start = self.start + max_period * i
+            end = min(self.end, self.start + max_period * (i + 1))
+            yield (start, end)
+            
     def process_resource_set(self, resource_set):
         client = local_session(
             self.manager.session_factory).client('cloudwatch')
@@ -158,17 +188,21 @@ class MetricsFilter(Filter):
             # across different periods or dimensions would be problematic.
             key = "%s.%s.%s" % (self.namespace, self.metric, self.statistics)
             if key not in collected_metrics:
-                collected_metrics[key] = client.get_metric_statistics(
-                    Namespace=self.namespace,
-                    MetricName=self.metric,
-                    Statistics=[self.statistics],
-                    StartTime=self.start,
-                    EndTime=self.end,
-                    Period=self.period,
-                    Dimensions=dimensions)['Datapoints']
-            if len(collected_metrics[key]) == 0:
+                collected_metrics[key] = mset = []
+                for s, e in self.get_date_increments():
+                    mset.extend(client.get_metric_statistics(
+                        Namespace=self.namespace,
+                        MetricName=self.metric,
+                        Statistics=[self.statistics],
+                        StartTime=s,
+                        EndTime=e,
+                        Period=self.period,
+                        Dimensions=dimensions)['Datapoints'])
+            if self.value is None:
+                matched.append(r)
+            elif len(collected_metrics[key]) == 0:
                 continue
-            if self.data.get('percent-attr'):
+            elif self.data.get('percent-attr'):
                 rvalue = r[self.data.get('percent-attr')]
                 if self.data.get('attr-multiplier'):
                     rvalue = rvalue * self.data['attr-multiplier']

@@ -91,17 +91,16 @@ CONFIG_SCHEMA = {
             'type': 'array',
             'items': {
                 'type': 'object',
-                'anyOf': [
-                    {"required": ['profile']},
-                    {"required": ['role']}
-                ],
-                'required': ['name', 'bucket', 'regions', 'title', 'id'],
+                "required": ['role', 'name', 'account_id', 'regions'],
                 'properties': {
                     'name': {'type': 'string'},
-                    'title': {'type': 'string'},
-                    'tags': {'type': 'object'},
+                    'account_id': {'type': 'string'},
+                    'tags': {'type': 'array'},
                     'bucket': {'type': 'string'},
-                    'regions': {'type': 'array', 'items': {'type': 'string'}}
+                    'regions': {'type': 'array', 'items': {'type': 'string'}},
+                    'role': {'oneOf': [
+                        {'type': 'array', 'items': {'type': 'string'}},
+                        {'type': 'string'}]}
                 }
             }
         }
@@ -200,8 +199,8 @@ class InfluxIndexer(Indexer):
                     'region': p['Region'],
                     'account': p['Account'],
                     'policy': p['Policy'],
-                    'env': p['Env'],
-                    'division': p['Division'],
+                    'env': p.get('type', ''),
+                    'division': p.get('division', ''),
                     'resource': p.get('ResType', ''),
                     'metric': p['MetricName'],
                     'namespace': p['Namespace']}})
@@ -209,14 +208,19 @@ class InfluxIndexer(Indexer):
 
 
 def index_metric_set(indexer, account, region, metric_set, start, end, period):
+
     session = local_session(
-        lambda : assumed_session(account['role'], 'PolicyIndex'))
+        lambda : get_session(account['role'], 'PolicyMetrics'))
     client = session.client('cloudwatch', region_name=region)
 
     t = time.time()
-    account_info = dict(account['tags'])
+    account_info = {}
+    for tag in account.get('tags', ()):
+        if ':' in tag:
+            k, v = tag.split(':', 1)
+            account_info[k] = v
     account_info['Account'] = account['name']
-    account_info['AccountId'] = account['id']
+    account_info['AccountId'] = account['account_id']
     account_info['Region'] = region
     point_count = 0
     for m in metric_set:
@@ -244,23 +248,29 @@ def index_metric_set(indexer, account, region, metric_set, start, end, period):
             p.update(m)
             p.update(account_info)
         point_count += len(points)
-        log.debug("account:%s region:%s metric:%s points:%d policy:%s",
+        log.debug("indexed metrics account:%s region:%s metric:%s points:%d policy:%s",
                   account['name'], region, m['MetricName'], len(points),
                   dims.get('Policy', 'unknown'))
         indexer.index(points)
     return time.time() - t, point_count
 
 
-def index_account_metrics(config, idx_name, region, account, start, end, period):
-    session = assumed_session(account['role'], 'PolicyIndex')
+def index_account_metrics(config, idx_name, region, account,
+                              start, end, period, metric_name=None):
+    session = local_session(
+        lambda : get_session(account['role'], 'PolicyMetrics'))
     indexer = get_indexer(config)
 
     client = session.client('cloudwatch', region_name=region)
     policies = set()
     account_metrics = []
 
+    params = {'Namespace': NAMESPACE}
+    if metric_name:
+        params['MetricName'] = metric_name
+        
     pager = client.get_paginator('list_metrics')
-    for p in pager.paginate(Namespace=NAMESPACE):
+    for p in pager.paginate(**params):
         metrics = p.get('Metrics')
         for metric in metrics:
             if 'Dimensions' not in metric:
@@ -270,21 +280,22 @@ def index_account_metrics(config, idx_name, region, account, start, end, period)
             dims = {d['Name']: d['Value'] for d in metric.get(
                 'Dimensions', ())}
             if dims['Policy'] not in policies:
-                log.debug("Processing account:%s region:%s policy: %s",
+                log.debug("metrics policy task account:%s region:%s policy: %s",
                           account['name'], region, dims['Policy'])
                 policies.add(dims['Policy'])
             account_metrics.append(metric)
 
-    for p in pager.paginate(Namespace='AWS/Lambda'):
-        metrics = p.get('Metrics')
-        for metric in metrics:
-            dims = {d['Name']: d['Value'] for d
-                    in metric.get('Dimensions', ())}
-            if not dims.get('FunctionName', '').startswith('custodian-'):
-                continue
-            account_metrics.append(metric)
+    if not metric_name:
+        for p in pager.paginate(Namespace='AWS/Lambda'):
+            metrics = p.get('Metrics')
+            for metric in metrics:
+                dims = {d['Name']: d['Value'] for d
+                        in metric.get('Dimensions', ())}
+                if not dims.get('FunctionName', '').startswith('custodian-'):
+                    continue
+                account_metrics.append(metric)
 
-    log.debug("account:%s region:%s processing metrics:%d start:%s end:%s",
+    log.debug("metrics task totals account:%s region:%s processing metrics:%d start:%s end:%s",
               account['name'], region, len(account_metrics),
               start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d"))
 
@@ -304,7 +315,10 @@ def index_account_metrics(config, idx_name, region, account, start, end, period)
     return region_time, region_points
 
 
-def index_account_resources(config, account, region, policy, date):
+def index_account_resources(config, account, region, policy, date): 
+    
+    session = assumed_session(account['role'], 'PolicyIndex')
+   
     indexer = get_indexer(config, type=policy['resource'])
     bucket = account['bucket']
     key_prefix = "accounts/{}/{}/policies/{}".format(
@@ -382,13 +396,27 @@ def valid_date(date, delta=0):
     return date
 
 
+def get_session(role, session_name="c7n-metrics", session=None):
+    if role == 'self':
+        session = boto3.Session()
+    elif isinstance(role, basestring):
+        session = assumed_session(role, session_name)
+    elif isinstance(role, list):
+        session = None
+        for r in role:
+            session = assumed_session(r, session_name, session=session)
+    else:
+        session = boto3.Session()
+    return session
+
+
 @click.group()
 def cli():
     """Custodian Indexing"""
 
 
 @cli.command(name='index-metrics')
-@click.option('-c', '--config', required=True, help="Config file")
+@click.option('-c', '--config', required=True, help="Config file", type=click.Path())
 @click.option('--start', required=True, help="Start date")
 @click.option('--end', required=False, help="End Date")
 @click.option('--incremental/--no-incremental', default=False,
@@ -397,11 +425,14 @@ def cli():
 @click.option('-a', '--accounts', multiple=True)
 @click.option('-p', '--period', default=3600)
 @click.option('-t', '--tag')
+@click.option('-m', '--metric-name')
 @click.option('--index', default='policy-metrics')
 @click.option('--verbose/--no-verbose', default=False)
+@click.option('--debug', is_flag=True)
 def index_metrics(
         config, start, end, incremental=False, concurrency=5, accounts=None,
-        period=3600, tag=None, index='policy-metrics', verbose=False):
+        period=3600, tag=None, index='policy-metrics', verbose=False, debug=False,
+        metric_name=None):
     """index policy metrics"""
     logging.basicConfig(level=(verbose and logging.DEBUG or logging.INFO))
     logging.getLogger('botocore').setLevel(logging.WARNING)
@@ -409,6 +440,13 @@ def index_metrics(
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('requests').setLevel(logging.WARNING)
     logging.getLogger('c7n.worker').setLevel(logging.INFO)
+
+    executor = ProcessPoolExecutor
+
+    if debug:
+        from c7n.executor import MainThreadExecutor
+        MainThreadExecutor.async = False
+        executor = MainThreadExecutor
 
     with open(config) as fh:
         config = yaml.safe_load(fh.read())
@@ -421,16 +459,19 @@ def index_metrics(
     i_time = i_points = 0
     t = time.time()
 
-    with ProcessPoolExecutor(max_workers=concurrency) as w:
+
+    with executor(max_workers=concurrency) as w:
         futures = {}
         jobs = []
         # Filter
-        for account in config.get('accounts'):
-            if accounts and account['name'] not in accounts:
+        for account in config.get('accounts', ()):
+            if accounts and not (
+                    account['name'] in accounts or
+                    account['account_id'] in accounts):
                 continue
             if tag:
                 found = False
-                for t in account['tags'].values():
+                for t in account.get('tags', ()):
                     if tag == t:
                         found = True
                         break
@@ -439,7 +480,8 @@ def index_metrics(
             p_accounts.add((account['name']))
             for region in account.get('regions'):
                 for (p_start, p_end) in get_periods(start, end, period):
-                    p = (config, index, region, account, p_start, p_end, period)
+                    p = (config, index, region, account, p_start, p_end,
+                             period, metric_name)
                     jobs.append(p)
 
         # by default we'll be effectively processing in order, but thats bumps
@@ -456,7 +498,7 @@ def index_metrics(
 
         # Process completed
         for f in as_completed(futures):
-            config, index, region, account, p_start, p_end, period = futures[f]
+            config, index, region, account, p_start, p_end, period, _ = futures[f]
             if f.exception():
                 log.warning("error account:%s region:%s error:%s",
                             account['name'], region, f.exception())
