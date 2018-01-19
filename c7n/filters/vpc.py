@@ -153,9 +153,9 @@ class NetworkLocation(Filter):
                 for k, v in i.items():
                     if jmespath.search(k, r) == v:
                         found = True
-                if found == True:
+                if found is True:
                     break
-            if found == True:
+            if found is True:
                 continue
             results.append(r)
         return results
