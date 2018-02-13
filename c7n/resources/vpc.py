@@ -1480,11 +1480,11 @@ class EndpointSecurityGroupFilter(net_filters.SecurityGroupFilter):
     RelatedIdsExpression = "Groups[].GroupId"
 
 
-@VpcEndpoint.filter_registry.register('subnet')    
+@VpcEndpoint.filter_registry.register('subnet')
 class EndpointSubnetFilter(net_filters.SubnetFilter):
 
     RelatedIdsExpression = "SubnetIds[]"
-        
+
 
 @resources.register('key-pair')
 class KeyPair(query.QueryResourceManager):
