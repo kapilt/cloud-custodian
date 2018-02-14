@@ -220,7 +220,7 @@ class PythonPackageArchive(object):
 
 def checksum(fh, hasher, blocksize=65536):
     buf = fh.read(blocksize)
-    while len(buf) > 0:
+    while buf:
         hasher.update(buf)
         buf = fh.read(blocksize)
     return hasher.digest()
@@ -379,7 +379,7 @@ class LambdaManager(object):
     def diff_tags(old_tags, new_tags):
         add = {}
         remove = set()
-        for k,v in new_tags.items():
+        for k, v in new_tags.items():
             if k not in old_tags or old_tags[k] != v:
                 add[k] = v
         for k in old_tags:
@@ -1033,7 +1033,8 @@ class BucketLambdaNotification(object):
         self.session = session_factory()
         self.bucket = bucket
 
-    def delta(self, src, tgt):
+    @staticmethod
+    def delta(src, tgt):
         for k in ['Id', 'LambdaFunctionArn', 'Events', 'Filters']:
             if src.get(k) != tgt.get(k):
                 return True
@@ -1062,7 +1063,7 @@ class BucketLambdaNotification(object):
             'Events': self.data.get('events', ['s3:ObjectCreated:*'])}
         if self.data.get('filters'):
             n_params['Filters'] = {
-                'Key': {'FilterRules': self.filters}}
+                'Key': {'FilterRules': self.data['filters']}}
 
         if found:
             if self.delta(found, n_params):
@@ -1199,7 +1200,7 @@ class SNSSubscription(object):
     def add(self, func):
         lambda_client = self.session.client('lambda')
         for arn in self.topic_arns:
-            region, topic_name, statement_id = self._parse_arn(arn)
+            _, topic_name, statement_id = self._parse_arn(arn)
 
             log.info("Subscribing %s to %s" % (func.name, topic_name))
 
@@ -1207,7 +1208,7 @@ class SNSSubscription(object):
             try:
                 lambda_client.add_permission(
                     FunctionName=func.name,
-                    StatementId='sns-topic-' + topic_name,
+                    StatementId=statement_id,
                     SourceArn=arn,
                     Action='lambda:InvokeFunction',
                     Principal='sns.amazonaws.com')
@@ -1225,7 +1226,7 @@ class SNSSubscription(object):
     def remove(self, func):
         lambda_client = self.session.client('lambda')
         for topic_arn in self.topic_arns:
-            region, topic_name, statement_id = self._parse_arn(topic_arn)
+            _, topic_name, statement_id = self._parse_arn(topic_arn)
 
             try:
                 response = lambda_client.remove_permission(
@@ -1383,7 +1384,7 @@ class ConfigRule(object):
             return self.client.put_config_rule(ConfigRule=rule)
         elif rule:
             log.debug("Config rule up to date")
-            return
+            return None
         try:
             self.session.client('lambda').add_permission(
                 FunctionName=func.name,
