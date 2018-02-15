@@ -109,3 +109,12 @@ class PluginRegistry(object):
         for ep in iter_entry_points(group="custodian.%s" % self.plugin_type):
             f = ep.load()
             f()
+
+
+class ComponentContainer(dict):
+    """support for a named component registry.
+    """
+    __slots__ = ()
+
+    def register(self, component):
+        self[component.name] = component
