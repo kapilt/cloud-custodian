@@ -27,10 +27,11 @@ from concurrent.futures import (
     as_completed)
 import yaml
 
-import click
-import jsonschema
+import boto3
 from botocore.compat import OrderedDict
 from botocore.exceptions import ClientError
+import click
+import jsonschema
 
 from c7n.credentials import assumed_session
 from c7n.executor import MainThreadExecutor
@@ -125,6 +126,14 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None):
     return accounts_config, custodian_config, executor
 
 
+def resolve_regions(regions, partition='aws'):
+    if 'all' in regions:
+        return boto3.Session().get_available_regions('ec2', partition)
+    if not regions:
+        return ('us-east-1', 'us-west-2')
+    return regions
+
+
 def filter_accounts(accounts_config, tags, accounts, not_accounts=None):
     filtered_accounts = []
     for a in accounts_config.get('accounts', ()):
@@ -201,7 +210,7 @@ def report(config, output, use, output_dir, accounts, field, no_default_fields, 
     with executor(max_workers=WORKER_COUNT) as w:
         futures = {}
         for a in accounts_config.get('accounts', ()):
-            for r in region or a.get('regions', ()) or ('us-east-1', 'us-west-2'):
+            for r in resolve_regions(region or a.get('regions', ())):
                 futures[w.submit(
                     report_account,
                     a, r,
@@ -302,7 +311,7 @@ def run_script(config, output_dir, accounts, tags, region, echo, serial, script_
     with executor(max_workers=WORKER_COUNT) as w:
         futures = {}
         for a in accounts_config.get('accounts', ()):
-            for r in region or a.get('regions', ()) or ('us-east-1', 'us-west-2'):
+            for r in resolve_regions(region or a.get('regions', ())):
                 futures[w.submit(
                     run_account_script, a, r, output_dir, serial, script_args)
                             ] = (a, r)
@@ -400,7 +409,7 @@ def run(config, use, output_dir, accounts, tags,
     with executor(max_workers=WORKER_COUNT) as w:
         futures = {}
         for a in accounts_config.get('accounts', ()):
-            for r in region or a.get('regions', ()) or ('us-east-1', 'us-west-2'):
+            for r in resolve_regions(region or a.get('regions', ())):
                 futures[w.submit(
                     run_account,
                     a, r,
