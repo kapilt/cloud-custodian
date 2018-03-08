@@ -57,12 +57,15 @@ CONFIG_SCHEMA = {
         'account': {
             'type': 'object',
             'additionalProperties': True,
-            'required': ['role', 'account_id'],
+            'oneOf': [
+                {'required': ['role', 'account_id']},
+                {'required': ['profile', 'account_id']}],
             'properties': {
                 'name': {'type': 'string'},
+                'email': {'type': 'string'},
                 'account_id': {'type': 'string'},
+                'profile': {'type': 'string'},
                 'tags': {'type': 'array', 'items': {'type': 'string'}},
-#                'bucket': {'type': 'string'},
                 'regions': {'type': 'array', 'items': {'type': 'string'}},
                 'role': {'oneOf': [
                     {'type': 'array', 'items': {'type': 'string'}},
@@ -132,6 +135,16 @@ def resolve_regions(regions, partition='aws'):
     if not regions:
         return ('us-east-1', 'us-west-2')
     return regions
+
+
+def get_session(account, session_name, region):
+    if account.get('role'):
+        return assumed_session(role, session_name, region=region)
+    elif account.get('profile')
+        return SessionFactory(region, profile)()
+    else:
+        raise ValueError(
+            "No profile or role assume specified for account %s" % account)
 
 
 def filter_accounts(accounts_config, tags, accounts, not_accounts=None):
@@ -258,7 +271,7 @@ def report(config, output, use, output_dir, accounts, field, no_default_fields, 
 
 def run_account_script(account, region, output_dir, debug, script_args):
     try:
-        session = assumed_session(account['role'], "org-script", region=region)
+        session = get_session(account, "org-script", region)
         creds = session._session.get_credentials()
     except:
         log.error(
@@ -346,10 +359,15 @@ def run_account(account, region, policies_config, output_path, cache_period, met
 
     cache_path = os.path.join(output_path, "c7n.cache")
     bag = Bag.empty(
-        region=region, assume_role=account['role'],
+        region=region,
         cache_period=cache_period, dryrun=dryrun, output_dir=output_path,
         account_id=account['account_id'], metrics_enabled=metrics,
         cache=cache_path, log_group=None, profile=None, external_id=None)
+
+    if account['role']:
+        bag['assume_role'] = account['role']
+    elif account['profile']:
+        bag['profile'] = account['profile']
 
     policies = PolicyCollection.from_data(policies_config, bag)
     policy_counts = {}
