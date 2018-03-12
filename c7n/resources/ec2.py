@@ -1379,11 +1379,14 @@ class PropagateSpotTags(BaseAction):
                 'Values': list(request_instance_map.keys())}]).get(
                     'SpotInstanceRequests', [])
 
+        updated = []
         for r in requests:
             if not r.get('Tags'):
                 continue
-            self.process_request_instances(
-                client, r, request_instance_map[r['SpotInstanceRequestId']])
+            updated.extend(
+                self.process_request_instances(
+                    client, r, request_instance_map[r['SpotInstanceRequestId']]))
+        return updated
 
     def process_request_instances(self, client, request, instances):
         # Now we find the tags we can copy : either all, either those
