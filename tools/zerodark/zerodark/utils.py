@@ -18,8 +18,25 @@ from dateutil.parser import parse as date_parse
 from dateutil.tz import tzutc
 from dateutil import zoneinfo
 
+import json
 import functools
 import humanize
+
+
+def unwrap(msg):
+
+    data = None
+    if 'Body' in msg:
+        data = json.loads(msg['Body'])
+    elif 'Message' in msg:
+        data = json.loads(msg['Message'])
+    else:
+        raise ValueError("unknown msg: %s" % msg)
+
+    if 'Message' in data:
+        data = json.loads(data['Message'])
+
+    return data
 
 
 def row_factory(cursor, row):
@@ -47,3 +64,20 @@ def get_dates(start, end, tz):
     if start > end:
         start, end = end, start
     return start, end
+
+
+def get_queue(queue):
+    if queue.startswith('https://queue.amazonaws.com'):
+        region = 'us-east-1'
+        queue_url = queue
+    elif queue.startswith('https://sqs.'):
+        region = queue.split('.', 2)[1]
+        queue_url = queue
+    elif queue.startswith('arn:sqs'):
+        queue_arn_split = queue.split(':', 5)
+        region = queue_arn_split[3]
+        owner_id = queue_arn_split[4]
+        queue_name = queue_arn_split[5]
+        queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (
+            region, owner_id, queue_name)
+    return queue_url, region

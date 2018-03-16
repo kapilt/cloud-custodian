@@ -33,7 +33,7 @@ import yaml
 
 from .constants import RESOURCE_KEY, REGION_KEY
 from .metrics import Resource
-from .utils import human_size, unwrap, get_dates
+from .utils import human_size, unwrap, get_dates, get_queue
 
 log = logging.getLogger('zerodark.ipdb')
 
@@ -111,7 +111,9 @@ def process_account_resources(
 
 def resource_info(eni_cfg):
     desc = eni_cfg.get('description')
-    instance_id = eni_cfg['attachment'].get('instanceId', '')
+    instance_id = None
+    if eni_cfg['attachment']:
+        instance_id = eni_cfg['attachment'].get('instanceId')
     if instance_id:
         rtype = RESOURCE_KEY['ec2']
         rid = instance_id
@@ -482,7 +484,7 @@ def index_eni_files(db, record_stream):
                     deletes[cfg['resourceId']] = cfg['configurationItemCaptureTime']
                     continue
                 eni = cfg['configuration']
-                if 'attachment' not in eni or cfg['resourceId'] in rids:
+                if 'attachment' not in eni or cfg['resourceId'] in rids or not eni['attachment']:
                     skipped += 1
                     continue
                 rids.add(cfg['resourceId'])
@@ -495,7 +497,8 @@ def index_eni_files(db, record_stream):
                     rtype,
                     eni['subnetId'],
                     REGION_KEY[cfg['awsRegion']],
-                    eni['attachment'].get('attachTime') or cfg['configurationItemCaptureTime'],
+                    eni['attachment'].get('attachTime') or cfg[
+                        'configurationItemCaptureTime'],
                     None))
 
         log.debug(
@@ -505,6 +508,7 @@ def index_eni_files(db, record_stream):
             stats['RecordOK'])
 
         if rows:
+            # TODO: deletes only processed against batch
             for idx, r in enumerate(rows):
                 if r[0] in deletes:
                     rows[idx] = list(r)
@@ -512,10 +516,10 @@ def index_eni_files(db, record_stream):
                     del deletes[r[0]]
             try:
                 cursor.executemany(
-                    '''insert into enis values (?, ?, ?, ?, ?, ?, ?, ?, ?)''', rows)
-            except Exception:
-                log.error("Error inserting enis account:%s rows:%d",
-                          cfg['awsAccountId'], len(rows))
+                   '''insert or replace into enis values (?, ?, ?, ?, ?, ?, ?, ?, ?)''', rows)
+            except Exception as e:
+                log.error("Error inserting enis account:%s rows:%d err:%s",
+                          cfg['awsAccountId'], len(rows), e)
             stats['RowCount'] += len(rows)
 
     # result = cursor.execute('select count(distinct ip_address) from enis').fetchone()
@@ -562,46 +566,89 @@ def cli():
 @click.option('--queue')
 @click.option('--s3-key')
 @click.option('--period', default=60, type=click.INT)
+@click.option('--queue-type', default="config")
 @click.option('--verbose', default=False, is_flag=True)
-def worker_config(queue, s3_key, period, verbose):
+@click.option('--config', type=click.Path())
+def worker_config(queue, s3_key, period, verbose, queue_type, config):
     """daemon queue worker for config notifications"""
     logging.basicConfig(level=(verbose and logging.DEBUG or logging.INFO))
     logging.getLogger('botocore').setLevel(logging.WARNING)
     logging.getLogger('s3transfer').setLevel(logging.WARNING)
 
-    queue, region = get_queue(queue)
+    with open(config) as fh:
+        conf = yaml.safe_load(fh.read()).get('ipdb-worker')
+
+    queue, region = get_queue(conf['queue']['url'])
     factory = SessionFactory(region)
     session = factory()
     client = session.client('sqs')
     messages = MessageIterator(client, queue, timeout=20)
 
+    processor = (
+        conf['queue']['type'] == 'config' and worker_process_config_event
+        or worker_process_config_s3)
+    processor(conf, client, messages)
+
+
+def worker_process_config_event(config, client, messages):
+    resource_types = set(config['resources'])
+    db = get_db(config)
+
+    t = time.time()
+    stats = Counter()
+    rtype_map = {v: k for k, v in RESOURCE_MAPPING.items()}
+    mbatch_limit = config.get('record-batch', 0)
+    mbatch = []
+    btime = time.time()
+
     for m in messages:
+        stats['Messages'] += 1
         msg = unwrap(m)
+        if msg['messageType'] == 'ConfigurationHistoryDeliveryCompleted':
+            continue
         if 'configurationItemSummary' in msg:
             rtype = msg['configurationItemSummary']['resourceType']
         else:
             rtype = msg['configurationItem']['resourceType']
-        if rtype not in RESOURCE_MAPPING.values():
-            log.info("skipping %s" % rtype)
+        if rtype not in resource_types:
             messages.ack(m)
-        log.info("message received %s", m)
+            continue
+        # micro batch
+        mbatch.append((
+            msg['configurationItem'], {'ReceiptHandle': m['ReceiptHandle']}))
+        if len(mbatch) < mbatch_limit:
+            continue
+        log.info("indexing microbatch %0.2f records", time.time() - btime)
+        indexer = RESOURCE_FILE_INDEXERS[rtype_map[rtype]]
+        # extract db init out, resource class indexer
+        stats += indexer(db, [[m[0] for m in mbatch]])
+        mbatch, btime = [], time.time()
+        for _, m in mbatch:
+            messages.ack(m)
+        if time.time() - t > config['flush-period']:
+            publish_db(config, db)
+            t = time.time()
 
 
-def get_queue(queue):
-    if queue.startswith('https://queue.amazonaws.com'):
-        region = 'us-east-1'
-        queue_url = queue
-    elif queue.startswith('https://sqs.'):
-        region = queue.split('.', 2)[1]
-        queue_url = queue
-    elif queue.startswith('arn:sqs'):
-        queue_arn_split = queue.split(':', 5)
-        region = queue_arn_split[3]
-        owner_id = queue_arn_split[4]
-        queue_name = queue_arn_split[5]
-        queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (
-            region, owner_id, queue_name)
-    return queue_url, region
+def worker_process_config_s3(config, client, messages):
+    for m in messages:
+        msg = unwrap(m)
+        for record in msg.get('Records', ()):
+            if 'eventSource' not in record:
+                log.warning("unknown message in queue %s" % (record.keys()),)
+                messages.ack(m)
+            if record['eventName'] != 'ObjectCreated:Put':
+                messages.ack(m)
+
+
+def get_db(config):
+    db_conf = config['db']
+    if db_conf['type'] == 'file':
+        return db_conf['path']
+
+
+def publish_db(config):
+    pass
 
 
 @cli.command('list-app-resources')
