@@ -1,4 +1,4 @@
-# Copyright 2015-2017 Capital One Services, LLC
+# Copyright 2015-2018 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -228,33 +228,6 @@ class And(Filter):
         return resources
 
 
-class AnnotationSweeper(object):
-    """Support clearing annotations set within a block filter.
-
-    See https://github.com/capitalone/cloud-custodian/issues/2116
-    """
-    def __init__(self, id_key, resources):
-        self.id_key = id_key
-        ra_map = {}
-        resource_map = {}
-        for r in resources:
-            ra_map[r[id_key]] = {k: v for k, v in r.items() if k.startswith('c7n')}
-            resource_map[r[id_key]] = r
-        # We keep a full copy of the annotation keys to allow restore.
-        self.ra_map = copy.deepcopy(ra_map)
-        self.resource_map = resource_map
-
-    def sweep(self, resources):
-        for rid in set(self.ra_map).difference([
-                r[self.id_key] for r in resources]):
-            # Clear annotations if the block filter didn't match
-            akeys = [k for k in self.resource_map[rid] if k.startswith('c7n')]
-            for k in akeys:
-                del self.resource_map[rid][k]
-            # Restore annotations that may have existed prior to the block filter.
-            self.resource_map[rid].update(self.ra_map[rid])
-
-
 class Not(Filter):
 
     def __init__(self, data, registry, manager):
@@ -281,6 +254,7 @@ class Not(Filter):
     def process_set(self, resources, event):
         resource_type = self.manager.get_model()
         resource_map = {r[resource_type.id]: r for r in resources}
+        sweeper = AnnotationSweeper(resource_type.id, resources)
 
         for f in self.filters:
             resources = f.process(resources, event)
@@ -288,7 +262,36 @@ class Not(Filter):
         before = set(resource_map.keys())
         after = set([r[resource_type.id] for r in resources])
         results = before - after
+        sweeper.sweep([])
+
         return [resource_map[r_id] for r_id in results]
+
+
+class AnnotationSweeper(object):
+    """Support clearing annotations set within a block filter.
+
+    See https://github.com/capitalone/cloud-custodian/issues/2116
+    """
+    def __init__(self, id_key, resources):
+        self.id_key = id_key
+        ra_map = {}
+        resource_map = {}
+        for r in resources:
+            ra_map[r[id_key]] = {k: v for k, v in r.items() if k.startswith('c7n')}
+            resource_map[r[id_key]] = r
+        # We keep a full copy of the annotation keys to allow restore.
+        self.ra_map = copy.deepcopy(ra_map)
+        self.resource_map = resource_map
+
+    def sweep(self, resources):
+        for rid in set(self.ra_map).difference([
+                r[self.id_key] for r in resources]):
+            # Clear annotations if the block filter didn't match
+            akeys = [k for k in self.resource_map[rid] if k.startswith('c7n')]
+            for k in akeys:
+                del self.resource_map[rid][k]
+            # Restore annotations that may have existed prior to the block filter.
+            self.resource_map[rid].update(self.ra_map[rid])
 
 
 class ValueFilter(Filter):
