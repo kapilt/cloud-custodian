@@ -495,9 +495,14 @@ class NetworkInterfaceTest(BaseTest):
                 {'type': 'subnet',
                  'key': 'SubnetId',
                  'value': sub_id},
-                {'type': 'security-group',
-                 'key': 'Description',
-                 'value': 'for apps'}
+                {'or': [
+                 {'type': 'security-group',
+                  'key': 'Description',
+                  'value': 'for apps'},
+                 {'type': 'security-group',
+                  'key': 'Description',
+                  'value': 'i-am-not-here'}
+                ]}
             ],
             'actions': [{
                 'type': 'modify-security-groups',
