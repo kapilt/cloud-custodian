@@ -32,7 +32,8 @@ RESOURCE_KEY = {
     'dax': 15,
     'ecs': 16,
     'vpce': 17,
-    'lambda': 18,
+    'elasticsearch': 19,
+    'unknown': 20,
 }
 
 

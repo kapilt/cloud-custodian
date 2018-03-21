@@ -16,7 +16,7 @@ __author__ = "Kapil Thangavelu <kapil.foss@gmail.com>"
 
 import boto3
 import click
-from c7n.credentials import SessionFactory
+from c7n.credentials import SessionFactory, assumed_session
 from c7n.sqsexec import MessageIterator
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -54,6 +54,7 @@ def download_config(
         Bucket=bucket,
         Prefix=config_prefix)
 
+    store = os.path.join(store, account_id, region)
     if not os.path.exists(store):
         os.makedirs(store)
 
@@ -90,9 +91,12 @@ def download_config(
 
 def process_account_resources(
         account_id, bucket, prefix, region,
-        store, start, end, resource='NetworkInterface'):
+        store, start, end, resource='NetworkInterface', assume=None):
 
-    client = boto3.client('s3')
+    if assume:
+        client = assumed_session(assume, 'ZeroDark').client('s3')
+    else:
+        client = boto3.client('s3')
     files = []
     t = time.time()
     period_stats = Counter()
@@ -180,6 +184,9 @@ def resource_info(eni_cfg):
     elif eni_cfg['attachment']['instanceOwnerId'] == 'aws-lambda':
         rtype = RESOURCE_KEY['lambda']
         rid = eni_cfg['requesterId'].split(':', 1)[1]
+    elif eni_cfg['attachment']['instanceOwnerId'] == 'amazon-elasticsearch':
+        rtype = RESOURCE_KEY['elasticsearch']
+        rid = desc.split(' ', 1)[1]
     else:
         rtype = RESOURCE_KEY['unknown']
         rid = json.dumps(eni_cfg)
@@ -279,6 +286,7 @@ create table if not exists ec2 (
            asg            text,
            start      datetime,
            end        datetime
+)
 """
 
 
@@ -319,7 +327,6 @@ def index_ec2_files(db, record_stream):
                         rows)
                     rows = []
         if deletes:
-            log.info("Delete count %d", len(deletes))
             stmt = 'update ec2 set end = ? where instance_id = ?'
             for p in deletes:
                 cursor.execute(stmt, p)
@@ -419,7 +426,10 @@ def index_elb_files(db, record_stream):
             for cfg in record_set:
                 stats['Records'] += 1
                 stats['Record%s' % cfg['configurationItemStatus']] += 1
-                if cfg['configurationItemStatus'] in ('ResourceDeleted',):
+                if cfg['configurationItemStatus'] in (u'ResourceNotRecorded'):
+                    continue
+                if cfg['configurationItemStatus'] in (
+                        'ResourceDeleted', u'ResourceDeletedNotRecorded',):
                     deletes[cfg['resourceId']] = cfg['configurationItemCaptureTime']
                     continue
                 rows.append((
@@ -465,6 +475,7 @@ create table if not exists enis (
 def index_eni_files(db, record_stream):
     stats = Counter()
     t = time.time()
+
     with sqlite3.connect(db) as conn:
         cursor = conn.cursor()
         cursor.execute(ENI_SCHEMA)
@@ -687,7 +698,7 @@ def list_app_resources(
 @click.option('-r', '--resources', multiple=True,
               type=click.Choice(list(RESOURCE_FILE_INDEXERS.keys())))
 @click.option('--store', type=click.Path())
-@click.option('-f', '--db')
+@click.option('-f', '--db', type=click.Path())
 @click.option('-v', '--verbose', is_flag=True)
 @click.option('--debug', is_flag=True)
 def load_resources(bucket, prefix, region, account_config, accounts,
@@ -699,8 +710,9 @@ def load_resources(bucket, prefix, region, account_config, accounts,
     start = date_parse(start)
     end = date_parse(end)
 
-    if not resources:
-        resources = ['NetworkInterface', 'Instance', 'LoadBalancer']
+    db = os.path.abspath(os.path.expanduser(db))
+#    if not resources:
+#        resources = ['NetworkInterface', 'Instance', 'LoadBalancer']
 
     account_map = {}
     data = yaml.safe_load(account_config.read())
@@ -719,22 +731,32 @@ def load_resources(bucket, prefix, region, account_config, accounts,
 
     stats = Counter()
     t = time.time()
+
     with executor(max_workers=multiprocessing.cpu_count()) as w:
         futures = {}
         for a in account_ids:
             for r in resources:
                 futures[w.submit(
                     process_account_resources, a, bucket, prefix,
-                    region, store, start, end, r)] = (a, r)
+                    region, store, start, end, r, assume)] = (a, r)
 
-        indexer = RESOURCE_FILE_INDEXERS[r]
         for f in as_completed(futures):
             a, r = futures[f]
             if f.exception():
                 log.error("account:%s error:%s", a, f.exception())
                 continue
             files, dl_stats = f.result()
-            idx_stats = indexer(db, resource_config_iter(files))
+            indexer = RESOURCE_FILE_INDEXERS[r]
+            try:
+                idx_stats = indexer(db, resource_config_iter(files))
+            except Exception:
+                log.error(
+                    "error processing resource:%s account:%s", r, a)
+                if debug:
+                    import traceback, pdb, sys
+                    traceback.print_exc()
+                    pdb.post_mortem(sys.exc_info()[-1])
+                raise
             log.info(
                 "loaded account:%s files:%d bytes:%s events:%d resources:%d idx-time:%d dl-time:%d",
                 account_map[a]['name'], len(files),
