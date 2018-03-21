@@ -34,11 +34,16 @@ class GoogleCloud(object):
     resources = PluginRegistry('%s.resources' % resource_prefix)
 
 
+gcp = GoogleCloud.resources
+
+
 @clouds.register('azure')
 class Azure(object):
 
     resource_prefix = 'azure'
     resources = PluginRegistry('%s.resources' % resource_prefix)
+
+azure = Azure.resources
 
 
 def resources(cloud_provider=None):
