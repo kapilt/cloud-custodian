@@ -43,6 +43,7 @@ class Azure(object):
     resource_prefix = 'azure'
     resources = PluginRegistry('%s.resources' % resource_prefix)
 
+
 azure = Azure.resources
 
 
