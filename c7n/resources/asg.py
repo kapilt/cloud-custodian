@@ -105,10 +105,15 @@ class LaunchConfigFilterBase(object):
         self.log.debug(
             "Querying launch configs for filter %s",
             self.__class__.__name__)
-        configs = self.manager.get_resource_manager(
-            'launch-config').resources()
+
+        lc_resources = self.manager.get_resource_manager('launch-config')
+        if len(config_names) < 5:
+            configs = lc_resources.get_resources(list(config_names))
+        else:
+            configs = lc_resources.resources()
         self.configs = {
-            cfg['LaunchConfigurationName']: cfg for cfg in configs}
+            cfg['LaunchConfigurationName']: cfg for cfg in configs
+            if cfg['LaunchConfigurationName'] in config_names}
 
 
 @filters.register('security-group')
@@ -157,13 +162,13 @@ class LaunchConfigFilter(ValueFilter, LaunchConfigFilterBase):
 
     .. code-block:: yaml
 
-            policies:
-              - name: launch-config-public-ip
-                resource: asg
-                filters:
-                  - type: launch-config
-                    key: AssociatePublicIpAddress
-                    value: true
+        policies:
+          - name: launch-configs-with-public-address
+            resource: asg
+            filters:
+              - type: launch-config
+                key: AssociatePublicIpAddress
+                value: true
     """
     schema = type_schema(
         'launch-config', rinherit=ValueFilter.schema)
@@ -590,14 +595,14 @@ class ImageFilter(ValueFilter, LaunchConfigFilterBase):
 
     .. code-block:: yaml
 
-            policies:
-              - name: asg-image-tag
-                resource: asg
-                filters:
-                  - type: image
-                    value: "tag:ImageTag"
-                    key: "TagValue"
-                    op: eq
+        policies:
+          - name: non-windows-asg
+            resource: asg
+            filters:
+              - type: image
+                key: Platform
+                value: Windows
+                op: ne
     """
     permissions = (
         "ec2:DescribeImages",
@@ -647,12 +652,12 @@ class VpcIdFilter(ValueFilter):
 
     .. code-block:: yaml
 
-            policies:
-              - name: asg-vpc-xyz
-                resource: asg
-                filters:
-                  - type: vpc-id
-                    value: vpc-12ab34cd
+        policies:
+          - name: asg-vpc-xyz
+            resource: asg
+            filters:
+              - type: vpc-id
+                value: vpc-12ab34cd
     """
 
     schema = type_schema(

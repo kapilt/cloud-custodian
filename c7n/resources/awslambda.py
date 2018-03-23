@@ -13,7 +13,11 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
+import jmespath
 import json
+import six
+
 from botocore.exceptions import ClientError
 
 from c7n.actions import ActionRegistry, BaseAction, RemovePolicyBase
@@ -21,8 +25,9 @@ from c7n.filters import CrossAccountAccessFilter, FilterRegistry, ValueFilter
 import c7n.filters.vpc as net_filters
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
-from c7n.tags import RemoveTag, Tag, TagActionFilter, TagDelayedAction
-from c7n.utils import get_retry, local_session, type_schema
+from c7n.tags import (
+    RemoveTag, Tag, TagActionFilter, TagDelayedAction, universal_augment)
+from c7n.utils import get_retry, local_session, type_schema, generate_arn
 
 filters = FilterRegistry('lambda.filters')
 actions = ActionRegistry('lambda.actions')
@@ -45,38 +50,23 @@ class AWSLambda(QueryResourceManager):
     action_registry = actions
     retry = staticmethod(get_retry(('Throttled',)))
 
-    def augment(self, functions):
-        resources = super(AWSLambda, self).augment(functions)
-        return list(filter(None, _lambda_function_tags(
-            self.get_model(),
-            resources,
-            self.session_factory,
-            self.executor_factory,
-            self.retry,
-            self.log)))
+    def augment(self, resources):
+        return universal_augment(
+            self, super(AWSLambda, self).augment(resources))
 
-
-def _lambda_function_tags(
-        model, functions, session_factory, executor_factory, retry, log):
-    """ Augment Lambda function with their respective tags
-    """
-
-    def process_tags(function):
-        client = local_session(session_factory).client('lambda')
-        arn = function['FunctionArn']
-        try:
-            tag_dict = retry(client.list_tags, Resource=arn)['Tags']
-        except ClientError as e:
-            log.warning("Exception getting Lambda tags  \n %s", e)
-            return None
-        tag_list = []
-        for k, v in tag_dict.items():
-            tag_list.append({'Key': k, 'Value': v})
-        function['Tags'] = tag_list
-        return function
-
-    with executor_factory(max_workers=2) as w:
-        return list(w.map(process_tags, functions))
+    @property
+    def generate_arn(self):
+        """ Generates generic arn if ID is not already arn format.
+        """
+        if self._generate_arn is None:
+            self._generate_arn = functools.partial(
+                generate_arn,
+                self.get_model().service,
+                region=self.config.region,
+                account_id=self.account_id,
+                resource_type=self.get_model().type,
+                separator=':')
+        return self._generate_arn
 
 
 def tag_function(session_factory, functions, tags, log):
@@ -110,6 +100,40 @@ class SubnetFilter(net_filters.SubnetFilter):
 filters.register('network-location', net_filters.NetworkLocation)
 
 
+@filters.register('reserved-concurrency')
+class ReservedConcurrency(ValueFilter):
+
+    annotation_key = "c7n:FunctionInfo"
+    value_key = '"c7n:FunctionInfo".Concurrency.ReservedConcurrentExecutions'
+    schema = type_schema('reserved-concurrency', rinherit=ValueFilter.schema)
+    permissions = ('lambda:GetFunction',)
+
+    def validate(self):
+        self.data['key'] = self.value_key
+        return super(ReservedConcurrency, self).validate()
+
+    def process(self, resources, event=None):
+        self.data['key'] = self.value_key
+        client = local_session(self.manager.session_factory).client('lambda')
+
+        def _augment(r):
+            try:
+                r[self.annotation_key] = self.manager.retry(
+                    client.get_function, FunctionName=r['FunctionArn'])
+                r[self.annotation_key].pop('ResponseMetadata')
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'AccessDeniedException':
+                    self.log.warning(
+                        "Access denied getting lambda:%s",
+                        r['FunctionName'])
+                raise
+            return r
+
+        with self.executor_factory(max_workers=3) as w:
+            resources = list(filter(None, w.map(_augment, resources)))
+            return super(ReservedConcurrency, self).process(resources, event)
+
+
 @filters.register('event-source')
 class LambdaEventSource(ValueFilter):
     # this uses iam policy, it should probably use
@@ -134,6 +158,7 @@ class LambdaEventSource(ValueFilter):
                     self.log.warning(
                         "Access denied getting policy lambda:%s",
                         r['FunctionName'])
+                raise
 
         self.log.debug("fetching policy for %d lambdas" % len(resources))
         self.data['key'] = self.annotation_key
@@ -350,6 +375,61 @@ class RemoveTag(RemoveTag):
         for f in functions:
             arn = f['FunctionArn']
             client.untag_resource(Resource=arn, TagKeys=tag_keys)
+
+
+@actions.register('set-concurrency')
+class SetConcurrency(BaseAction):
+    """Set lambda function concurrency to the desired level.
+
+    Can be used to set the reserved function concurrency to an exact value,
+    to delete reserved concurrency, or to set the value to an attribute of
+    the resource.
+    """
+
+    schema = type_schema(
+        'set-concurrency',
+        required=('value',),
+        **{'expr': {'type': 'boolean'},
+           'value': {'oneOf': [
+               {'type': 'string'},
+               {'type': 'integer'},
+               {'type': 'null'}]}})
+
+    permissions = ('lambda:DeleteFunctionConcurrency',
+                   'lambda:PutFunctionConcurrency')
+
+    def validate(self):
+        if self.data.get('expr', False) and not isinstance(self.data['value'], six.text_type):
+            raise ValueError("invalid value expression %s" % self.data['value'])
+        return self
+
+    def process(self, functions):
+        client = local_session(self.manager.session_factory).client('lambda')
+        is_expr = self.data.get('expr', False)
+        value = self.data['value']
+        if is_expr:
+            value = jmespath.compile(value)
+
+        none_type = type(None)
+
+        for function in functions:
+            fvalue = value
+            if is_expr:
+                fvalue = value.search(function)
+                if isinstance(fvalue, float):
+                    fvalue = int(fvalue)
+                if isinstance(value, int) or isinstance(value, none_type):
+                    self.policy.log.warning(
+                        "Function: %s Invalid expression value for concurrency: %s",
+                        function['FunctionName'], fvalue)
+                    continue
+            if fvalue is None:
+                client.delete_function_concurrency(
+                    FunctionName=function['FunctionName'])
+            else:
+                client.put_function_concurrency(
+                    FunctionName=function['FunctionName'],
+                    ReservedConcurrentExecutions=fvalue)
 
 
 @actions.register('delete')
