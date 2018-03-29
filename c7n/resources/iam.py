@@ -309,6 +309,7 @@ class UnusedIamRole(IamRoleUsage):
 class RoleCrossAccountAccess(CrossAccountAccessFilter):
 
     policy_attribute = 'AssumeRolePolicyDocument'
+    permissions = ('iam:ListRoles',)
 
 
 @Role.filter_registry.register('has-inline-policy')
