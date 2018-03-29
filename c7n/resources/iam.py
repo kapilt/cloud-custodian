@@ -27,6 +27,7 @@ from botocore.exceptions import ClientError
 
 from c7n.actions import BaseAction
 from c7n.filters import ValueFilter, Filter, OPERATORS
+from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager, DescribeSource
 from c7n.utils import local_session, type_schema, chunks
@@ -249,6 +250,8 @@ class IamRoleUsage(Filter):
 class UsedIamRole(IamRoleUsage):
     """Filter IAM roles that are either being used or not
 
+    Checks for usage on EC2, Lambda, ECS only
+
     :example:
 
     .. code-block:: yaml
@@ -282,6 +285,8 @@ class UnusedIamRole(IamRoleUsage):
     This filter has been deprecated. Please use the 'used' filter
     with the 'state' attribute to get unused iam roles
 
+    Checks for usage on EC2, Lambda, ECS only
+
     :example:
 
     .. code-block:: yaml
@@ -298,6 +303,12 @@ class UnusedIamRole(IamRoleUsage):
 
     def process(self, resources, event=None):
         return UsedIamRole({'state': False}, self.manager).process(resources)
+
+
+@Role.filter_registry.register('cross-account')
+class RoleCrossAccountAccess(CrossAccountAccessFilter):
+
+    policy_attribute = 'AssumeRolePolicyDocument'
 
 
 @Role.filter_registry.register('has-inline-policy')
