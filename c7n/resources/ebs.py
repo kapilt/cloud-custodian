@@ -28,6 +28,7 @@ from c7n.filters import (
     CrossAccountAccessFilter, Filter, FilterRegistry, AgeFilter, ValueFilter,
     ANNOTATION_KEY, FilterValidationError, OPERATORS)
 from c7n.filters.health import HealthEventFilter
+from c7n.filters.iamaccess import CrossAccountAccessFilter
 
 from c7n.manager import resources
 from c7n.resources.kms import ResourceKmsKeyAlias
@@ -82,6 +83,58 @@ class Snapshot(QueryResourceManager):
         if query.get('OwnerIds') is None:
             query['OwnerIds'] = ['self']
         return super(Snapshot, self).resources(query=query)
+
+
+@Snapshot.filter_registry.register('cross-account')
+class SnapCrossAccount(CrossAccountAccessFilter):
+
+    def process(self, resources):
+        accounts = self.get_accounts()
+        client = local_session(self.manager.session_factory).client('ec2')
+        results = []
+
+        with self.executor_factory(max_workers=2) as w:
+            futures = []
+            for resource_set in chunks(resources, 50):
+                futures.append(
+                    w.submit(
+                        self.process_resource_set,
+                        client, accounts, resource_set))
+            for f in as_completed(futures):
+                if f.exception():
+                    self.log.error("Error processing snapshot cross-account %s",
+                                   f.exception())
+                    continue
+                results.extend(f.result())
+        return results
+
+    def process_resource_set(self, client, accounts, resources):
+        results = []
+        for r in resources:
+            try:
+                attrs = self.manager.retry(
+                    client.describe_snapshot_attributes,
+                    SnapshotId=r['SnapshotId'],
+                    attribute='createVolumePermission')
+            except ClientError as e:
+                if e.response['Error']['Code'] in (
+                        'InvalidSnapshot.NotFound',
+                        'InvalidSnapshotID.Malformed'):
+                    continue
+                raise
+
+            s_accounts = set()
+            for p in attrs['CreateVolumePermissions']:
+                if 'Group' in p:
+                    s_accounts.add(p['Group'])
+                elif 'UserId' in p:
+                    s_accounts.add(p['UserId'])
+
+            violations = s_accounts.difference(accounts)
+            if violations:
+                r['c7n:CrossAccountViolations'] = violations
+                results.append(r)
+        return results
 
 
 @Snapshot.filter_registry.register('age')
