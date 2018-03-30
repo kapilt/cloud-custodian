@@ -30,6 +30,7 @@ from c7n.filters import ValueFilter, Filter, OPERATORS
 from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager, DescribeSource
+from c7n.resolver import ValuesFrom
 from c7n.utils import local_session, type_schema, chunks
 
 
@@ -310,6 +311,12 @@ class RoleCrossAccountAccess(CrossAccountAccessFilter):
 
     policy_attribute = 'AssumeRolePolicyDocument'
     permissions = ('iam:ListRoles',)
+
+    schema = type_schema(
+        'cross-account',
+        # white list accounts
+        whitelist_from=ValuesFrom.schema,
+        whitelist={'type': 'array', 'items': {'type': 'string'}})
 
 
 @Role.filter_registry.register('has-inline-policy')
