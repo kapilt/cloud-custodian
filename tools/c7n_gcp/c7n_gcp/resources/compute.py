@@ -22,7 +22,8 @@ class Instance(QueryResourceManager):
         service = 'compute'
         version = 'v1'
         component = 'instances'
-        scope = 'zone'
+        enum_spec = ('aggregatedList', 'items', None)
+        scope = 'project'
 
 
 @resources.register('image')
