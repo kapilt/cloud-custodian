@@ -14,6 +14,7 @@
 
 import six
 import os
+import jmespath
 
 from c7n.actions import ActionRegistry
 from c7n.filters import FilterRegistry
@@ -52,8 +53,11 @@ class ResourceQuery(object):
         if client.supports_pagination(enum_op):
             results = []
             for page in client.execute_paged_query(enum_op, params):
-                results.extend(page.get(path))
-        return client.execute_query(enum_op, verb_arguments=params).get(path)
+                results.extend(jmespath.search(path, page))
+            return results
+        else:
+            return jmespath.search(path,
+                client.execute_query(enum_op, verb_arguments=params))
 
 
 # We use env vars per terraform gcp precedence order.

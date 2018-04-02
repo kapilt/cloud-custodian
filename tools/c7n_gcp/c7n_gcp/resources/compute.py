@@ -22,7 +22,7 @@ class Instance(QueryResourceManager):
         service = 'compute'
         version = 'v1'
         component = 'instances'
-        enum_spec = ('aggregatedList', 'items', None)
+        enum_spec = ('aggregatedList', 'items.*.instances[]', None)
         scope = 'project'
 
 
@@ -43,3 +43,4 @@ class Disk(QueryResourceManager):
         version = 'v1'
         component = 'disks'
         scope = 'zone'
+        enum_spec = ('aggregatedList', 'items.*.disks[]', None)

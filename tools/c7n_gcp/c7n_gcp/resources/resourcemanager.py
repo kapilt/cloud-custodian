@@ -21,7 +21,7 @@ class Organization(QueryResourceManager):
 
     class resource_type(TypeInfo):
         service = 'cloudresourcemanager'
-        version = 'v2'
+        version = 'v1'
         component = 'organizations'
         scope = 'global'
 
@@ -41,6 +41,7 @@ class Project(QueryResourceManager):
 
     class resource_type(TypeInfo):
         service = 'cloudresourcemanager'
-        version = 'v2'
+        version = 'v1'
         component = 'projects'
         scope = 'global'
+        enum_spec = ('list', 'projects', None)
