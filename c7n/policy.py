@@ -496,7 +496,7 @@ class PeriodicMode(LambdaMode, PullMode):
     POLICY_METRICS = ('ResourceCount', 'ResourceTime', 'ActionTime')
 
     schema = utils.type_schema(
-        'periodic', schedule={'type': 'string'}, rinherits=LambdaMode.schema)
+        'periodic', schedule={'type': 'string'}, rinherit=LambdaMode.schema)
 
     def run(self, event, lambda_context):
         return PullMode.run(self)
@@ -518,7 +518,7 @@ class CloudTrailMode(LambdaMode):
                      'ids': {'type': 'string'},
                      'event': {'type': 'string'}}}]
         }},
-        rinherits=LambdaMode.schema)
+        rinherit=LambdaMode.schema)
 
     def validate(self):
         events = self.policy.data['mode'].get('events')
@@ -540,21 +540,29 @@ class CloudTrailMode(LambdaMode):
 class EC2InstanceState(LambdaMode):
     """a lambda policy that executes on ec2 instance state changes."""
 
-    schema = utils.type_schema('ec2-instance-state', rinherits=LambdaMode.schema)
+    schema = utils.type_schema(
+        'ec2-instance-state', rinherit=LambdaMode.schema,
+        events={'type': 'array', 'items': {
+            'enum': ['running', 'shutting-down',
+                     'stopped', 'stopping', 'terminated']}})
 
 
 @execution.register('asg-instance-state')
 class ASGInstanceState(LambdaMode):
     """a lambda policy that executes on an asg's ec2 instance state changes."""
 
-    schema = utils.type_schema('asg-instance-state', rinherits=LambdaMode.schema)
+    schema = utils.type_schema(
+        'asg-instance-state', rinherit=LambdaMode.schema,
+        events={'type': 'array', 'items': {
+            'enum': ['launch-success', 'launch-failure',
+                     'terminate-success', 'terminate-failure']}})
 
 
 @execution.register('guard-duty')
 class GuardDutyMode(LambdaMode):
     """Incident Response for AWS Guard Duty"""
 
-    schema = utils.type_schema('guard-duty', rinherits=LambdaMode.schema)
+    schema = utils.type_schema('guard-duty', rinherit=LambdaMode.schema)
 
     supported_resources = ('account', 'ec2', 'iam-user')
 
@@ -599,7 +607,7 @@ class ConfigRuleMode(LambdaMode):
     """
 
     cfg_event = None
-    schema = utils.type_schema('config-rule', rinherits=LambdaMode.schema)
+    schema = utils.type_schema('config-rule', rinherit=LambdaMode.schema)
 
     def resolve_resources(self, event):
         source = self.policy.resource_manager.get_source('config')
