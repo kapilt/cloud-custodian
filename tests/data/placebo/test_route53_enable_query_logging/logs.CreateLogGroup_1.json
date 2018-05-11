@@ -11,7 +11,6 @@
                 "content-length": "264", 
                 "content-type": "application/x-amz-json-1.1"
             }
-        }, 
-        "logGroups": []
+        }
     }
 }
