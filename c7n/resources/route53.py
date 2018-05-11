@@ -216,14 +216,31 @@ class Route53DomainRemoveTag(RemoveTag):
                 TagsToDelete=keys)
 
 
-
 @HostedZone.action_registry.register('enable-query-logging')
 class EnableQueryLogging(BaseAction):
+    """Enables query logging on a public hosted zone
 
-    permissions = ('route53:GetQueryLoggingConfig','route53:GetHostedZone','route53:CreateQueryLoggingConfig',
-        'route53:DeleteQueryLoggingConfig','logs:CreateLogGroup','logs:DescribeLogGroups','logs:PutRetentionPolicy')
+    :example:
 
-    schema = type_schema('enable-query-logging', state={'type': 'boolean'}, logretentiondays={'type': 'number'})
+    .. code-block: yaml
+
+        policies:
+          - name: enablednsquerylogging
+            resource: hostedzone
+            filters:
+                - type: query-logging-enabled
+                state: false          
+            actions:
+                - type: enable-query-logging
+                state: true
+                logretentiondays: 30
+    """
+    permissions = ('route53:GetQueryLoggingConfig','route53:GetHostedZone',
+        'route53:CreateQueryLoggingConfig','route53:DeleteQueryLoggingConfig',
+        'logs:CreateLogGroup','logs:DescribeLogGroups','logs:PutRetentionPolicy')
+
+    schema = type_schema('enable-query-logging', state={'type': 'boolean'}, 
+        logretentiondays={'type': 'number'})
 
     def process(self, resources):
 
@@ -232,30 +249,32 @@ class EnableQueryLogging(BaseAction):
         logretentiondays = self.data.get('logretentiondays', 30)
         valid_days = [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
         if logretentiondays not in valid_days:
-            raise ValueError("logretentiondays must be one of : ", valid_days) 
+            raise ValueError("logretentiondays must be one of : ", valid_days)
 
         for r in resources:
             hosted_zone_arn = self.manager.get_arn(r).split("/")[-1]
 
-            #Take no action on Private Zones
-            if r['Config']['PrivateZone'] == True:
+            # Take no action on Private Zones
+            if r['Config']['PrivateZone'] is True:
                 continue
-            
             if state:
-                #create cloudwatch loggroup if it doesn't exist
+                # create cloudwatch loggroup if it doesn't exist
                 logs_client = local_session(self.manager.session_factory).client('logs')
-                log_group_name='/aws/route53/' + r['Name']
+                log_group_name ='/aws/route53/' + r['Name']
                 loggroup_arn = get_loggroup_arn(logs_client, log_group_name)
                 if not loggroup_arn:
                     logs_client.create_log_group(logGroupName=log_group_name)
                 loggroup_arn = get_loggroup_arn(logs_client, log_group_name)
-                logs_client.put_retention_policy(logGroupName=log_group_name, retentionInDays=logretentiondays)
-                #create the query logging config
-                client.create_query_logging_config(HostedZoneId=hosted_zone_arn,CloudWatchLogsLogGroupArn=loggroup_arn)
+                logs_client.put_retention_policy(logGroupName=log_group_name, 
+                    retentionInDays=logretentiondays)
+                # create the query logging config
+                client.create_query_logging_config(HostedZoneId=hosted_zone_arn,
+                    CloudWatchLogsLogGroupArn=loggroup_arn)
             else:          
                 #delete query logging config
                 log_config_id = client.list_query_logging_configs(HostedZoneId=hosted_zone_arn)
                 client.delete_query_logging_config(Id=log_config_id['QueryLoggingConfigs'][0]['Id'])
+
 
 def get_log_enabled_zones(client,zonelist=[],next_token=""):
     kwargs = {}
@@ -266,8 +285,9 @@ def get_log_enabled_zones(client,zonelist=[],next_token=""):
         zonelist.append(hz['HostedZoneId'])
     if 'NextToken' in logged_zones:
         get_log_enabled_zones(client, zonelist,logged_zones['NextToken'])
-    return zonelist    
-    
+    return zonelist
+   
+
 def get_loggroup_arn(logs_client, log_group_name):
     log_group = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name)
     if len(log_group['logGroups']) == 0:
@@ -291,11 +311,10 @@ class IsQueryLoggingEnabled(Filter):
         results = []
 
         for r in resources:
-            #print('r', r)
-            host_zone_id = self.manager.get_arn(r).split("/")[-1]    
+            host_zone_id = self.manager.get_arn(r).split("/")[-1]
             r['Id'].split("/")[-1] = logging = host_zone_id in enabled_zones
             if logging and state:
-                 results.append(r)
+                results.append(r)
             elif not logging and not state:
-                 results.append(r)
+                results.append(r)
         return results
