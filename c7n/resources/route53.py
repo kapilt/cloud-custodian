@@ -17,7 +17,7 @@ import functools
 
 from c7n.query import QueryResourceManager, ChildResourceManager
 from c7n.manager import resources
-from c7n.utils import chunks, get_retry, generate_arn, local_session,type_schema
+from c7n.utils import chunks, get_retry, generate_arn, local_session, type_schema
 from c7n.actions import BaseAction
 from c7n.filters import Filter
 
