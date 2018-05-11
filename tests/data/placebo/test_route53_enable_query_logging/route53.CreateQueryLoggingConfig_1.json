@@ -1,0 +1,23 @@
+{
+    "status_code": 201, 
+    "data": {
+        "Location": "https://route53.amazonaws.com/2013-04-01/queryloggingconfig/2abc1737-8e41-0491-e505-86049e865927", 
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 201, 
+            "RequestId": "24c6e663-5231-11e8-9edf-1350a2c48d8e", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "24c6e663-5231-11e8-9edf-1350a2c48d8e", 
+                "date": "Mon, 07 May 2018 19:59:25 GMT", 
+                "content-length": "419", 
+                "content-type": "text/xml", 
+                "location": "https://route53.amazonaws.com/2013-04-01/queryloggingconfig/2abc1737-8e41-0491-e505-86049e865927"
+            }
+        }, 
+        "QueryLoggingConfig": {
+            "HostedZoneId": "TESTABCXYZ1234", 
+            "CloudWatchLogsLogGroupArn": "arn:aws:logs:us-east-1:112358132134:log-group:/aws/route53/test.enablequerylogging.cloud.:*", 
+            "Id": "2abc1737-8e41-0491-e505-86049e865927"
+        }
+    }
+}

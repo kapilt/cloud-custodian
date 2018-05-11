@@ -16,7 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 
 from .common import BaseTest
-from c7n.resources.route53 import HostedZone
+from c7n.resources.route53 import HostedZone, EnableQueryLogging, IsQueryLoggingEnabled
 
 
 class Route53HostedZoneTest(BaseTest):
@@ -326,3 +326,26 @@ class Route53DomainTest(BaseTest):
         tags = client.list_tags_for_domain(
             DomainName=resources[0]['DomainName'])['TagList']
         self.assertEqual(len(tags), 0)
+
+class Route53EnableDNSQueryLoggingTest(BaseTest):
+
+    def test_hostedzone_querylogging(self):
+        session_factory = self.replay_flight_data('test_route53_enable_query_logging')
+        p = self.load_policy({
+            'name': 'enablednsquerylogging',
+            'resource': 'hostedzone',
+            'filters': [
+                {'Config.PrivateZone': False},
+                {'type': 'query-logging-enabled', 'state': False}],
+            'actions': [
+                {'type': 'enable-query-logging', 'state': True, 'logretentiondays': 60 }],
+                },
+            session_factory=session_factory)
+        self.assertEqual(len(p.run()), 1)
+        p = self.load_policy({
+            'name': 'query-logging-enabled',
+            'resource': 'hostedzone',
+            'filters': [{'type': 'query-logging-enabled', 'state': True}]},
+            session_factory=session_factory)
+        self.assertEqual(p.run()[0]['Id'], "/hostedzone/TESTABCXYZ1234")
+

@@ -1,0 +1,23 @@
+{
+    "status_code": 200, 
+    "data": {
+        "ResourceTagSets": [
+            {
+                "ResourceType": "hostedzone", 
+                "ResourceId": "TESTABCXYZ1234", 
+                "Tags": []
+            }
+        ], 
+        "ResponseMetadata": {
+            "RetryAttempts": 0, 
+            "HTTPStatusCode": 200, 
+            "RequestId": "2464c8d7-5231-11e8-9f8f-f98993fd7411", 
+            "HTTPHeaders": {
+                "x-amzn-requestid": "2464c8d7-5231-11e8-9f8f-f98993fd7411", 
+                "date": "Mon, 07 May 2018 19:59:24 GMT", 
+                "content-length": "1089", 
+                "content-type": "text/xml"
+            }
+        }
+    }
+}
