@@ -311,8 +311,8 @@ class IsQueryLoggingEnabled(Filter):
         results = []
 
         for r in resources:
-            host_zone_id = self.manager.get_arn(r).split("/")[-1]
-            logging = host_zone_id in enabled_zones
+            hosted_zone_id = self.manager.get_arn(r).split("/")[-1]
+            logging = hosted_zone_id in enabled_zones
             if logging and state:
                 results.append(r)
             elif not logging and not state:
