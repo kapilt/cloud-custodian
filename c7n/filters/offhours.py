@@ -329,16 +329,16 @@ class Time(Filter):
     def validate(self):
         if self.get_tz(self.default_tz) is None:
             raise PolicyValidationError(
-                "Invalid timezone specified %s on %s" % (
-                    self.default_tz, self.manager.data))
+                "Invalid timezone specified %s" % (
+                    self.default_tz))
         hour = self.data.get("%shour" % self.time_type, self.DEFAULT_HR)
         if hour not in self.parser.VALID_HOURS:
             raise PolicyValidationError(
-                "Invalid hour specified %s in %s" % (hour, self.manager.data))
+                "Invalid hour specified %s" % (hour,))
         if 'skip-days' in self.data and 'skip-days-from' in self.data:
             raise PolicyValidationError(
-                "Cannot specify two sets of skip days %s on %s" % (
-                    self.data, self.manager.data))
+                "Cannot specify two sets of skip days %s" % (
+                    self.data,))
         return self
 
     def process(self, resources, event=None):

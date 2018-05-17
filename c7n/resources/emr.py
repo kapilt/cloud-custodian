@@ -258,7 +258,7 @@ class QueryFilter(object):
         results = []
         for d in data:
             if not isinstance(d, dict):
-                raise ValueError(
+                raise PolicyValidationError(
                     "EMR Query Filter Invalid structure %s" % d)
             results.append(cls(d).validate())
         return results
