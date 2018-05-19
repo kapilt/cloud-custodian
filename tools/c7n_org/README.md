@@ -1,6 +1,6 @@
 ## What is c7n-org?
 
-c7n-org is a tool to run custodian against multiple AWS accounts or Azure subscriptions at once.
+c7n-org is a tool to run custodian against multiple AWS accounts, Azure subscriptions, or GCP projects in parallel.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Options:
 
 Commands:
   report      report on an AWS cross account policy execution
-  run         run a custodian policy across accounts (AWS or Azure)
+  run         run a custodian policy across accounts (AWS, Azure, GCP)
   run-script  run a script across AWS accounts
 ```
 
@@ -55,19 +55,44 @@ subscriptions:
   subscription_id: 1z2y3x4w-5v6u-7t8s9r...
 ```
 
+Example GCP Config File:
+
+```yaml
+projects:
+- name: app-dev
+  project_id: app-203501
+  tags:
+  - label:env:dev  
+- name: app-prod
+  project_id: app-1291
+  tags:
+  - label:env:dev
+
+```
+
 ### Config File Generation
 
 We also distribute scripts to generate the necessary config file.
 
+**Note** Currently these are distributed only via git, per
+https://github.com/capitalone/cloud-custodian/issues/2420 we'll
+be looking to incorporate them into a new c7n-org subcommand.
+
 - For **AWS**, the script `orgaccounts.py` generates a config file from the AWS Organizations API
 - For **Azure**, the script `azuresubs.py` generates a config file from the Azure Resource Management API
     - Please see the **Additional Azure Instructions** section at the bottom of the page for initial setup
+- For **GCP**, the script `gcpprojects.py` generats a config
+file from the GCP Resource Management API
     
 ```shell
-python orgaccounts.py -f output.yml
+python orgaccounts.py -f accounts.yml
 ```
 ```shell
-python azuresubs.py -f output.yml
+python azuresubs.py -f subscriptions.yml
+```
+
+```shell
+python gcpprojects.py -f projects.yml
 ```
 
 ## Running a Policy with c7n-org
@@ -75,14 +100,14 @@ python azuresubs.py -f output.yml
 To run a policy, the following arguments must be passed in:
 
 ```shell
--c | accounts config file
+-c | accounts|projects|subscriptions config file
 -s | output directory
 -u | policy
 ```
 
 
 ```shell
-c7n-org run -c custodian-all-us.yml -s output -u test.yml --dryrun
+c7n-org run -c accounts.yml -s output -u test.yml --dryrun
 ```
 
 After running the above command, the following folder structure will be created:
@@ -127,23 +152,10 @@ the `c7n-org report` subcommand.
 
 ## Additional Azure Instructions
 
-In order for Cloud Custodian to have access to your subscription, permission must be 
-given to the service principal through the Azure portal. 
+If your using an Azure Service Principal for executing c7n-org
+you'll need to ensure that the principal has access to multiple
+subscriptions.
 
-For instructions on creating a service principal, visit the 
-[Authentication docs page](http://capitalone.github.io/cloud-custodian/docs/azure/authentication.html).
+For instructions on creating a service principal and granting access across subscriptions, visit the 
+[Azure authentication docs page](http://capitalone.github.io/cloud-custodian/docs/azure/authentication.html).
 
-Once the service principal is created, follow these steps:
-
-- Open the `Subscriptions` tab
-- Select a subscription you'd like to manage with Cloud Custodian
-- Click `Access Control (IAM)`
-- Click `Add`
-- Set Role to `Contributor`
-- Type name of service principal in search bar and select it
-- Click `Save`
-
-Now when you run `azuresubs.py` with the appropriate environment variables 
-(see [auth docs](http://capitalone.github.io/cloud-custodian/docs/azure/authentication.html) 
-if you are unclear on what those are), the subscription will be automatically included in the generated
-config file.
