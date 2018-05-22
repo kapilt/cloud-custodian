@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Base GCP client which uses the discovery API."""
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import logging
 import threading
 from googleapiclient import discovery
@@ -96,8 +98,13 @@ def _create_service_api(credentials, service_name, version, developer_key=None,
         'version': version,
         'developerKey': developer_key,
         'cache_discovery': cache_discovery,
-        'credentials': credentials,
     }
+
+    if http:
+        discovery_kwargs['http'] = http
+    else:
+        discovery_kwargs['credentials'] = credentials
+
     return discovery.build(**discovery_kwargs)
 
 
@@ -180,7 +187,6 @@ class Session(object):
         Returns:
             object: An instance of repository_class.
         """
-
         service = _create_service_api(
             self._credentials,
             service_name,
