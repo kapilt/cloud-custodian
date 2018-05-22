@@ -44,7 +44,7 @@ You will need to map it to environment variables for Custodian like this:
     AZURE_CLIENT_SECRET=password
 
 
-If your using a Service Principal across subscriptions with `c7n-org` you'll
+If you're using a Service Principal across subscriptions with `c7n-org` you'll
 need to grant it access to each of the subscriptions.
 
 Once the service principal is created, follow these steps:

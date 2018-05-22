@@ -1,6 +1,7 @@
 ## What is c7n-org?
 
-c7n-org is a tool to run custodian against multiple AWS accounts, Azure subscriptions, or GCP projects in parallel.
+c7n-org is a tool to run custodian against multiple AWS accounts,
+Azure subscriptions, or GCP projects in parallel.
 
 ## Installation
 
@@ -24,7 +25,8 @@ Commands:
   run-script  run a script across AWS accounts
 ```
 
-In order to run c7n-org against multiple accounts, a config file must first be created containing pertinent information about the accounts:
+In order to run c7n-org against multiple accounts, a config file must
+first be created containing pertinent information about the accounts:
 
 
 Example AWS Config File:
@@ -72,25 +74,31 @@ projects:
 
 ### Config File Generation
 
-We also distribute scripts to generate the necessary config file.
+We also distribute scripts to generate the necessary config file in the `scripts` folder.
 
 **Note** Currently these are distributed only via git, per
 https://github.com/capitalone/cloud-custodian/issues/2420 we'll
 be looking to incorporate them into a new c7n-org subcommand.
 
-- For **AWS**, the script `orgaccounts.py` generates a config file from the AWS Organizations API
-- For **Azure**, the script `azuresubs.py` generates a config file from the Azure Resource Management API
-    - Please see the **Additional Azure Instructions** section at the bottom of the page for initial setup
-- For **GCP**, the script `gcpprojects.py` generats a config
-file from the GCP Resource Management API
-    
+- For **AWS**, the script `orgaccounts.py` generates a config file
+  from the AWS Organizations API
+
+- For **Azure**, the script `azuresubs.py` generates a config file
+  from the Azure Resource Management API
+
+    - Please see the **Additional Azure Instructions** section at the
+      bottom of the page for initial setup
+
+- For **GCP**, the script `gcpprojects.py` generates a config file from
+  the GCP Resource Management API
+
+
 ```shell
 python orgaccounts.py -f accounts.yml
 ```
 ```shell
 python azuresubs.py -f subscriptions.yml
 ```
-
 ```shell
 python gcpprojects.py -f projects.yml
 ```
@@ -127,35 +135,42 @@ output
 ...
 ```
 
+Use `c7n-org report` to generate a csv report from the output directory.
+
 ## Selecting accounts and policy for execution
 
-You can filter the accounts to be run against by either passing the account name or id
-via the `-a` flag, which can be specified multiple times.
+You can filter the accounts to be run against by either passing the
+account name or id via the `-a` flag, which can be specified multiple
+times.
 
-Groups of accounts can also be selected for execution by specifying the `-t` tag filter.
-Account tags are specified in the config file. ie given the above accounts config file
-you can specify all prod accounts with `-t type:prod`.
+Groups of accounts can also be selected for execution by specifying
+the `-t` tag filter.  Account tags are specified in the config
+file. ie given the above accounts config file you can specify all prod
+accounts with `-t type:prod`.
 
-You can specify which policies to use for execution by either specifying `-p` or selecting
-groups of policies via their tags with `-l`.
+You can specify which policies to use for execution by either
+specifying `-p` or selecting groups of policies via their tags with
+`-l`.
 
 
 See `c7n-org run --help` for more information.
 
 ## Other commands
 
-c7n-org also supports running arbitrary scripts on AWS against accounts via the run-script command, which
-exports standard AWS SDK credential information into the process environment before executing.
+c7n-org also supports running arbitrary scripts on AWS against
+accounts via the run-script command, which exports standard AWS SDK
+credential information into the process environment before executing.
 
-c7n-org also supports generating reports for a given policy execution across accounts via
-the `c7n-org report` subcommand.
+c7n-org also supports generating reports for a given policy execution
+across accounts via the `c7n-org report` subcommand.
 
 ## Additional Azure Instructions
 
-If your using an Azure Service Principal for executing c7n-org
+If you're using an Azure Service Principal for executing c7n-org
 you'll need to ensure that the principal has access to multiple
 subscriptions.
 
-For instructions on creating a service principal and granting access across subscriptions, visit the 
-[Azure authentication docs page](http://capitalone.github.io/cloud-custodian/docs/azure/authentication.html).
+For instructions on creating a service principal and granting access
+across subscriptions, visit the [Azure authentication docs
+page](http://capitalone.github.io/cloud-custodian/docs/azure/authentication.html).
 
