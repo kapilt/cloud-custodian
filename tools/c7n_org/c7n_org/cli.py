@@ -21,10 +21,14 @@ import multiprocessing
 import time
 import subprocess
 import sys
+import platform
 
 from concurrent.futures import (
     ProcessPoolExecutor,
-    as_completed)
+    as_completed,
+    process)
+
+from distutils.version import StrictVersion
 import yaml
 
 import boto3
@@ -47,10 +51,6 @@ from c7n.utils import UnicodeWriter
 
 log = logging.getLogger('c7n_org')
 
-# On OSX High Sierra Workaround
-# https://github.com/ansible/ansible/issues/32499
-if sys.platform == 'darwin':
-    os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
 
 WORKER_COUNT = int(
     os.environ.get('C7N_ORG_PARALLEL', multiprocessing.cpu_count() * 4))
@@ -131,6 +131,59 @@ def cli():
     """custodian organization multi-account runner."""
 
 
+def platform_initialize():
+    """Check for workaround on posix incompatibility on OSX High Sierra.
+
+    Platform Implementations
+
+    On OSX (10.13 aka High Sierra) for python2 compatibility we require
+    a environment variable to be set to avoid deadlocks. If its not
+    found exit with an error message.
+
+    More details https://bugs.python.org/issue33725
+
+    For python3 on OSX, we will attempt to switch the default multiprocessing
+    backend.
+
+    On windows, multiprocessing uses the spawn primitive, we need to
+    reinitialize the resource registry from plugins once for e
+
+    - Returns true if platform is darwin and python version 3
+    - Exits program if python verison
+
+    """
+    executor = ProcessPoolExecutor
+    if sys.platform not in ('win32', 'darwin'):
+        return executor
+
+    elif sys.platform == 'darwin':
+        if sys.version_info.major != 2:
+            return ExtendedProcessPool
+        if StrictVersion(platform.mac_ver()[0]) <= StrictVersion('10.13.0'):
+            return executor
+        if 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY' not in os.environ:
+            log.error(
+                "Please set OBJC_DISABLE_INITIALIZE_FORK_SAFETY environment variable")
+            sys.exit(1)
+    elif sys.platform == 'win32':
+        return ExtendedProcessPool
+    return False
+
+
+class ExtendedProcessPool(ProcessPoolExecutor):
+
+    initializer = load_resources
+
+    def _adjust_process_count(self):
+        for _ in range(len(self._processes), self._max_workers):
+            p = multiprocessing.Process(
+                target=process._process_worker,
+                args=(self._call_queue,
+                      self._result_queue,))
+            p.start()
+            self._processes.add(p)
+
+
 def init(config, use, debug, verbose, accounts, tags, policies, resource=None, policy_tags=()):
     level = verbose and logging.DEBUG or logging.INFO
     logging.basicConfig(
@@ -157,7 +210,9 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None, p
     filter_accounts(accounts_config, tags, accounts)
 
     load_resources()
+
     MainThreadExecutor.async = False
+
     executor = debug and MainThreadExecutor or ProcessPoolExecutor
     return accounts_config, custodian_config, executor
 
