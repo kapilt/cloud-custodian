@@ -54,4 +54,7 @@ class Delete(Action):
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('eks')
         for r in resources:
-            client.delete_cluster(name=r['name'])
+            try:
+                client.delete_cluster(name=r['name'])
+            except client.exceptions.ResourceNotFoundException:
+                continue
