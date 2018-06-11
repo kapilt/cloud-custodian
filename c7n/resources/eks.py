@@ -26,7 +26,7 @@ class EKS(QueryResourceManager):
     class resource_type(object):
         service = 'eks'
         enum_spec = ('list_clusters', 'clusters', None)
-        batch_spec = ('describe_cluster', 'name', None, 'cluster')
+        detail_spec = ('describe_cluster', 'name', None, 'cluster')
         id = name = 'name'
         date = 'createdAt'
         dimension = None
@@ -36,13 +36,13 @@ class EKS(QueryResourceManager):
 @EKS.filter_registry.register('subnet')
 class EKSSubnetFilter(SubnetFilter):
 
-    RelatedIdsExpression = "resourcesVpcConfig.subnetIds"
+    RelatedIdsExpression = "resourcesVpcConfig.subnetIds[]"
 
 
 @EKS.filter_registry.register('security-group')
 class EKSSGFilter(SecurityGroupFilter):
 
-    RelatedIdsExpression = "resourcesVpcConfig.securityGroupIds"
+    RelatedIdsExpression = "resourcesVpcConfig.securityGroupIds[]"
 
 
 @EKS.action_registry.register('delete')
