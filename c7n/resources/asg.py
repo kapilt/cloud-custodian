@@ -1628,11 +1628,8 @@ class LaunchConfig(query.QueryResourceManager):
 
 
 class DescribeLaunchConfig(query.DescribeSource):
-
-    def augment(self, resources):
-        for r in resources:
-            r.pop('UserData', None)
-        return resources
+    """Query for launch configs from asg api
+    """
 
 
 @LaunchConfig.filter_registry.register('age')

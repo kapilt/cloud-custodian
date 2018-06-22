@@ -1552,15 +1552,22 @@ class InstanceAttribute(ValueFilter):
     def get_instance_attribute(self, resources, attribute):
         client = utils.local_session(
             self.manager.session_factory).client('ec2')
-
+        annotation_key = 'c7n:attribute-%s' % attribute
         for resource in resources:
+            if annotation_key in resource:
+                continue
             instance_id = resource['InstanceId']
-            fetched_attribute = self.manager.retry(
-                client.describe_instance_attribute,
-                Attribute=attribute,
-                InstanceId=instance_id)
+            try:
+                fetched_attribute = self.manager.retry(
+                    client.describe_instance_attribute,
+                    Attribute=attribute,
+                    InstanceId=instance_id)
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'InvalidInstanceID.NotFound':
+                    resource[annotation_key] = None
+                    continue
+                raise
             keys = list(fetched_attribute.keys())
             keys.remove('ResponseMetadata')
             keys.remove('InstanceId')
-            resource['c7n:attribute-%s' % attribute] = fetched_attribute[
-                keys[0]]
+            resource[annotation_key] = fetched_attribute[keys[0]]
