@@ -63,9 +63,50 @@ CONFIG_SCHEMA = {
             }
         },
 
+        'classify': {
+            'type': 'object',
+            'required': ['type', 'info-types'],
+            'properties': {
+                # specifying a template will override all other config
+                'inspect-template': {'type': 'string'},
+                'project': {'type': 'string', 'title': 'qualified project path'},
+                'min-likelihood': {'enum': [
+                    'LIKELIHOOD_UNSPECIFIED', 'VERY_UNLIKELY',
+                    'UNLIKELY', 'POSSIBLE', 'LIKELY',
+                    'VERY_LIKELY']},
+                'include-quote': {'type': 'boolean', 'default': False},
+                'max-findings-by-item': {'type': 'integer', 'default': 10},
+                'max-findings-by-type': {'type': 'integer', 'default': 10},
+                # https://cloud.google.com/dlp/docs/infotypes-reference
+                'info-types': {'type': 'array', 'items': {'type': 'string'}},
+                # TODO: unconfigured content-options, custom info types, exclude info types.
+                },
+            },
+
+        'object-filters': {
+            'type': 'object',
+            'properties': {
+                'min-size': {'type': 'float'},
+                'max-size': {'type': 'float'},
+                'latest': {'type': 'boolean'},
+                # modified within the last n days
+                'last-modified': {'type': 'float'},
+                'extensions': {'type': 'array', 'items': {'type': 'string'}},
+                'multipart': {'type': 'boolean'},
+                'replication': {'type': 'array', 'items': {
+                    'enum': ['PENDING', 'COMPLETED', 'FAILED', 'REPLICA', '']}},
+                'encryption': {'type': 'array', 'items': {
+                    'enum': ['SSE-S3', 'SSE-C', 'SSE-KMS', 'NOT-SSE']}},
+            },
+        },
+
+
         'inventory': {
             'type': 'object',
             'properties': {
+                'object-filters': {'$ref': '#/definitions/object-filters'},
+                'sample': {'type': 'float',
+                           'title': 'sample percent of objects from the bucket'},
                 'role': {
                     'description': "".join([
                         'The role to assume when loading inventory data ',
@@ -109,7 +150,8 @@ CONFIG_SCHEMA = {
             'type': 'object',
             'oneOf': [
                 {'$ref': '#/definitions/object-acl'},
-                {'$ref': '#/definitions/encrypt-keys'}
+                {'$ref': '#/definitions/encrypt-keys'},
+                {'$ref': '#/definitions/classify'}
             ],
         },
 
@@ -140,7 +182,7 @@ CONFIG_SCHEMA = {
             'items': {'$ref': '#/definitions/account'}
         },
     }
-}
+    }
 
 
 def debug(f):
