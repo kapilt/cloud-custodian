@@ -26,5 +26,3 @@ class KubernetesCluster(QueryResourceManager):
         scope = 'project'
         scope_key = 'parent'
         scope_template = "projects/{}/locations/-"
-
-

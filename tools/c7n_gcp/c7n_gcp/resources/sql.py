@@ -35,5 +35,3 @@ class SQLInstance(QueryResourceManager):
         scope = 'project'
         # scope_key = 'project'
         scope_template = "projects/{}/instances"
-
-

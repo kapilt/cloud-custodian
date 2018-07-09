@@ -26,5 +26,3 @@ class SourceRepository(QueryResourceManager):
         scope = 'project'
         scope_key = 'name'
         scope_template = "projects/{}-"
-
-
