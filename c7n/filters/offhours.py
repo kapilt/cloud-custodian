@@ -458,7 +458,7 @@ class Time(Filter):
     def get_tz(cls, tz):
         found = cls.TZ_ALIASES.get(tz)
         if found:
-            return found
+            tz = found
         return zoneinfo.gettz(tz.title())
 
     def get_default_schedule(self):
