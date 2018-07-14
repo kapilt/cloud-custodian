@@ -240,7 +240,8 @@ def enable_region(master_info, accounts_config, executor, message, region):
         process_failed_invites(
             master_client, region,
             [a for a in accounts_config['accounts']
-             if a['account_id'] in invites_failed])
+             if a['account_id'] in invites_failed],
+             detector_id)
 
     if suspended_ids:
         unprocessed = master_client.start_monitoring_members(
@@ -257,6 +258,10 @@ def enable_region(master_info, accounts_config, executor, message, region):
                for account in accounts_config['accounts']
                if account['account_id'] not in extant_ids]
 
+    # Add back in failed invitations we reset
+    members.extend([
+        m for m in extant_members if m['AccountId'] in invites_failed])
+    
     if not members:
         if not suspended_ids and not invited_ids:
             log.info("Region:%s All accounts already enabled", region)
@@ -281,9 +286,7 @@ def enable_region(master_info, accounts_config, executor, message, region):
             region, format_event(unprocessed))
 
     log.info("Region:%s Inviting %d member accounts", region, len(members))
-    # Add back in failed invitations we reset
-    members.extend([
-        m for m in extant_members if m['AccountId'] in invites_failed])
+
     unprocessed = []
     for account_set in chunks(
             [m for m in members if not m['AccountId'] in invited_ids], 25):
@@ -325,7 +328,7 @@ def enable_region(master_info, accounts_config, executor, message, region):
     return members
 
 
-def process_failed_invites(master_client, region, accounts):
+def process_failed_invites(master_client, region, accounts, detector_id):
     """Most common reason we've seen for invite failure is detector suspension.
 
     If the member account detector is suspended before the master
@@ -342,7 +345,11 @@ def process_failed_invites(master_client, region, accounts):
     unprocessed = master_client.delete_invitations(
         AccountIds=list(account_ids)).get('UnprocessedAccounts', ())
     if unprocessed:
-        log.warning("Master failed to delete invitations for %s", unprocessed)
+        log.warning(
+            "Region:%s Master failed to delete invitations for %s", region, unprocessed)
+
+    master_client.delete_members(
+        DetectorId=detector_id, AccountIds=list(account_ids))
 
     for a in accounts:
         session = get_session(
@@ -350,6 +357,9 @@ def process_failed_invites(master_client, region, accounts):
             profile=a.get('profile'))
         client = session.client('guardduty')
         detector_id = get_or_create_detector_id(client)
+        log.info("Region:%s account:%s detector:%s",
+                     region, a['account_id'],
+                     str(client.get_detector(DetectorId=detector_id)))
         client.update_detector(DetectorId=detector_id, Enable=True)
 
 
