@@ -21,7 +21,7 @@ import mimetypes
 # import tempfile
 # import os
 
-from google.cloud.dlp import DlpServiceClient, types
+from google.cloud.dlp import DlpServiceClient
 from boto3.s3.transfer import TransferConfig
 
 
@@ -40,13 +40,16 @@ class ObjectContentClassify(object):
         self.data = data
         self.service = DlpServiceClient()
 
-        limits = {'max_findings_per_request': self.data.get('max-findings-by-item', 10)}
+        limits = {'max_findings_per_request': self.data.get(
+            'max-findings-by-item', 10)}
         if 'max-findings-by-item' in self.data:
-            limits['max_findings_per_item'] = self.data.get('max-findings-by-type', 10)
+            limits['max_findings_per_item'] = self.data.get(
+                'max-findings-by-type', 10)
         self.inspect_config = {
             'info_types': [{'name': it} for it in self.data['info-types']],
             'include_quote': self.data.get('include-quote', False),
-            'min_likelihood': self.data.get('min-likelihood', 'LIKELIHOOD_UNSPECIFIED'),
+            'min_likelihood': self.data.get(
+                'min-likelihood', 'LIKELIHOOD_UNSPECIFIED'),
             'limits': limits,
         },
         self.transfer_config = TransferConfig(use_threads=False)
@@ -69,9 +72,13 @@ class ObjectContentClassify(object):
         return result
 
     def process_key(self, client, bucket_name, key):
-        return self.process_object(key, client.get_object(Bucket=bucket_name, Key=key['Key']))
+        return self.process_object(
+            key, client.get_object(Bucket=bucket_name, Key=key['Key']))
 
     def process_version(self, client, bucket_name, key):
         return self.process_object(
             key,
-            client.get_object_version(Bucket=bucket_name, Key=key['Key'], VersionId=key['VersionId']))
+            client.get_object_version(
+                Bucket=bucket_name,
+                Key=key['Key'],
+                VersionId=key['VersionId']))
