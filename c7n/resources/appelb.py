@@ -1013,15 +1013,15 @@ class TargetGroupMetrics(MetricsFilter):
     def get_dimensions(self, resource):
         lbs = []
 
-        app_lb = '/loadbalancer/app/'
-        net_lb = '/loadbalancer/net/'
-        tg_lb = '/loadbalancer/targetgroup/'
+        app_lb = ':loadbalancer/app/'
+        net_lb = ':loadbalancer/net/'
+        tg_lb = ':targetgroup/'
 
         for n in resource['LoadBalancerArns']:
             if app_lb in n:
-                lbs.append("app/%s" % n[n.index(app_lb) + 1:])
+                lbs.append("app/%s" % n[n.index(app_lb) + len(app_lb) + 1:])
             elif net_lb in n:
-                lbs.append("net/%s" % n[n.index(net_lb) + 1:])
+                lbs.append("net/%s" % n[n.index(net_lb) + len(app_lb) + 1:])
 
         if not lbs:
             return None
@@ -1031,8 +1031,8 @@ class TargetGroupMetrics(MetricsFilter):
              'Value': lbs[0]},
             {'Name': 'TargetGroup',
              'Value': 'targetgroup/%s' % (
-                 resource['TargetGroupArn'][
-                     resource['TargetGroupArn'].index(tg_lb) + 1:])}]
+                 resource['TargetGroupArn'].split(tg_lb)[-1])}]
+
 
 
 @AppELBTargetGroup.filter_registry.register('default-vpc')
