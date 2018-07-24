@@ -1,7 +1,7 @@
 accountWhitelist:
   - 123445678901
 assumeRoles:
-  123445678901: omnisssm-iam-role
+  123445678901: omnissm-iam-role
 instanceRole: null
 maxRetries: 10
 queueName: omnissm-deferred-actions-queue

@@ -34,7 +34,7 @@ Resources:
       Handler: "main"
       Tags:
         App: OmniSSM
-      Role: arn:aws:iam::644160558196:role/CloudCustodianRole
+      Role: arn:aws:iam::644160558196:role/SSM-Register-API
       Environment:
         Variables:
           OMNISSM_REGISTRATIONS_TABLE: !Ref RegistrationsTable
