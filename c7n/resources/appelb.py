@@ -1034,7 +1034,6 @@ class TargetGroupMetrics(MetricsFilter):
                  resource['TargetGroupArn'].split(tg_lb)[-1])}]
 
 
-
 @AppELBTargetGroup.filter_registry.register('default-vpc')
 class AppELBTargetGroupDefaultVpcFilter(DefaultVpcBase):
     """Filter all application elb target groups within the default vpc
