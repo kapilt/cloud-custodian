@@ -49,6 +49,7 @@ class EMRCluster(QueryResourceManager):
         id = 'Id'
         date = "Status.Timeline.CreationDateTime"
         filter_name = None
+        dimension = None
 
     action_registry = actions
     filter_registry = filters
