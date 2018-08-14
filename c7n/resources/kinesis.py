@@ -102,6 +102,103 @@ class FirehoseDelete(Action):
                 DeliveryStreamName=r['DeliveryStreamName'])
 
 
+@DeliveryStream.action_registry.register('encrypt-s3-destination')
+class FirehoseEncryptS3Destination(Action):
+    """Action to set encryption key a Firehose S3 destination
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: encrypt-s3-destination
+                resource: firehouse
+                filters:
+                  - KmsMasterKeyId: absent
+                actions:
+                  - type: encrypt-s3-destination
+                    key_arn: <arn of KMS key/alias>
+    """
+    schema = type_schema(
+        'encrypt-s3-destination',
+        key_arn={'type': 'string'}, required=('key_arn',))
+
+    permissions = ("firehose:UpdateDestination",)
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('firehose')
+        key = self.data.get('key_arn')
+        for r in resources:
+            if not r['DeliveryStreamStatus'] == 'ACTIVE':
+                continue
+            version = r['VersionId']
+            name = r['DeliveryStreamName']
+            destination_id = r['Destinations'][0]['DestinationId']
+            if 'SplunkDestinationDescription' in r.keys():
+                dest = r['SplunkDestinationDescription']
+                if 'S3BackupMode' in dest.keys():
+                    del dest['S3BackupMode']
+                if 'S3DestinationDescription' in dest.keys():
+                    dest['S3Update'] = dest.pop('S3DestinationDescription')
+                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
+                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
+                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
+                            {"AWSKMSKeyARN": key}
+                client.update_destination(
+                    DeliveryStreamName=name,
+                    DestinationId=destination_id,
+                    CurrentDeliveryStreamVersionId=version,
+                    SplunkDestinationUpdate=r['SplunkDestinationDescription'])
+
+            if 'ElasticsearchDestinationDescription' in r.keys():
+                dest = r['ElasticsearchDestinationDescription']
+                if 'S3BackupMode' in dest.keys():
+                    del dest['S3BackupMode']
+                if 'S3DestinationDescription' in dest.keys():
+                    dest['S3Update'] = dest.pop('S3DestinationDescription')
+                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
+                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
+                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
+                            {"AWSKMSKeyARN": key}
+                client.update_destination(
+                    DeliveryStreamName=name,
+                    DestinationId=destination_id,
+                    CurrentDeliveryStreamVersionId=version,
+                    ElasticsearchDestinationUpdate=r['ElasticsearchDestinationDescription'])
+
+            if 'ExtendedS3DestinationDescription' in r.keys():
+                dest = r['ExtendedS3DestinationDescription']
+                if 'NoEncryptionConfig' in dest['EncryptionConfiguration'].keys():
+                    del dest['EncryptionConfiguration']['NoEncryptionConfig']
+                    dest['EncryptionConfiguration']['KMSEncryptionConfig'] = {"AWSKMSKeyARN": key}
+                client.update_destination(
+                    DeliveryStreamName=name,
+                    DestinationId=destination_id,
+                    CurrentDeliveryStreamVersionId=version,
+                    ExtendedS3DestinationUpdate=r['ExtendedS3DestinationDescription'])
+
+            if 'RedshiftDestinationDescription' in r.keys():
+                dest = r['RedshiftDestinationDescription']
+                for k in ["ClusterJDBCURL", "CopyCommand", "Username"]:
+                    if k in dest.keys():
+                        del dest[k]
+
+                if 'S3BackupMode' in dest.keys():
+                    del dest['S3BackupMode']
+                if 'S3DestinationDescription' in dest.keys():
+                    dest['S3Update'] = dest.pop('S3DestinationDescription')
+                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
+                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
+                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
+                            {"AWSKMSKeyARN": key}
+
+                client.update_destination(
+                    DeliveryStreamName=name,
+                    DestinationId=destination_id,
+                    CurrentDeliveryStreamVersionId=version,
+                    RedshiftDestinationUpdate=r['RedshiftDestinationDescription'])
+
+
 @resources.register('kinesis-analytics')
 class AnalyticsApp(QueryResourceManager):
 
