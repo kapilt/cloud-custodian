@@ -133,9 +133,10 @@ class FirehoseEncryptS3Destination(Action):
                 continue
             version = r['VersionId']
             name = r['DeliveryStreamName']
-            destination_id = r['Destinations'][0]['DestinationId']
-            if 'SplunkDestinationDescription' in r.keys():
-                dest = r['SplunkDestinationDescription']
+            d = r['Destinations'][0]
+            destination_id = d['DestinationId']
+            if 'SplunkDestinationDescription' in d.keys():
+                dest = d['SplunkDestinationDescription']
                 if 'S3BackupMode' in dest.keys():
                     del dest['S3BackupMode']
                 if 'S3DestinationDescription' in dest.keys():
@@ -148,10 +149,10 @@ class FirehoseEncryptS3Destination(Action):
                     DeliveryStreamName=name,
                     DestinationId=destination_id,
                     CurrentDeliveryStreamVersionId=version,
-                    SplunkDestinationUpdate=r['SplunkDestinationDescription'])
+                    SplunkDestinationUpdate=d['SplunkDestinationDescription'])
 
-            if 'ElasticsearchDestinationDescription' in r.keys():
-                dest = r['ElasticsearchDestinationDescription']
+            if 'ElasticsearchDestinationDescription' in d.keys():
+                dest = d['ElasticsearchDestinationDescription']
                 if 'S3BackupMode' in dest.keys():
                     del dest['S3BackupMode']
                 if 'S3DestinationDescription' in dest.keys():
@@ -164,10 +165,10 @@ class FirehoseEncryptS3Destination(Action):
                     DeliveryStreamName=name,
                     DestinationId=destination_id,
                     CurrentDeliveryStreamVersionId=version,
-                    ElasticsearchDestinationUpdate=r['ElasticsearchDestinationDescription'])
+                    ElasticsearchDestinationUpdate=d['ElasticsearchDestinationDescription'])
 
-            if 'ExtendedS3DestinationDescription' in r.keys():
-                dest = r['ExtendedS3DestinationDescription']
+            if 'ExtendedS3DestinationDescription' in d.keys():
+                dest = d['ExtendedS3DestinationDescription']
                 if 'NoEncryptionConfig' in dest['EncryptionConfiguration'].keys():
                     del dest['EncryptionConfiguration']['NoEncryptionConfig']
                     dest['EncryptionConfiguration']['KMSEncryptionConfig'] = {"AWSKMSKeyARN": key}
@@ -175,10 +176,10 @@ class FirehoseEncryptS3Destination(Action):
                     DeliveryStreamName=name,
                     DestinationId=destination_id,
                     CurrentDeliveryStreamVersionId=version,
-                    ExtendedS3DestinationUpdate=r['ExtendedS3DestinationDescription'])
+                    ExtendedS3DestinationUpdate=d['ExtendedS3DestinationDescription'])
 
-            if 'RedshiftDestinationDescription' in r.keys():
-                dest = r['RedshiftDestinationDescription']
+            if 'RedshiftDestinationDescription' in d.keys():
+                dest = d['RedshiftDestinationDescription']
                 for k in ["ClusterJDBCURL", "CopyCommand", "Username"]:
                     if k in dest.keys():
                         del dest[k]
@@ -196,7 +197,7 @@ class FirehoseEncryptS3Destination(Action):
                     DeliveryStreamName=name,
                     DestinationId=destination_id,
                     CurrentDeliveryStreamVersionId=version,
-                    RedshiftDestinationUpdate=r['RedshiftDestinationDescription'])
+                    RedshiftDestinationUpdate=d['RedshiftDestinationDescription'])
 
 
 @resources.register('kinesis-analytics')
