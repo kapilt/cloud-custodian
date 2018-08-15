@@ -151,6 +151,26 @@ class Kinesis(BaseTest):
         )['DeliveryStreamDescription']['Destinations'][0]['SplunkDestinationDescription']
         assert 'KMSEncryptionConfig' in s['S3DestinationDescription']['EncryptionConfiguration'].keys()
 
+    def test_firehose_elasticsearch_encrypt_s3_destination(self):
+        factory = self.replay_flight_data("test_firehose_elasticsearch_encrypt_s3_destination")
+        p = self.load_policy(
+            {
+                "name": "khole",
+                "resource": "firehose",
+                "filters": [{"type": "value",
+                    "key": "Destinations[0].ElasticsearchDestinationDescription.S3DestinationDescription.EncryptionConfiguration.NoEncryptionConfig",
+                             "value": "present"}],
+                "actions": [{"type": "encrypt-s3-destination", "key_arn": "arn:aws:kms:us-east-1:123456789:alias/aws/s3"}],
+            },
+            session_factory=factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        s = factory().client("firehose").describe_delivery_stream(
+            DeliveryStreamName="firehose-splunk"
+        )['DeliveryStreamDescription']['Destinations'][0]['ElasticsearchDestinationDescription']
+        assert 'KMSEncryptionConfig' in s['S3DestinationDescription']['EncryptionConfiguration'].keys()
+
     def test_app_query(self):
         factory = self.replay_flight_data("test_kinesis_analytics_query")
         p = self.load_policy(
