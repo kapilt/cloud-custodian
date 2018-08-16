@@ -137,7 +137,7 @@ class FirehoseEncryptS3Destination(Action):
 
             policies:
               - name: encrypt-s3-destination
-                resource: firehouse
+                resource: firehose
                 filters:
                   - KmsMasterKeyId: absent
                 actions:
