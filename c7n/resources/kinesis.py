@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import jmespath
+
 from c7n.actions import Action
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
@@ -150,6 +152,29 @@ class FirehoseEncryptS3Destination(Action):
 
     permissions = ("firehose:UpdateDestination",)
 
+    DEST_MD = {
+        'SplunkDestinationDescription': {
+            'clear': ['S3BackupMode'],
+            'encrypt_path': 'S3DestinationDescription.EncryptionConfiguration',
+            'remap': [('S3DestinationDescription', 'S3Update')]
+        },
+        'ElasticsearchDestinationDescription': {
+            'clear': ['S3BackupMode'],
+            'encrypt_path': 'S3DestinationDescription.EncryptionConfiguration',
+            'remap': [('S3DestinationDescription', 'S3Update')]
+        },
+        'ExtendedS3DestinationDescription': {
+            'clear': [],
+            'encrypt_path': 'S3DestinationDescription.EncryptionConfiguration',
+            'remap': ()
+        },
+        'RedshiftDestinationDescription': {
+            'clear': ['S3BackupMode', "ClusterJDBCURL", "CopyCommand", "Username"],
+            'encrypt_path': 'S3DestinationDescription.EncryptionConfiguration',
+            'remap': [('S3DestinationDescription', 'S3Update')]
+        },
+    }
+
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('firehose')
         key = self.data.get('key_arn')
@@ -160,69 +185,28 @@ class FirehoseEncryptS3Destination(Action):
             name = r['DeliveryStreamName']
             d = r['Destinations'][0]
             destination_id = d['DestinationId']
-            if 'SplunkDestinationDescription' in d.keys():
-                dest = d['SplunkDestinationDescription']
-                if 'S3BackupMode' in dest.keys():
-                    del dest['S3BackupMode']
-                if 'S3DestinationDescription' in dest.keys():
-                    dest['S3Update'] = dest.pop('S3DestinationDescription')
-                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
-                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
-                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
-                            {"AWSKMSKeyARN": key}
-                client.update_destination(
-                    DeliveryStreamName=name,
-                    DestinationId=destination_id,
-                    CurrentDeliveryStreamVersionId=version,
-                    SplunkDestinationUpdate=d['SplunkDestinationDescription'])
 
-            if 'ElasticsearchDestinationDescription' in d.keys():
-                dest = d['ElasticsearchDestinationDescription']
-                if 'S3BackupMode' in dest.keys():
-                    del dest['S3BackupMode']
-                if 'S3DestinationDescription' in dest.keys():
-                    dest['S3Update'] = dest.pop('S3DestinationDescription')
-                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
-                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
-                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
-                            {"AWSKMSKeyARN": key}
-                client.update_destination(
-                    DeliveryStreamName=name,
-                    DestinationId=destination_id,
-                    CurrentDeliveryStreamVersionId=version,
-                    ElasticsearchDestinationUpdate=d['ElasticsearchDestinationDescription'])
+            for dtype, dmetadata in self.DEST_MD.items():
+                if dtype not in d:
+                    continue
+                dinfo = d[dtype]
+                for k in dmetadata['clear']:
+                    dinfo.pop(dinfo, None)
+                if dmetadata['encrypt_path']:
+                    encrypt_info = jmespath.search(dmetadata['encrypt_path'], dinfo)
+                else:
+                    encrypt_info = dinfo
+                encrypt_info.pop('NoEncryptionConfig', None)
+                encrypt_info['KMSEncryptionConfig'] = {'AWSKMSKeyArn': key}
 
-            if 'ExtendedS3DestinationDescription' in d.keys():
-                dest = d['ExtendedS3DestinationDescription']
-                if 'NoEncryptionConfig' in dest['EncryptionConfiguration'].keys():
-                    del dest['EncryptionConfiguration']['NoEncryptionConfig']
-                    dest['EncryptionConfiguration']['KMSEncryptionConfig'] = {"AWSKMSKeyARN": key}
-                client.update_destination(
-                    DeliveryStreamName=name,
-                    DestinationId=destination_id,
-                    CurrentDeliveryStreamVersionId=version,
-                    ExtendedS3DestinationUpdate=d['ExtendedS3DestinationDescription'])
-
-            if 'RedshiftDestinationDescription' in d.keys():
-                dest = d['RedshiftDestinationDescription']
-                for k in ["ClusterJDBCURL", "CopyCommand", "Username"]:
-                    if k in dest.keys():
-                        del dest[k]
-
-                if 'S3BackupMode' in dest.keys():
-                    del dest['S3BackupMode']
-                if 'S3DestinationDescription' in dest.keys():
-                    dest['S3Update'] = dest.pop('S3DestinationDescription')
-                    if 'NoEncryptionConfig' in dest['S3Update']['EncryptionConfiguration']:
-                        del dest['S3Update']['EncryptionConfiguration']['NoEncryptionConfig']
-                        dest['S3Update']['EncryptionConfiguration']['KMSEncryptionConfig'] = \
-                            {"AWSKMSKeyARN": key}
-
-                client.update_destination(
-                    DeliveryStreamName=name,
-                    DestinationId=destination_id,
-                    CurrentDeliveryStreamVersionId=version,
-                    RedshiftDestinationUpdate=d['RedshiftDestinationDescription'])
+                for old_k, new_k in dmetadata['remap']:
+                    if old_k in dinfo:
+                        dinfo[new_k] = dinfo.pop(old_k)
+                params = dict(DeliveryStreamName=name,
+                              DestionationId=destination_id,
+                              CurrentDeliveryStreamVersionId=version)
+                params[dtype] = dinfo
+                client.update_destination(**params)
 
 
 @resources.register('kinesis-analytics')
