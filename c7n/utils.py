@@ -499,7 +499,7 @@ def format_string_values(obj, err_fallback=(IndexError,), *args, **kwargs):
     elif isinstance(obj, six.string_types):
         try:
             return obj.format(*args, **kwargs)
-        except err_fallback as e:
+        except err_fallback:
             return obj
     else:
         return obj

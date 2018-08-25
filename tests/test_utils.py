@@ -395,4 +395,3 @@ class UtilTest(unittest.TestCase):
             utils.format_string_values(
                 {'k': '{1}'}),
             {'k': '{1}'})
-                
