@@ -361,9 +361,9 @@ class SetEncryption(BaseAction):
         try:
             client.set_queue_attributes(
                 QueueUrl=queue['QueueUrl'],
-                Attributes={'KmsMasterKeyId': self.key_id}
+                Attributes={'KmsMasterKeyId': key_id}
             )
-        except (client.QueueDoesNotExist,) as e:
+        except (client.exceptions.QueueDoesNotExist,) as e:
             self.log.exception(
                 "Exception modifying queue:\n %s" % e)
 
