@@ -313,7 +313,9 @@ def process_resource(type_name, resource_type, resource_defs, alias_name=None, d
             if filter_name in definitions['filters']:
                 assert definitions['filters'][filter_name] == f.schema, "Schema mismatch on filter w/ schema alias"
             definitions['filters'][filter_name] = f.schema
-            r['filters']['$ref'] = '#/definitions/filters/%s' % filter_name
+            filter_refs.append({
+                '$ref': '#/definitions/filters/%s' % filter_name})
+            continue
         elif filter_name == 'value':
             r['filters'][filter_name] = {
                 '$ref': '#/definitions/filters/value'}
