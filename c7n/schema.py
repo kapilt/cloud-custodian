@@ -273,7 +273,7 @@ def process_resource(type_name, resource_type, resource_defs, alias_name=None, d
             seen_actions.add(a)
         if a.schema_alias:
             if action_name in definitions['actions']:
-                assert definitions['actions'][action_name] == a.schema, "Schema mismatch on action w/ schema alias"
+                assert definitions['actions'][action_name] == a.schema, "Schema mismatch on action w/ schema alias"  # NOQA
             definitions['actions'][action_name] = a.schema
             action_refs.append({'$ref': '#/definitions/actions/%s' % action_name})
         else:
@@ -311,7 +311,7 @@ def process_resource(type_name, resource_type, resource_defs, alias_name=None, d
             continue
         if f.schema_alias:
             if filter_name in definitions['filters']:
-                assert definitions['filters'][filter_name] == f.schema, "Schema mismatch on filter w/ schema alias"
+                assert definitions['filters'][filter_name] == f.schema, "Schema mismatch on filter w/ schema alias" # NOQA
             definitions['filters'][filter_name] = f.schema
             filter_refs.append({
                 '$ref': '#/definitions/filters/%s' % filter_name})
