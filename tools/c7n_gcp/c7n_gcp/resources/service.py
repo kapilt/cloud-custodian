@@ -26,7 +26,7 @@ class Service(QueryResourceManager):
         version = 'v1'
         component = 'services'
         enum_spec = ('list', 'services[]', None)
-        scope = 'project'        
+        scope = 'project'
         scope_key = 'consumerId'
         scope_template = 'project:{}'
 
@@ -44,7 +44,7 @@ class Disable(MethodAction):
 
       policies:
         - name: disable-disallowed-services
-          resource: ec2
+          resource: gcp.service
           mode:
             type: gcp-audit
             methods:
@@ -64,5 +64,3 @@ class Disable(MethodAction):
                 'body': {
                     'consumerId': 'project:{}'.format(
                         session.get_default_project())}}
-
-    
