@@ -344,7 +344,7 @@ class TagCountFilter(Filter):
         'tag-count',
         count={'type': 'integer', 'minimum': 0},
         op={'enum': list(OPERATORS.keys())})
-    schema_alias = 'tag_count'
+    schema_alias = True
 
     def __call__(self, i):
         count = self.data.get('count', 10)
@@ -370,7 +370,7 @@ class Tag(Action):
         value={'type': 'string'},
         tag={'type': 'string'},
     )
-    schema_alias = 'tag'
+    schema_alias = True
     permissions = ('ec2:CreateTags',)
 
     def validate(self):
