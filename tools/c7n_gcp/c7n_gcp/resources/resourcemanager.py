@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from c7n_gcp.filters.iam import IamAccess
 from c7n_gcp.provider import resources
 from c7n_gcp.query import QueryResourceManager, TypeInfo
 
@@ -45,10 +44,3 @@ class Project(QueryResourceManager):
         component = 'projects'
         scope = 'global'
         enum_spec = ('list', 'projects', None)
-
-
-@Project.filter_registry.register('iam-policy')
-class ProjectIamAccess(IamAccess):
-
-    def get_resource_params(self, m, r):
-        return {'resource': r['projectId']}
