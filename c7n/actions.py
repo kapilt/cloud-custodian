@@ -30,6 +30,7 @@ from c7n.executor import ThreadPoolExecutor
 from c7n.manager import resources
 from c7n.registry import PluginRegistry
 from c7n.resolver import ValuesFrom
+from c7n.stream import streams
 from c7n import utils
 from c7n.version import version as VERSION
 
