@@ -26,6 +26,7 @@ import time
 
 import click
 import jsonschema
+from six import string_types
 
 from rq.job import Job
 from rq.registry import FinishedJobRegistry, StartedJobRegistry
@@ -81,8 +82,8 @@ CONFIG_SCHEMA = {
                 # https://cloud.google.com/dlp/docs/infotypes-reference
                 'info-types': {'type': 'array', 'items': {'type': 'string'}},
                 # TODO: unconfigured content-options, custom info types, exclude info types.
-                },
             },
+        },
 
         'object-filters': {
             'type': 'object',
@@ -183,7 +184,7 @@ CONFIG_SCHEMA = {
             'items': {'$ref': '#/definitions/account'}
         },
     }
-    }
+}
 
 
 def debug(f):
@@ -733,7 +734,7 @@ def inspect_queue(queue, state, limit, bucket):
     conn = worker.connection
 
     def job_row(j):
-        if isinstance(j.args[0], basestring):
+        if isinstance(j.args[0], string_types):
             account, bucket = j.args[0].split(':', 1)
         elif isinstance(j.args[0], dict):
             account, bucket = j.args[0]['name'], "set %d" % len(j.args[1])
