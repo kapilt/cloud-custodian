@@ -306,7 +306,7 @@ class PolicyLambdaProvision(BaseTest):
             Config.empty(),
         )
 
-        output = self.capture_logging("custodian.lambda", level=logging.DEBUG)
+        output = self.capture_logging("custodian.serverless", level=logging.DEBUG)
         result2 = mgr.publish(PolicyLambda(p), "Dev", role=ROLE)
 
         lines = output.getvalue().strip().split("\n")
@@ -731,7 +731,6 @@ class PolicyLambdaProvision(BaseTest):
             {
                 "DeadLetterConfig": {},
                 "Description": "cloud-custodian lambda policy",
-                "Environment": {"Variables": {}},
                 "FunctionName": "custodian-hello",
                 "Handler": "custodian_policy.run",
                 "KMSKeyArn": "",

@@ -18,13 +18,22 @@
             "value": "cloud-custodian"
         },
         "sku": {
-            "value": "BASIC"
+            "value": "Basic"
         },
         "workerSize": {
             "value": "0"
         },
         "skuCode": {
             "value": "B1"
+        },
+        "dockerVersion": {
+            "value": "DOCKER|mcr.microsoft.com/azure-functions/python:latest"
+        },
+        "functionsExtVersion": {
+            "value": "beta"
+        },
+        "machineDecryptionKey": {
+            "value": "DefaultKey"
         }
     }
 }

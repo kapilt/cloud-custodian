@@ -25,6 +25,15 @@
         },
         "skuCode": {
             "value": "B1"
+        },
+        "dockerVersion": {
+            "value": "DOCKER|mcr.microsoft.com/azure-functions/python:latest"
+        },
+        "functionsExtVersion": {
+            "value": "beta"
+        },
+        "machineDecryptionKey": {
+            "value": "DefaultKey"
         }
     }
 }

@@ -1,11 +1,12 @@
 
 install:
-	python -m virtualenv --python python2.7 .
+	python3.6 -m virtualenv --python python3.6 .
 	. bin/activate && pip install -r requirements-dev.txt
 	. bin/activate && pip install -e .
 	. bin/activate && pip install -r tools/c7n_mailer/requirements.txt
 	. bin/activate && pip install -r tools/c7n_azure/requirements.txt
 	. bin/activate && pip install -r tools/c7n_gcp/requirements.txt
+	. bin/activate && pip install -r tools/c7n_kube/requirements.txt
 
 coverage:
 	rm -Rf .coverage

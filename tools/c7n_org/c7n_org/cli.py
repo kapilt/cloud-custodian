@@ -157,7 +157,7 @@ def init(config, use, debug, verbose, accounts, tags, policies, resource=None, p
     filter_accounts(accounts_config, tags, accounts)
 
     load_resources()
-    MainThreadExecutor.async = False
+    MainThreadExecutor.c7n_async = False
     executor = debug and MainThreadExecutor or ProcessPoolExecutor
     return accounts_config, custodian_config, executor
 
@@ -466,6 +466,11 @@ def run_account(account, region, policies_config, output_path,
     st = time.time()
     with environ(**account_tags(account)):
         for p in policies:
+
+            # Variable expansion and non schema validation (not optional)
+            p.expand_variables(p.get_variables())
+            p.validate()
+
             log.debug(
                 "Running policy:%s account:%s region:%s",
                 p.name, account['name'], region)

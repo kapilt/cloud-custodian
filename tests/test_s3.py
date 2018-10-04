@@ -860,7 +860,7 @@ class S3ConfigSource(ConfigTest):
             session_factory=session_factory,
         )
 
-        manager = p.get_resource_manager()
+        manager = p.load_resource_manager()
         resource_a = manager.get_resources([bname])[0]
         results = self.wait_for_config(session, queue_url, bname)
         resource_b = s3.ConfigS3(manager).load_resource(results[0])
@@ -1886,7 +1886,7 @@ class S3Test(BaseTest):
         )
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
         self.patch(s3.RemovePolicyStatement, "executor_factory", MainThreadExecutor)
-        self.patch(MainThreadExecutor, "async", False)
+        self.patch(MainThreadExecutor, "c7n_async", False)
 
         bname = "custodian-policy-test"
         statement = {

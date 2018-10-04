@@ -1,17 +1,34 @@
+# Copyright 2015-2018 Capital One Services, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import re
-from vcr_unittest import VCRTestCase
-
-from c7n.schema import generate
-from c7n.resources import load_resources
-from c7n.testing import TestUtils
+import datetime
 
 from c7n_azure.session import Session
+from vcr_unittest import VCRTestCase
+
+from c7n.resources import load_resources
+from c7n.schema import generate
+from c7n.testing import TestUtils
 
 load_resources()
 
 C7N_SCHEMA = generate()
 DEFAULT_SUBSCRIPTION_ID = 'ea42f556-5106-4743-99b0-c129bfa71a47'
+# latest VCR recording date that tag tests
+# If tests need to be re-recorded, update to current date
+TEST_DATE = datetime.datetime(2018, 9, 10, 23, 59, 59)
 
 
 class AzureVCRBaseTest(VCRTestCase):
@@ -53,6 +70,9 @@ class AzureVCRBaseTest(VCRTestCase):
             DEFAULT_SUBSCRIPTION_ID,
             r2.path)
 
+        r1_path = r1_path.replace('//', '/')
+        r2_path = r2_path.replace('//', '/')
+
         return r1_path == r2_path
 
     def request_callback(self, request):
@@ -62,6 +82,10 @@ class AzureVCRBaseTest(VCRTestCase):
                 r"[\da-zA-Z]{8}-([\da-zA-Z]{4}-){3}[\da-zA-Z]{12}",
                 DEFAULT_SUBSCRIPTION_ID,
                 request.url)
+        if request.body:
+            request.body = b'mock_body'
+        if re.match('https://login.microsoftonline.com/([^/]+)/oauth2/token', request.uri):
+            return None
         if re.match('https://login.microsoftonline.com/([^/]+)/oauth2/token', request.uri):
             return None
         return request

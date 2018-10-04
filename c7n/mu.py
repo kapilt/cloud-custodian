@@ -30,18 +30,16 @@ import time
 import tempfile
 import zipfile
 
-from boto3.s3.transfer import S3Transfer, TransferConfig
-from botocore.exceptions import ClientError
-
 from concurrent.futures import ThreadPoolExecutor
 
 # Static event mapping to help simplify cwe rules creation
+from c7n.exceptions import ClientError
 from c7n.cwe import CloudWatchEvents
 from c7n.logs_support import _timestamp_from_string
 from c7n.utils import parse_s3, local_session
 
 
-log = logging.getLogger('custodian.lambda')
+log = logging.getLogger('custodian.serverless')
 
 
 class PythonPackageArchive(object):
@@ -94,7 +92,7 @@ class PythonPackageArchive(object):
                 # https://docs.python.org/3/reference/import.html#module-path
                 for directory in module.__path__:
                     self.add_directory(directory, ignore)
-                if not hasattr(module, '__file__'):
+                if getattr(module, '__file__', None) is None:
 
                     # Likely a namespace package. Try to add *.pth files so
                     # submodules are importable under Python 2.7.
@@ -192,7 +190,7 @@ class PythonPackageArchive(object):
         self._closed = True
         self._zip_file.close()
         log.debug(
-            "Created custodian lambda archive size: %0.2fmb",
+            "Created custodian serverless archive size: %0.2fmb",
             (os.path.getsize(self._temp_archive_file.name) / (
                 1024.0 * 1024.0)))
         return self
@@ -206,7 +204,7 @@ class PythonPackageArchive(object):
         """Return the b64 encoded sha256 checksum of the archive."""
         assert self._closed, "Archive not closed"
         with open(self._temp_archive_file.name, 'rb') as fh:
-            return encoder(checksum(fh, hasher()))
+            return encoder(checksum(fh, hasher())).decode('ascii')
 
     def get_bytes(self):
         """Return the entire zip file as a byte string. """
@@ -457,6 +455,7 @@ class LambdaManager(object):
         return result, changed
 
     def _upload_func(self, s3_uri, func, archive):
+        from boto3.s3.transfer import S3Transfer, TransferConfig
         _, bucket, key_prefix = parse_s3(s3_uri)
         key = "%s/%s" % (key_prefix, func.name)
         transfer = S3Transfer(
@@ -596,11 +595,13 @@ class AbstractLambdaFunction:
             'Handler': self.handler,
             'Timeout': self.timeout,
             'TracingConfig': self.tracing_config,
-            'Environment': self.environment,
             'KMSKeyArn': self.kms_key_arn,
             'DeadLetterConfig': self.dead_letter_config,
             'VpcConfig': LAMBDA_EMPTY_VALUES['VpcConfig'],
             'Tags': self.tags}
+
+        if self.environment['Variables']:
+            conf['Environment'] = self.environment
 
         if self.subnets and self.security_groups:
             conf['VpcConfig'] = {
@@ -1402,7 +1403,7 @@ class ConfigRule(object):
         )
 
         if isinstance(func, PolicyLambda):
-            manager = func.policy.get_resource_manager()
+            manager = func.policy.load_resource_manager()
             if hasattr(manager.get_model(), 'config_type'):
                 config_type = manager.get_model().config_type
             else:
