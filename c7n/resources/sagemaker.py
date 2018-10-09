@@ -20,7 +20,8 @@ from c7n.exceptions import PolicyValidationError
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.utils import local_session, type_schema
-from c7n.tags import RemoveTag, Tag, TagActionFilter, TagDelayedAction
+from c7n.tags import (
+    RemoveTag, Tag, TagActionFilter, TagDelayedAction, universal_augment)
 from c7n.filters.vpc import SubnetFilter, SecurityGroupFilter
 
 
@@ -38,23 +39,9 @@ class NotebookInstance(QueryResourceManager):
         date = 'CreationTime'
         dimension = None
         filter_name = None
+        resource_type = "sagemaker:notebook"
 
-    permissions = ('sagemaker:ListTags',)
-
-    def augment(self, resources):
-        client = local_session(self.session_factory).client('sagemaker')
-
-        def _augment(r):
-            # List tags for the Notebook-Instance & set as attribute
-            tags = self.retry(client.list_tags,
-                ResourceArn=r['NotebookInstanceArn'])['Tags']
-            r['Tags'] = tags
-            return r
-
-        # Describe notebook-instance & then list tags
-        resources = super(NotebookInstance, self).augment(resources)
-        with self.executor_factory(max_workers=1) as w:
-            return list(filter(None, w.map(_augment, resources)))
+    augment = universal_augment
 
 
 NotebookInstance.filter_registry.register('marked-for-op', TagActionFilter)
@@ -73,10 +60,7 @@ class SagemakerJob(QueryResourceManager):
         date = 'CreationTime'
         dimension = None
         filter_name = None
-
-    permissions = (
-        'sagemaker:ListTrainingJobs', 'sagemaker:DescribeTrainingJobs',
-        'sagemaker:ListTags')
+        resource_type = "sagemaker:training-job"
 
     def __init__(self, ctx, data):
         super(SagemakerJob, self).__init__(ctx, data)
@@ -93,18 +77,7 @@ class SagemakerJob(QueryResourceManager):
                 query[k] = v
         return super(SagemakerJob, self).resources(query=query)
 
-    def augment(self, jobs):
-        client = local_session(self.session_factory).client('sagemaker')
-
-        def _augment(j):
-            tags = self.retry(client.list_tags,
-                ResourceArn=j['TrainingJobArn'])['Tags']
-            j['Tags'] = tags
-            return j
-
-        jobs = super(SagemakerJob, self).augment(jobs)
-        with self.executor_factory(max_workers=1) as w:
-            return list(filter(None, w.map(_augment, jobs)))
+    augment = universal_augment
 
 
 class QueryFilter(object):
@@ -182,22 +155,9 @@ class SagemakerEndpoint(QueryResourceManager):
         date = 'CreationTime'
         dimension = None
         filter_name = None
+        resource_type = "sagemaker:endpoint"
 
-    permissions = ('sagemaker:ListTags',)
-
-    def augment(self, endpoints):
-        client = local_session(self.session_factory).client('sagemaker')
-
-        def _augment(e):
-            tags = self.retry(client.list_tags,
-                ResourceArn=e['EndpointArn'])['Tags']
-            e['Tags'] = tags
-            return e
-
-        # Describe endpoints & then list tags
-        endpoints = super(SagemakerEndpoint, self).augment(endpoints)
-        with self.executor_factory(max_workers=1) as w:
-            return list(filter(None, w.map(_augment, endpoints)))
+    augment = universal_augment
 
 
 SagemakerEndpoint.filter_registry.register('marked-for-op', TagActionFilter)
@@ -217,21 +177,9 @@ class SagemakerEndpointConfig(QueryResourceManager):
         date = 'CreationTime'
         dimension = None
         filter_name = None
+        resource_type = "sagemaker:endpoint-config"
 
-    permissions = ('sagemaker:ListTags',)
-
-    def augment(self, endpoints):
-        client = local_session(self.session_factory).client('sagemaker')
-
-        def _augment(e):
-            tags = self.retry(client.list_tags,
-                ResourceArn=e['EndpointConfigArn'])['Tags']
-            e['Tags'] = tags
-            return e
-
-        endpoints = super(SagemakerEndpointConfig, self).augment(endpoints)
-        with self.executor_factory(max_workers=1) as w:
-            return list(filter(None, w.map(_augment, endpoints)))
+    augment = universal_augment
 
 
 SagemakerEndpointConfig.filter_registry.register('marked-for-op', TagActionFilter)
@@ -250,20 +198,9 @@ class Model(QueryResourceManager):
         date = 'CreationTime'
         dimension = None
         filter_name = None
+        resource_type = "sagemaker:model"
 
-    permissions = ('sagemaker:ListTags',)
-
-    def augment(self, resources):
-        client = local_session(self.session_factory).client('sagemaker')
-
-        def _augment(r):
-            tags = self.retry(client.list_tags,
-                ResourceArn=r['ModelArn'])['Tags']
-            r.setdefault('Tags', []).extend(tags)
-            return r
-
-        with self.executor_factory(max_workers=1) as w:
-            return list(filter(None, w.map(_augment, resources)))
+    augment = universal_augment
 
 
 Model.filter_registry.register('marked-for-op', TagActionFilter)
