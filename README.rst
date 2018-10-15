@@ -35,7 +35,7 @@ garbage collection of unused resources and off-hours resource
 management.
 
 Custodian policies are written in simple YAML configuration files that
-enable users to specify policies on a resource type (EC2, ASG, Redshift, CosmoDB,
+enable users to specify policies on a resource type (EC2, ASG, Redshift, CosmosDB,
 PubSub Topic) and are constructed from a vocabulary of filters and actions.
 
 It integrates with the cloud native serverless capabilities of each
