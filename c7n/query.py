@@ -417,13 +417,20 @@ class QueryResourceManager(ResourceManager):
         if query is None:
             query = {}
 
-        resources = self.augment(self.source.resources(query))
+        with self.ctx.tracer.subsegment('resource-fetch'):
+            resources = self.source.resources(query)
+        with self.ctx.tracer.subsegment('resource-augment'):
+            resources = self.augment(resources)
+
         resource_count = len(resources)
         self._cache.save(key, resources)
-        resources = self.filter_resources(resources)
+
+        with self.ctx.tracer.subsegment('filter'):
+            resources = self.filter_resources(resources)
 
         # Check if we're out of a policies execution limits.
-        self.check_resource_limit(len(resources), resource_count)
+        if self.data == self.ctx.policy.data:
+            self.check_resource_limit(len(resources), resource_count)
         return resources
 
     def check_resource_limit(self, selection_count, population_count):
