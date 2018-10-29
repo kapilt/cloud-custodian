@@ -138,7 +138,7 @@ class RelatedTaskDefinitionFilter(ValueFilter):
     related_key = 'taskDefinition'
 
     def process(self, resources, event=None):
-        task_def_ids = [s[self.related_key] for s in resources]
+        task_def_ids = list({s[self.related_key] for s in resources})
         task_def_manager = self.manager.get_resource_manager(
             'ecs-task-definition')
 
