@@ -234,7 +234,6 @@ class TaskTaskDefinitionFilter(RelatedTaskDefinitionFilter):
     related_key = 'taskDefinitionArn'
 
 
-
 @Task.action_registry.register('stop')
 class StopTask(BaseAction):
     """Stop/Delete a currently running task."""
