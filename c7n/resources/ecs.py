@@ -165,6 +165,27 @@ class RelatedTaskDefinitionFilter(ValueFilter):
 @Service.filter_registry.register('task-definition')
 class ServiceTaskDefinitionFilter(RelatedTaskDefinitionFilter):
     """Filter services by their task definitions.
+
+    :Example:
+
+     Find any fargate services that are running with a particular
+     image in the task and delete them.
+
+    .. code-block:: yaml
+
+       policies:
+         - name: fargate-readonly-tasks
+           resource: ecs-task
+           filters:
+            - launchType: FARGATE
+            - type: task-definition
+              key: "containerDefinitions[].image"
+              value: "elasticsearch/elasticsearch:6.4.3
+              value_type: swap
+              op: contains
+           actions:
+            - delete
+
     """
 
 
@@ -230,7 +251,29 @@ class Task(query.ChildResourceManager):
 
 @Task.filter_registry.register('task-definition')
 class TaskTaskDefinitionFilter(RelatedTaskDefinitionFilter):
-    """Filter tasks by their task definition."""
+    """Filter tasks by their task definition.
+
+    :Example:
+
+     Find any fargate tasks that are running without read only root
+     and stop them.
+
+    .. code-block:: yaml
+
+       policies:
+         - name: fargate-readonly-tasks
+           resource: ecs-task
+           filters:
+            - launchType: FARGATE
+            - type: task-definition
+              key: "containerDefinitions[].readonlyRootFilesystem"
+              value: None
+              value_type: swap
+              op: contains
+           actions:
+            - stop
+
+    """
     related_key = 'taskDefinitionArn'
 
 
