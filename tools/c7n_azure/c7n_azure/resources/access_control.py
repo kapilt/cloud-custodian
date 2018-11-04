@@ -67,9 +67,10 @@ class RoleAssignment(QueryResourceManager):
         for resource in resources:
             if resource['properties']['principalId'] in principal_dics.keys():
                 graph_resource = principal_dics[resource['properties']['principalId']]
-                resource['principalName'] = GraphHelper.get_principal_name(graph_resource)
-                resource['displayName'] = graph_resource.display_name
-                resource['aadType'] = graph_resource.object_type
+                if graph_resource.object_id:
+                    resource['principalName'] = GraphHelper.get_principal_name(graph_resource)
+                    resource['displayName'] = graph_resource.display_name
+                    resource['aadType'] = graph_resource.object_type
 
         return resources
 
@@ -234,13 +235,8 @@ class DeleteAssignmentAction(BaseAction):
 
     schema = type_schema('delete')
 
-    def __init__(self, data=None, manager=None, log_dir=None):
-        super(DeleteAssignmentAction, self).__init__(data, manager, log_dir)
-        self.client = self.manager.get_client()
-
-    def delete(self, assignment_scope, assignment_name):
-        self.client.role_assignments.delete(assignment_scope, assignment_name)
-
     def process(self, assignments):
+        client = self.manager.get_client()
         for assignment in assignments:
-            self.delete(assignment['properties']['scope'], assignment['name'])
+            client.role_assignments.delete(
+                assignment['properties']['scope'], assignment['name'])
