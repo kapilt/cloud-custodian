@@ -48,7 +48,7 @@ class MethodFilter(Filter):
         if not self.method_spec:
             raise NotImplementedError("subclass must define method_spec")
         if ('annotation_key' not in self.method_spec or
-            'op' not in self.method_spec):
+                'op' not in self.method_spec):
             raise NotImplementedError("missing required in method_spec")
         return self
 
