@@ -155,21 +155,6 @@ class AccountTests(BaseTest):
              'IgnorePublicAcls': False,
              'RestrictPublicBuckets': False})
 
-    def test_s3_public_block_filter(self):
-        session_factory = self.replay_flight_data('test_account_filter_s3_public_block')
-        p = self.load_policy({
-            'name': 'account-s3-public-block',
-            'resource': 'account',
-            'filters': [{
-                'type': 's3-public-block',
-                'key': 'BlockPublicPolicy',
-                'value': True}]},
-            config={'account_id': '644160558196'},
-            session_factory=session_factory)
-        resources = p.run()
-        self.assertEqual(len(resources), 1)
-        self.assertEqual(resources[0]['c7n:s3-public-block'], {})
-
     def test_cloudtrail_enabled(self):
         session_factory = self.replay_flight_data("test_account_trail")
         p = self.load_policy(
