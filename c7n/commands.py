@@ -69,7 +69,7 @@ def policy_command(f):
                 continue
             except yaml.YAMLError as e:
                 log.error(
-                    "yaml syntax error loading policy file ({}) error: {}".format(
+                    "yaml syntax error loading policy file ({}) error:\n {}".format(
                         fp, e))
                 errors += 1
                 continue
