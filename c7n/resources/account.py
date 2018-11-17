@@ -1061,7 +1061,7 @@ class S3PublicBlock(ValueFilter):
     """
 
     annotation_key = 'c7n:s3-public-block'
-    annotate = False # no annotation from value filter
+    annotate = False  # no annotation from value filter
     schema = type_schema('s3-public-block', rinherit=ValueFilter.schema)
     permissions = ('s3:GetAccountPublicAccessBlock',)
 
