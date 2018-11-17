@@ -156,7 +156,7 @@ class AccountTests(BaseTest):
              'RestrictPublicBuckets': False})
 
     def test_s3_public_block_filter(self):
-        session_factory = self.record_flight_data('test_account_filter_s3_public_block')
+        session_factory = self.replay_flight_data('test_account_filter_s3_public_block')
         p = self.load_policy({
             'name': 'account-s3-public-block',
             'resource': 'account',
