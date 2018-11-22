@@ -1,0 +1,41 @@
+{
+    "status_code": 200,
+    "data": {
+        "BackupSummaries": [
+            {
+                "TableName": "omnissm-registrations",
+                "TableId": "965beb2f-1c36-4d44-a1e1-8b3dee3911b9",
+                "TableArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations",
+                "BackupArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations/backup/01542926070254-63dd3a98",
+                "BackupName": "voodoo",
+                "BackupCreationDateTime": {
+                    "__class__": "datetime",
+                    "year": 2018,
+                    "month": 11,
+                    "day": 22,
+                    "hour": 17,
+                    "minute": 34,
+                    "second": 30,
+                    "microsecond": 254000
+                },
+                "BackupStatus": "AVAILABLE",
+                "BackupType": "USER",
+                "BackupSizeBytes": 595
+            }
+        ],
+        "ResponseMetadata": {
+            "RequestId": "I1G5BN41PC861OLUNBTKU1JJDBVV4KQNSO5AEMVJF66Q9ASUAAJG",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "server": "Server",
+                "date": "Thu, 22 Nov 2018 23:04:15 GMT",
+                "content-type": "application/x-amz-json-1.0",
+                "content-length": "435",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "I1G5BN41PC861OLUNBTKU1JJDBVV4KQNSO5AEMVJF66Q9ASUAAJG",
+                "x-amz-crc32": "3573712329"
+            },
+            "RetryAttempts": 0
+        }
+    }
+}

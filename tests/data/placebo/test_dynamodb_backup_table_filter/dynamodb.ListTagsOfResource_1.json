@@ -1,0 +1,29 @@
+{
+    "status_code": 200,
+    "data": {
+        "Tags": [
+            {
+                "Key": "App",
+                "Value": "SystemsManager"
+            },
+            {
+                "Key": "Env",
+                "Value": "Dev"
+            }
+        ],
+        "ResponseMetadata": {
+            "RequestId": "CGU98N77KOAID88HUU87HSD8SFVV4KQNSO5AEMVJF66Q9ASUAAJG",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "server": "Server",
+                "date": "Thu, 22 Nov 2018 23:04:15 GMT",
+                "content-type": "application/x-amz-json-1.0",
+                "content-length": "77",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "CGU98N77KOAID88HUU87HSD8SFVV4KQNSO5AEMVJF66Q9ASUAAJG",
+                "x-amz-crc32": "1775279305"
+            },
+            "RetryAttempts": 0
+        }
+    }
+}

@@ -19,7 +19,8 @@ from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 
 from c7n.actions import BaseAction, ModifyVpcSecurityGroupsAction
-from c7n.filters import FilterRegistry
+from c7n.filters import FilterRegistry, ValueFilter
+from c7n.filters.related import RelatedResourceFilter
 from c7n import query
 from c7n.manager import resources
 from c7n.tags import TagDelayedAction, RemoveTag, TagActionFilter, Tag
@@ -376,12 +377,25 @@ class Backup(query.QueryResourceManager):
         type = 'table'
         enum_spec = ('list_backups', 'BackupSummaries', None)
         detail_spec = None
-        id = 'Table'
+        id = 'BackupName'
         filter_name = None
         name = 'TableName'
         date = 'BackupCreationDateTime'
         dimension = 'TableName'
         config_type = 'AWS::DynamoDB::Table'
+
+
+@Backup.filter_registry.register('table')
+class TableFilter(RelatedResourceFilter):
+    """Filter backups by their table's attributes.
+    """
+    schema = type_schema(
+        'table', rinherit=ValueFilter.schema)
+
+    FetchThreshold = 1
+    RelatedIdsExpression = "TableName"
+    RelatedResource = 'c7n.resources.dynamodb.Table'
+    AnnotationKey = None
 
 
 @Backup.action_registry.register('delete')

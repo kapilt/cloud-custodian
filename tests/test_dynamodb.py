@@ -214,6 +214,18 @@ class DynamodbTest(BaseTest):
             "custom-c7n-dynamodb-backup-%s" % (suffix),
         )
 
+    def test_dynamodb_backup_table_filter(self):
+        factory = self.replay_flight_data('test_dynamodb_backup_table_filter')
+        p = self.load_policy({
+            "name": "dynamodb-backup-filter",
+            "resource": "dynamodb-backup",
+            'filters': [{'type': 'table', 'key': 'tag:Env', 'value': 'Dev'}]},
+            session_factory=factory,
+            config={'region': 'us-east-2'})
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['TableName'], 'omnissm-registrations')
+
     def test_dynamodb_delete_backup(self):
         factory = self.replay_flight_data("test_dynamodb_delete_backup")
         p = self.load_policy(

@@ -1,0 +1,136 @@
+{
+    "status_code": 200,
+    "data": {
+        "Table": {
+            "AttributeDefinitions": [
+                {
+                    "AttributeName": "IsInventoried",
+                    "AttributeType": "N"
+                },
+                {
+                    "AttributeName": "IsTagged",
+                    "AttributeType": "N"
+                },
+                {
+                    "AttributeName": "ManagedId",
+                    "AttributeType": "S"
+                },
+                {
+                    "AttributeName": "id",
+                    "AttributeType": "S"
+                }
+            ],
+            "TableName": "omnissm-registrations",
+            "KeySchema": [
+                {
+                    "AttributeName": "id",
+                    "KeyType": "HASH"
+                }
+            ],
+            "TableStatus": "ACTIVE",
+            "CreationDateTime": {
+                "__class__": "datetime",
+                "year": 2018,
+                "month": 10,
+                "day": 3,
+                "hour": 20,
+                "minute": 48,
+                "second": 32,
+                "microsecond": 848000
+            },
+            "ProvisionedThroughput": {
+                "NumberOfDecreasesToday": 0,
+                "ReadCapacityUnits": 5,
+                "WriteCapacityUnits": 5
+            },
+            "TableSizeBytes": 595,
+            "ItemCount": 2,
+            "TableArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations",
+            "TableId": "965beb2f-1c36-4d44-a1e1-8b3dee3911b9",
+            "GlobalSecondaryIndexes": [
+                {
+                    "IndexName": "IsInventoried-index",
+                    "KeySchema": [
+                        {
+                            "AttributeName": "IsInventoried",
+                            "KeyType": "HASH"
+                        }
+                    ],
+                    "Projection": {
+                        "ProjectionType": "ALL"
+                    },
+                    "IndexStatus": "ACTIVE",
+                    "ProvisionedThroughput": {
+                        "NumberOfDecreasesToday": 0,
+                        "ReadCapacityUnits": 5,
+                        "WriteCapacityUnits": 5
+                    },
+                    "IndexSizeBytes": 307,
+                    "ItemCount": 1,
+                    "IndexArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations/index/IsInventoried-index"
+                },
+                {
+                    "IndexName": "IsTagged-index",
+                    "KeySchema": [
+                        {
+                            "AttributeName": "IsTagged",
+                            "KeyType": "HASH"
+                        }
+                    ],
+                    "Projection": {
+                        "ProjectionType": "ALL"
+                    },
+                    "IndexStatus": "ACTIVE",
+                    "ProvisionedThroughput": {
+                        "NumberOfDecreasesToday": 0,
+                        "ReadCapacityUnits": 5,
+                        "WriteCapacityUnits": 5
+                    },
+                    "IndexSizeBytes": 307,
+                    "ItemCount": 1,
+                    "IndexArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations/index/IsTagged-index"
+                },
+                {
+                    "IndexName": "ManagedId-index",
+                    "KeySchema": [
+                        {
+                            "AttributeName": "ManagedId",
+                            "KeyType": "HASH"
+                        }
+                    ],
+                    "Projection": {
+                        "ProjectionType": "ALL"
+                    },
+                    "IndexStatus": "ACTIVE",
+                    "ProvisionedThroughput": {
+                        "NumberOfDecreasesToday": 0,
+                        "ReadCapacityUnits": 5,
+                        "WriteCapacityUnits": 5
+                    },
+                    "IndexSizeBytes": 595,
+                    "ItemCount": 2,
+                    "IndexArn": "arn:aws:dynamodb:us-east-2:644160558196:table/omnissm-registrations/index/ManagedId-index"
+                }
+            ],
+            "SSEDescription": {
+                "Status": "ENABLED",
+                "SSEType": "KMS",
+                "KMSMasterKeyArn": "arn:aws:kms:us-east-2:644160558196:key/826bd35f-cc5b-49f7-bd05-8c11ce3e8e93"
+            }
+        },
+        "ResponseMetadata": {
+            "RequestId": "V8VS7AI1OVQKUJS0EFPTKGF5RNVV4KQNSO5AEMVJF66Q9ASUAAJG",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "server": "Server",
+                "date": "Thu, 22 Nov 2018 23:04:15 GMT",
+                "content-type": "application/x-amz-json-1.0",
+                "content-length": "2000",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "V8VS7AI1OVQKUJS0EFPTKGF5RNVV4KQNSO5AEMVJF66Q9ASUAAJG",
+                "x-amz-crc32": "2472015164"
+            },
+            "RetryAttempts": 0
+        }
+    }
+}
