@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
 import itertools
 import operator
 import zlib
@@ -1717,6 +1718,56 @@ class EndpointSecurityGroupFilter(net_filters.SecurityGroupFilter):
 class EndpointSubnetFilter(net_filters.SubnetFilter):
 
     RelatedIdsExpression = "SubnetIds[]"
+
+
+@VpcEndpoint.filter_registry.register('cross-account')
+class EndpointCrossAccount(CrossAccountAccessFilter):
+
+    policy_attribute = 'PolicyDocument'
+
+
+@VpcEndpoint.action_registry.register('modify-policy')
+class EndpointSetPolicy(BaseAction):
+
+    schema = type_schema(
+        'modify-policy',
+        {'add': {
+            'type': 'array', 'items': {
+                'type': '#/definitions/iam-statement'}},
+         'remove': {
+             'type': 'array', 'items': {
+                 {'$ref': '#/definitions/iam-statement'}}}})
+
+    permissions = ('ec2:ModifyVpcEndpoint',)
+
+    def process(self, resources):
+        rcount = len(resources)
+        resources = [r for r in resources if 'PolicyDocument' in r]
+        rfcount = len(resources)
+        if rcount != rfcount:
+            self.log.info(
+                ("implicitly filtered from %d to %d "
+                 "endpoints that support policies"),
+                rcount, rfcount)
+
+        s_add = self.data.get('add', [])
+        s_remove = self.data.get('remove', [])
+
+        client = local_session(
+            self.manager.session_factory).client('ec2')
+        for r in resources:
+            statements = json.loads(
+                r['PolicyDocument']).get('Statement', [])
+
+            for s in s_remove:
+                if s in statements:
+                    statements.remove(s)
+            if s_add:
+                statements.extend(s_add)
+
+            client.modify_vpc_endpoint(
+                VpcEndpointId=r['VpcEndpointId'],
+                PolicyDocument=json.dumps({'Statement': statements}))
 
 
 @resources.register('key-pair')
