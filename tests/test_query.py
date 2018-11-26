@@ -19,7 +19,6 @@ import os
 
 
 from c7n.query import ResourceQuery, RetryPageIterator
-from c7n.resources.cw import LogGroup
 from c7n.resources.vpc import InternetGateway
 
 from botocore.config import Config
