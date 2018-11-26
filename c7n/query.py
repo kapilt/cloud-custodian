@@ -34,8 +34,7 @@ from c7n.manager import ResourceManager
 from c7n.registry import PluginRegistry
 from c7n.tags import register_ec2_tags, register_universal_tags
 from c7n.utils import (
-    local_session, generate_arn, get_retry, chunks, camelResource,
-    set_value_from_jmespath)
+    local_session, generate_arn, get_retry, chunks, camelResource)
 
 
 try:
@@ -203,8 +202,6 @@ class QueryMeta(type):
 
 def _napi(op_name):
     return op_name.title().replace('_', '')
-
-
 
 
 sources = PluginRegistry('sources')
