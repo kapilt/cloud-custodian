@@ -532,16 +532,32 @@ class PHDMode(LambdaMode):
                 "policy:%s phd event mode not supported for resource: %s" % (
                     self.policy.name, self.policy.resource_type))
 
-    def check_event(self, event):
-        return True
-
-    def run(self, event, lambda_context):
-        if not self.check_event(event):
-            return
-        super(PHDMode, self).run(event, lambda_context)
+    @staticmethod
+    def process_event_arns(client, event_arns):
+        entities = []
+        paginator = client.get_paginator('describe_affected_entities')
+        for event_set in utils.chunks(event_arns, 10):
+            entities.extend(list(itertools.chain(
+                            *[p['entities'] for p in paginator.paginate(
+                                filter={'eventArns': event_arns})])))
+        return entities
 
     def resolve_resources(self, event):
-        event['detail'].get('resources')
+        session = utils.local_session(self.manager.session_factory)
+        health = session.get_client('health')
+        he_arn = event['detail']['eventArn']
+        resource_arns = self.process_event_arns(health, events=[he_arn])
+
+        m = self.manager.get_model()
+        if 'arn' in m.id.lower():
+            resource_ids = resource_arns
+        else:
+            resource_ids = [r.rsplit('/', 1)[-1] for r in resource_arns]
+
+        resources = self.manager.get_resources(resource_ids)
+        for r in resources:
+            r.setdefault('c7n:HealthEvent', []).append(he_arn)
+        return resources
 
 
 @execution.register('cloudtrail')
