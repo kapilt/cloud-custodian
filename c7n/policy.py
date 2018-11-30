@@ -516,6 +516,34 @@ class PeriodicMode(LambdaMode, PullMode):
         return PullMode.run(self)
 
 
+@execution.register('phd')
+class PHDMode(LambdaMode):
+    """Personal Health Dashboard event response"""
+
+    schema = utils.type_schema(
+        'phd',
+        events={'type': 'array', 'items': {'type': 'string'}},
+        statuses={'type': 'array', 'items': {
+            'enum': ['open', 'upcoming', 'closed']}})
+
+    def validate(self):
+        if 'health-event' not in self.policy.resource_manager.filter_registry:
+            raise PolicyValidationError(
+                "policy:%s phd event mode not supported for resource: %s" % (
+                    self.policy.name, self.policy.resource_type))
+
+    def check_event(self, event):
+        return True
+
+    def run(self, event, lambda_context):
+        if not self.check_event(event):
+            return
+        super(PHDMode, self).run(event, lambda_context)
+
+    def resolve_resources(self, event):
+        event['detail'].get('resources')
+
+
 @execution.register('cloudtrail')
 class CloudTrailMode(LambdaMode):
     """A lambda policy using cloudwatch events rules on cloudtrail api logs."""
