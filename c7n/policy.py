@@ -518,11 +518,14 @@ class PeriodicMode(LambdaMode, PullMode):
 
 @execution.register('phd')
 class PHDMode(LambdaMode):
-    """Personal Health Dashboard event response"""
+    """Personal Health Dashboard event based policy execution."""
 
     schema = utils.type_schema(
         'phd',
+        required=['events'],
         events={'type': 'array', 'items': {'type': 'string'}},
+        categories={'type': 'array', 'items': {
+            'enum': ['issue', 'account', 'scheduled']}},
         statuses={'type': 'array', 'items': {
             'enum': ['open', 'upcoming', 'closed']}})
 
