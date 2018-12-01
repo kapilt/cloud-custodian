@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import deque
 import logging
 
 from c7n import cache
@@ -114,3 +115,12 @@ class ResourceManager(object):
         """Returns the resource meta-model.
         """
         return self.query.resolve(self.resource_type)
+
+    def iter_filters(self):
+        queue = deque(self.filters)
+        while queue:
+            f = queue.popleft()
+            if f.type in ('or', 'and', 'not'):
+                for gf in f.filters:
+                    queue.appendleft(gf)
+            yield f
