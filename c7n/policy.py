@@ -525,7 +525,7 @@ class PHDMode(LambdaMode):
         required=['events'],
         events={'type': 'array', 'items': {'type': 'string'}},
         categories={'type': 'array', 'items': {
-            'enum': ['issue', 'account', 'scheduled']}},
+            'enum': ['issue', 'accountNotification', 'scheduledChange']}},
         statuses={'type': 'array', 'items': {
             'enum': ['open', 'upcoming', 'closed']}})
 

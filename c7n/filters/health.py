@@ -30,7 +30,7 @@ class HealthEventFilter(Filter):
         'health-event',
         types={'type': 'array', 'items': {'type': 'string'}},
         category={'type': 'array', 'items': {
-            'enum': ['issue', 'scheduledNotiifcation', 'account']}},
+            'enum': ['issue', 'accountNotification', 'scheduledChange']}},
         statuses={'type': 'array', 'items': {
             'type': 'string',
             'enum': ['open', 'upcoming', 'closed']
