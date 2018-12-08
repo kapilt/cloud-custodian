@@ -1,0 +1,39 @@
+steps:
+
+ # Test across python in parallel
+ - id: "test-py2.7"
+   name: 'python:2.7'   
+   args: 'tox -e py27'
+
+ - id: "test-py3.6"
+   name: 'python:3.6'
+   args: 'tox -e py36'
+   waitFor: ['-']
+
+ - id: "test-3.7"
+   name: 'python:3.7'
+   args: 'tox -e py37'
+   waitFor: ['-']
+
+ 
+ 
+ 
+
+# Image Publishing
+
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['build', '-t', 'gcr.io/cloud-custodian/c7n', '.']
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['push', 'gcr.io/cloud-custodian/c7n']
+
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['build', '-t', 'gcr.io/cloud-custodian/org', '-f', 'tools/c7n_org/Dockerfile', '.']
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['push', 'gcr.io/cloud-custodian/org']
+
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['build', '-t', 'gcr.io/cloud-custodian/policy-stream', '-f', 'tools/c7n_org/Dockerfile', '.']
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['push', 'gcr.io/cloud-custodian/policy-stream']
+
+
