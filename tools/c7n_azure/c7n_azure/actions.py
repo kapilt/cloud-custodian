@@ -24,8 +24,8 @@ import six
 from c7n_azure import constants
 from c7n_azure.storage_utils import StorageUtilities
 from c7n_azure.tags import TagHelper
-from c7n_azure.utils import utcnow, ThreadHelper
-from dateutil import zoneinfo
+from c7n_azure.utils import utcnow, ThreadHelper, StringUtils
+from dateutil import tz as tzutils
 from msrestazure.azure_exceptions import CloudError
 
 from c7n import utils
@@ -177,6 +177,8 @@ class AutoTagUser(EventAction):
     # compiled JMES paths
     sp_jmes_path = jmespath.compile(constants.EVENT_GRID_SP_NAME_JMES_PATH)
     user_jmes_path = jmespath.compile(constants.EVENT_GRID_USER_NAME_JMES_PATH)
+    service_admin_jmes_path = jmespath.compile(constants.EVENT_GRID_SERVICE_ADMIN_JMES_PATH)
+    principal_role_jmes_path = jmespath.compile(constants.EVENT_GRID_PRINCIPAL_ROLE_JMES_PATH)
     principal_type_jmes_path = jmespath.compile(constants.EVENT_GRID_PRINCIPAL_TYPE_JMES_PATH)
 
     schema = utils.type_schema(
@@ -226,10 +228,16 @@ class AutoTagUser(EventAction):
 
         user = self.default_user
         if event_item:
+            principal_role = self.principal_role_jmes_path.search(event_item)
             principal_type = self.principal_type_jmes_path.search(event_item)
-            if principal_type == 'User':
+
+            # The Subscription Admins role does not have a principal type
+            if StringUtils.equal(principal_role, 'Subscription Admin'):
+                user = self.service_admin_jmes_path.search(event_item) or user
+            # Non Subscription Admins have either a User or ServicePrincipal type
+            elif StringUtils.equal(principal_type, 'User'):
                 user = self.user_jmes_path.search(event_item) or user
-            elif principal_type == 'ServicePrincipal':
+            elif StringUtils.equal(principal_type, 'ServicePrincipal'):
                 user = self.sp_jmes_path.search(event_item) or user
             else:
                 self.log.error('Principal type of event cannot be determined.')
@@ -471,7 +479,7 @@ class TagDelayedAction(AzureBaseAction):
 
     def __init__(self, data=None, manager=None, log_dir=None):
         super(TagDelayedAction, self).__init__(data, manager, log_dir)
-        self.tz = zoneinfo.gettz(
+        self.tz = tzutils.gettz(
             Time.TZ_ALIASES.get(self.data.get('tz', 'utc')))
 
         msg_tmpl = self.data.get('msg', self.default_template)
@@ -492,7 +500,7 @@ class TagDelayedAction(AzureBaseAction):
                 "mark-for-op specifies invalid op:%s in %s" % (
                     op, self.manager.data))
 
-        self.tz = zoneinfo.gettz(
+        self.tz = tzutils.gettz(
             Time.TZ_ALIASES.get(self.data.get('tz', 'utc')))
         if not self.tz:
             raise PolicyValidationError(
