@@ -145,13 +145,14 @@ class AzureEvents(object):
 
 class AzureEventSubscription(object):
 
-    @classmethod
-    def create(cls, destination, name, session=None, event_filter=None):
+    @staticmethod
+    def create(destination, name, session=None, event_filter=None):
+
         s = session or local_session(Session)
         event_filter = event_filter or EventSubscriptionFilter()
 
         event_info = EventSubscription(destination=destination, filter=event_filter)
-        scope = '/subscriptions/%s' % s.subscription_id
+        scope = '/subscriptions/%s' % s.get_subscription_id()
 
         client = s.client('azure.mgmt.eventgrid.EventGridManagementClient')
         event_subscription = client.event_subscriptions.create_or_update(scope, name, event_info)

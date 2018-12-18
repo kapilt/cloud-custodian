@@ -361,10 +361,16 @@ class LogOutput(object):
 @log_outputs.register('default')
 class LogFile(LogOutput):
 
+    def __repr__(self):
+        return "<LogFile file://%s>" % self.log_path
+
+    @property
+    def log_path(self):
+        return os.path.join(
+            self.ctx.log_dir, 'custodian-run.log')
+
     def get_handler(self):
-        return logging.FileHandler(
-            os.path.join(
-                self.ctx.log_dir, 'custodian-run.log'))
+        return logging.FileHandler(self.log_path)
 
 
 @blob_outputs.register('file')
@@ -413,7 +419,8 @@ class DirectoryOutput(object):
     def get_output_vars(self):
         data = {
             'account_id': self.ctx.options.account_id,
-            'policy': self.ctx.policy.name,
+            'region': self.ctx.options.region,
+            'policy_name': self.ctx.policy.name,
             'now': datetime.utcnow(),
             'uuid': str(uuid.uuid4())}
         return data

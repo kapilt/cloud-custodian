@@ -18,6 +18,7 @@ import os
 import re
 
 from azure.common.credentials import ServicePrincipalCredentials, BasicTokenAuthentication
+from msrestazure.azure_active_directory import MSIAuthentication
 from azure_common import BaseTest
 from c7n_azure import constants
 from c7n_azure.session import Session
@@ -45,6 +46,33 @@ class SessionTest(BaseTest):
                 s = Session()
 
                 self.assertIs(type(s.get_credentials()), ServicePrincipalCredentials)
+                self.assertEqual(s.get_subscription_id(), 'ea42f556-5106-4743-99b0-c129bfa71a47')
+
+    def test_initialize_msi_auth_system(self):
+        with patch('msrestazure.azure_active_directory.MSIAuthentication.__init__',
+                   autospec=True, return_value=None):
+            with patch.dict(os.environ,
+                            {
+                                constants.ENV_USE_MSI: 'true',
+                                constants.ENV_SUB_ID: 'ea42f556-5106-4743-99b0-c129bfa71a47'
+                            }, clear=True):
+                s = Session()
+
+                self.assertIs(type(s.get_credentials()), MSIAuthentication)
+                self.assertEqual(s.get_subscription_id(), 'ea42f556-5106-4743-99b0-c129bfa71a47')
+
+    def test_initialize_msi_auth_user(self):
+        with patch('msrestazure.azure_active_directory.MSIAuthentication.__init__',
+                   autospec=True, return_value=None):
+            with patch.dict(os.environ,
+                            {
+                                constants.ENV_USE_MSI: 'true',
+                                constants.ENV_SUB_ID: 'ea42f556-5106-4743-99b0-c129bfa71a47',
+                                constants.ENV_CLIENT_ID: 'client'
+                            }, clear=True):
+                s = Session()
+
+                self.assertIs(type(s.get_credentials()), MSIAuthentication)
                 self.assertEqual(s.get_subscription_id(), 'ea42f556-5106-4743-99b0-c129bfa71a47')
 
     def test_initialize_session_token(self):
@@ -122,3 +150,8 @@ class SessionTest(BaseTest):
         resource = next(client.resources.list())
         self.assertTrue(re.match('\\d{4}-\\d{2}-\\d{2}',
                                  s.resource_api_version(resource.id)) is not None)
+
+    def test_get_session_for_resource(self):
+        s = Session()
+        resource_session = s.get_session_for_resource(constants.RESOURCE_STORAGE)
+        self.assertEqual(resource_session.resource_namespace, constants.RESOURCE_STORAGE)
