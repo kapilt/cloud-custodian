@@ -130,6 +130,17 @@ class PolicyLambdaProvision(BaseTest):
         resources = mode.run(event, None)
         self.assertEqual(len(resources), 1)
 
+    def test_phd_mode(self):
+        factory = self.replay_flight_data('test_phd_event_mode')
+        p = self.load_policy(
+            {'name': 'ec2-retire',
+             'resource': 'ec2',
+             'mode': {'type': 'phd'}}, session_factory=factory)
+        mode = p.get_execution_mode()
+        event = event_data('event-phd-ec2-retire.json')
+        resources = mode.run(event, None)
+        self.assertEqual(len(resources), 0)
+
     def test_cwl_subscriber(self):
         self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
         session_factory = self.replay_flight_data("test_cwl_subscriber")
