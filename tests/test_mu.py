@@ -135,7 +135,9 @@ class PolicyLambdaProvision(BaseTest):
         p = self.load_policy(
             {'name': 'ec2-retire',
              'resource': 'ec2',
-             'mode': {'type': 'phd'}}, session_factory=factory)
+             'mode': {
+                 'events': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED'],
+                 'type': 'phd'}}, session_factory=factory)
         mode = p.get_execution_mode()
         event = event_data('event-phd-ec2-retire.json')
         resources = mode.run(event, None)
