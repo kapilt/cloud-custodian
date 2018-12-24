@@ -67,3 +67,41 @@ class SqlInstanceStop(MethodAction):
         return {'project': project,
                 'instance': instance,
                 'body': {'settings': {'activationPolicy': 'NEVER'}}}
+
+
+@SqlInstance.action_registry.register('start')
+class SqlInstanceStart(MethodAction):
+
+    schema = type_schema('start')
+    method_spec = {'op': 'patch'}
+    path_param_re = re.compile('.*?/projects/(.*?)/instances/(.*)')
+
+    def get_resource_params(self, model, resource):
+        project, instance = self.path_param_re.match(
+            resource['selfLink']).groups()
+        return {'project': project,
+                'instance': instance,
+                'body': {'settings': {'activationPolicy': 'ALWAYS'}}}
+    
+
+@resources.register('sql-backup')
+class Backup(QueryResourceManager):
+
+    class resource_type(TypeInfo):
+        service = 'sqladmin'
+        version = 'v1beta4'
+        component = 'instances'
+        enum_spec = ('list', "items[]", None)
+        scope = 'project'
+
+        @staticmethod
+        def get(client, resource_info):
+            return client.execute_command(
+                'get', {'project': resource_info['project'],
+                        'id': resource_info['id'],
+                        'instance': resource_info['name']})
+
+
+
+
+
