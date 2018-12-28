@@ -1457,6 +1457,41 @@ class SetInstanceProfile(BaseAction, StateTransitionFilter):
         return instances
 
 
+@actions.register('send-ssm-command')
+class SendSsmCommand(BaseAction):
+    """Send SSM Command to instances.
+
+    The instances must already be running ssm agents and be registered
+    to the ssm service.
+    """
+
+    schema = type_schema(
+        'send-ssm-command',
+        require=('DocumentName',),
+        **{'DocumentName': {'type': 'string'},
+           'Comment': {'type': 'string'},
+           'Parameters': {'type': 'object'},
+           'MaxConcurrency': {'type': 'string'},
+           'MaxErrors': {'type': 'string'},
+           'TimeoutSeconds': {'type': 'integer'},
+           'ServiceRoleArn': {'type': 'string'},
+           'NotificationConfig': {'type': 'object'},
+           'CloudWatchOutputConfig': {'type': 'object'}})
+
+    permissions = ('ssm:SendCommand',)
+
+    def process(self, resources):
+        client = utils.local_session(self.manager.session_factory).client('ssm')
+        for resource_set in utils.chunks(resources, 50):
+            params = dict(self.data)
+            params.pop('type')
+            params['InstanceIds'] = self.get_ssm_ids(resource_set)
+            client.send_command(**params)
+
+    def get_ssm_ids(self, resource_set):
+        return [r['InstanceId'] for r in resource_set]
+
+
 @actions.register('propagate-spot-tags')
 class PropagateSpotTags(BaseAction):
     """Propagate Tags that are set at Spot Request level to EC2 instances.
