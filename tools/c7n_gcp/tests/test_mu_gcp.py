@@ -18,6 +18,8 @@ import os
 import shutil
 import sys
 
+import mock
+
 from c7n.exceptions import PolicyValidationError
 from c7n.policy import PolicyCollection
 from c7n.testing import functional
@@ -61,7 +63,8 @@ class FunctionTest(BaseTest):
             func_info['name'],
             'projects/custodian-1291/locations/us-central1/functions/custodian-dev')
 
-    def test_handler_run(self):
+    @mock.patch('c7n.policy.PolicyCollection.from_data')
+    def test_handler_run(self, from_data):
         func_cwd = self.get_temp_dir()
         output_temp = self.get_temp_dir()
         pdata = {
@@ -79,7 +82,7 @@ class FunctionTest(BaseTest):
 
         self.patch(p, 'push', lambda evt, ctx: None)
         self.patch(handler, 'get_tmp_output_dir', lambda: output_temp)
-        self.patch(PolicyCollection, 'from_data', lambda data, config: [p])
+        from_data.return_value = [p]
         self.change_cwd(func_cwd)
         self.assertEqual(handler.run(event), True)
 
