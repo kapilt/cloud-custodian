@@ -75,8 +75,7 @@ class FunctionTest(BaseTest):
             fh.write(json.dumps({'policies': [pdata]}))
 
         event = event_data('bq-dataset-create.json')
-        factory = self.replay_flight_data('mu-handler-run')
-        p = self.load_policy(pdata, session_factory=factory)
+        p = self.load_policy(pdata)
 
         self.patch(p, 'push', lambda evt, ctx: None)
         self.patch(handler, 'get_tmp_output_dir', lambda: output_temp)
