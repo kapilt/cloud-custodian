@@ -21,7 +21,6 @@ import sys
 import mock
 
 from c7n.exceptions import PolicyValidationError
-from c7n.policy import PolicyCollection
 from c7n.testing import functional
 
 from c7n_gcp import handler, mu, policy
