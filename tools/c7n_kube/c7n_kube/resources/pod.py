@@ -11,24 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import logging
-
-import c7n_kube.resources.configmap
-import c7n_kube.resources.daemonset
-import c7n_kube.resources.namespace
-import c7n_kube.resources.node
-import c7n_kube.resources.pod
-import c7n_kube.resources.replicationcontroller
-import c7n_kube.resources.secret
-import c7n_kube.resources.service
-import c7n_kube.resources.serviceaccount
-import c7n_kube.resources.statefulset
-import c7n_kube.resources.volume # NOQA
-
-log = logging.getLogger('custodian.k8s')
+#
+from c7n_kube.query import QueryResourceManager, TypeInfo
+from c7n_kube.provider import resources
 
 
-def initialize_kube():
-    """kubernetes entry point
-    """
+@resources.register('pod')
+class Pod(QueryResourceManager):
+    class resource_type(TypeInfo):
+        group = 'Core'
+        version = 'V1'
+        enum_spec = ('list_pod_for_all_namespaces', 'items', None)
