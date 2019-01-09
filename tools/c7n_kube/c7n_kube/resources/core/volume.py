@@ -11,42 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import logging
-
-from c7n_kube.resource.core import (
-    configmap,
-    namespace,
-    node,
-    pod,
-    replicationcontroller,
-    secret,
-    service,
-    serviceaccount,
-    volume)
-
-from c7n_kube.resources.apps import (
-    daemonset,
-    replicaset,
-    statefulset)
-
-log = logging.getLogger('custodian.k8s')
-
-ALL = [
-    configmap,
-    namespace,
-    node,
-    pod,
-    replicationcontroller,
-    secret,
-    service,
-    serviceaccount,
-    volume,
-    daemonset,
-    replicaset,
-    statefulset]
+#
+from c7n_kube.query import QueryResourceManager, TypeInfo
+from c7n_kube.provider import resources
 
 
-def initialize_kube():
-    """kubernetes entry point
-    """
+@resources.register('volume')
+class PersistentVolume(QueryResourceManager):
+    class resource_type(TypeInfo):
+        group = 'Core'
+        version = 'V1'
+        enum_spec = ('list_persistent_volume', 'items', None)
+
+
+@resources.register('volume-claim')
+class PersistentVolumeClaim(QueryResourceManager):
+    class resource_type(TypeInfo):
+        group = 'Core'
+        version = 'V1'
+        enum_spec = ('list_persistent_volume_claim_for_all_namespaces', 'items', None)

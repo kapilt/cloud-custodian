@@ -18,6 +18,7 @@ from c7n_kube.provider import resources
 
 @resources.register('pod')
 class Pod(QueryResourceManager):
+
     class resource_type(TypeInfo):
         group = 'Core'
         version = 'V1'

@@ -16,18 +16,10 @@ from c7n_kube.query import QueryResourceManager, TypeInfo
 from c7n_kube.provider import resources
 
 
-@resources.register('volume')
-class PersistentVolume(QueryResourceManager):
-    class resource_type(TypeInfo):
-        group = 'Core'
-        version = 'V1'
-        enum_spec = ('list_persistent_volume', 'items', None)
+@resources.register('replica-set')
+class StatefulSet(QueryResourceManager):
 
-
-@resources.register('volume-claim')
-class PersistentVolumeClaim(QueryResourceManager):
     class resource_type(TypeInfo):
-        group = 'Core'
+        group = 'Apps'
         version = 'V1'
-        enum_spec = ('list_persistent_volume_claim_for_all_namespaces', 'items', None)
-        
+        enum_spec = ('list_replica_set_for_all_namespaces', 'items', None)

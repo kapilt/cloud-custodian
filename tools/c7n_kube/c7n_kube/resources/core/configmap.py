@@ -16,9 +16,9 @@ from c7n_kube.query import QueryResourceManager, TypeInfo
 from c7n_kube.provider import resources
 
 
-@resources.register('node')
-class Node(QueryResourceManager):
+@resources.register('config-map')
+class ConfigMap(QueryResourceManager):
     class resource_type(TypeInfo):
         group = 'Core'
         version = 'V1'
-        enum_spec = ('list_node', 'items', None)
+        enum_spec = ('list_config_map_for_all_namespaces', 'items', None)

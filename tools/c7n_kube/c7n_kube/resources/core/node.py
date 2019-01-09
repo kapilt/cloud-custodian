@@ -16,9 +16,10 @@ from c7n_kube.query import QueryResourceManager, TypeInfo
 from c7n_kube.provider import resources
 
 
-@resources.register('config-map')
-class ConfigMap(QueryResourceManager):
+@resources.register('node')
+class Node(QueryResourceManager):
+
     class resource_type(TypeInfo):
         group = 'Core'
         version = 'V1'
-        enum_spec = ('list_pod_for_all_namespaces', 'items', None)
+        enum_spec = ('list_node', 'items', None)
