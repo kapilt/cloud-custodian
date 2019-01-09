@@ -14,7 +14,7 @@
 
 import logging
 
-from c7n_kube.resource.core import (
+from c7n_kube.resources.core import (
     configmap,
     namespace,
     node,
