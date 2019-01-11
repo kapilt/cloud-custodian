@@ -62,7 +62,6 @@ class KubeTest(TestUtils):
 
     KubeConfigPath = init_kube_config()
     recording = False
-    vcr = None
 
     def replay_flight_data(self, name=None):
         kw = self._get_vcr_kwargs()
