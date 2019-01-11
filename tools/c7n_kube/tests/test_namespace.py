@@ -17,9 +17,11 @@ from common_kube import KubeTest
 class NamespaceTest(KubeTest):
 
     def test_ns_query(self):
+        factory = self.replay_flight_data()
         p = self.load_policy({
             'name': 'all-namespaces',
-            'resource': 'k8s.namespace'})
+            'resource': 'k8s.namespace'},
+            session_factory=factory)
         resources = p.run()
         self.assertEqual(len(resources), 3)
         self.assertEqual(

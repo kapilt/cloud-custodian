@@ -37,7 +37,7 @@ class Kubernetes(Provider):
 
     def get_session_factory(self, options):
         """Get a credential/session factory for api usage."""
-        return partial(Session, config_file=options.get('config_file'))
+        return Session
 
 
 resources = Kubernetes.resources
