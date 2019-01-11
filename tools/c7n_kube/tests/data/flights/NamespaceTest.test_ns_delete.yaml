@@ -1,0 +1,56 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: [application/json]
+      Content-Type: [application/json]
+      User-Agent: [Swagger-Codegen/7.0.0/python]
+    method: GET
+    uri: https://ghost/api/v1/namespaces
+  response:
+    body: {string: '{"kind":"NamespaceList","apiVersion":"v1","metadata":{"selfLink":"/api/v1/namespaces","resourceVersion":"1930381"},"items":[{"metadata":{"name":"default","selfLink":"/api/v1/namespaces/default","uid":"e4a71ece-0dc4-11e9-95a0-42010a800051","resourceVersion":"24","creationTimestamp":"2019-01-01T12:58:11Z"},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Active"}},{"metadata":{"name":"hello","selfLink":"/api/v1/namespaces/hello","uid":"319472df-15af-11e9-98ff-42010a800162","resourceVersion":"1930365","creationTimestamp":"2019-01-11T14:43:00Z"},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Active"}},{"metadata":{"name":"kube-public","selfLink":"/api/v1/namespaces/kube-public","uid":"e4b0bd24-0dc4-11e9-95a0-42010a800051","resourceVersion":"34","creationTimestamp":"2019-01-01T12:58:11Z"},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Active"}},{"metadata":{"name":"kube-system","selfLink":"/api/v1/namespaces/kube-system","uid":"e4afd241-0dc4-11e9-95a0-42010a800051","resourceVersion":"114","creationTimestamp":"2019-01-01T12:58:11Z","annotations":{"kubectl.kubernetes.io/last-applied-configuration":"{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"name\":\"kube-system\",\"namespace\":\"\"}}\n"}},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Active"}}]}
+
+        '}
+    headers:
+      Audit-Id: [91dfde04-3e12-408c-9ca4-209706803548]
+      Content-Length: ['1332']
+      Content-Type: [application/json]
+      Date: ['Fri, 11 Jan 2019 14:43:04 GMT']
+    status: {code: 200, message: OK}
+- request:
+    body: '{}'
+    headers:
+      Accept: [application/json]
+      Content-Type: [application/json]
+      User-Agent: [Swagger-Codegen/7.0.0/python]
+    method: DELETE
+    uri: https://ghost/api/v1/namespaces/hello
+  response:
+    body: {string: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"hello","selfLink":"/api/v1/namespaces/hello","uid":"319472df-15af-11e9-98ff-42010a800162","resourceVersion":"1930382","creationTimestamp":"2019-01-11T14:43:00Z","deletionTimestamp":"2019-01-11T14:43:05Z"},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Terminating"}}
+
+        '}
+    headers:
+      Audit-Id: [3591c871-1408-4bc8-9fdf-02cad5368786]
+      Content-Length: ['334']
+      Content-Type: [application/json]
+      Date: ['Fri, 11 Jan 2019 14:43:05 GMT']
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: [application/json]
+      Content-Type: [application/json]
+      User-Agent: [Swagger-Codegen/7.0.0/python]
+    method: GET
+    uri: https://ghost/api/v1/namespaces/hello
+  response:
+    body: {string: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"hello","selfLink":"/api/v1/namespaces/hello","uid":"319472df-15af-11e9-98ff-42010a800162","resourceVersion":"1930382","creationTimestamp":"2019-01-11T14:43:00Z","deletionTimestamp":"2019-01-11T14:43:05Z"},"spec":{"finalizers":["kubernetes"]},"status":{"phase":"Terminating"}}
+
+        '}
+    headers:
+      Audit-Id: [87602dd5-a6d0-4239-b0a1-5dfe31c57876]
+      Content-Length: ['334']
+      Content-Type: [application/json]
+      Date: ['Fri, 11 Jan 2019 14:43:06 GMT']
+    status: {code: 200, message: OK}
+version: 1

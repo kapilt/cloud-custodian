@@ -13,8 +13,10 @@
 # limitations under the License.
 import atexit
 from functools import partial
-import os
 import json
+import os
+from six.moves.urllib.parse import urlparse
+
 import tempfile
 import vcr
 
@@ -26,6 +28,7 @@ from c7n_kube.client import Session
 
 load_resources()
 
+RECORDED_HOST = 'ghost'
 
 KUBE_CONFIG = {
     'apiVersion': 1,
@@ -38,7 +41,7 @@ KUBE_CONFIG = {
     'clusters': [
         {'name': 'c7n-ghost',
          'cluster': {
-            'server': 'https://ghost'}},
+             'server': 'https://ghost'}},
     ],
     'users': [
         {'name': 'c7n-test-user',
@@ -59,34 +62,43 @@ class KubeTest(TestUtils):
 
     KubeConfigPath = init_kube_config()
     recording = False
+    vcr = None
 
     def replay_flight_data(self, name=None):
         kw = self._get_vcr_kwargs()
         kw['record_mode'] = 'none'
-        myvcr = self._get_vcr(**kw)
-        cm = myvcr.use_cassette(name or self._get_cassette_name())
+        self.myvcr = self._get_vcr(**kw)
+        cm = self.myvcr.use_cassette(
+            name or self._get_cassette_name())
         cm.__enter__()
         self.addCleanup(cm.__exit__, None, None, None)
         return partial(Session, config_file=self.KubeConfigPath)
 
     def record_flight_data(self, name=None):
         kw = self._get_vcr_kwargs()
-        myvcr = self._get_vcr(**kw)
         kw['record_mode'] = 'all'
-        cm = myvcr.use_cassette(name or self._get_cassette_name())
+        kw['before_record_request'] = self._record_change_host
+        self.myvcr = self._get_vcr(**kw)
+
+        flight_path = os.path.join(
+            kw['cassette_library_dir'], name or self._get_cassette_name())
+        if os.path.exists(flight_path):
+            os.unlink(flight_path)
+
+        cm = self.myvcr.use_cassette(name or self._get_cassette_name())
         self.recording = True
         cm.__enter__()
         self.addCleanup(cm.__exit__, None, None, None)
+
         return Session
 
     def _get_vcr_kwargs(self):
-        return dict(filter_headers=['authorization'])
+        return dict(filter_headers=['authorization'],
+                    cassette_library_dir=self._get_cassette_library_dir())
 
     def _get_vcr(self, **kwargs):
-        if 'cassette_library_dir' not in kwargs:
-            kwargs['cassette_library_dir'] = self._get_cassette_library_dir()
         myvcr = vcr.VCR(**kwargs)
-        myvcr.register_matcher('kubematcher', self.kube_matcher)
+        myvcr.register_matcher('kubematcher', self._kube_matcher)
         myvcr.match_on = ['kubematcher']
         return myvcr
 
@@ -99,5 +111,16 @@ class KubeTest(TestUtils):
         return '{0}.{1}.yaml'.format(self.__class__.__name__,
                                      self._testMethodName)
 
-    def kube_matcher(self, r1, r2):
+    def _kube_matcher(self, *args):
         return True
+
+    def _record_change_host(self, request):
+        parsed = urlparse(request.uri)
+        request.uri = parsed.__class__(
+            parsed.scheme,
+            RECORDED_HOST,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment).geturl()
+        return request

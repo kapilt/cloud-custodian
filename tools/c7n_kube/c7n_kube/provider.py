@@ -16,7 +16,6 @@ from c7n.registry import PluginRegistry
 from c7n.provider import Provider, clouds
 
 from .client import Session
-from functools import partial
 
 import logging
 
