@@ -16,10 +16,10 @@ from c7n_kube.query import QueryResourceManager, TypeInfo
 from c7n_kube.provider import resources
 
 
-@resources.register('replica-set')
-class ReplicaSet(QueryResourceManager):
+@resources.register('deployment')
+class Deployment(QueryResourceManager):
 
     class resource_type(TypeInfo):
         group = 'Apps'
         version = 'V1'
-        enum_spec = ('list_replica_set_for_all_namespaces', 'items', None)
+        enum_spec = ('list_deployment_for_all_namespaces', 'items', None)

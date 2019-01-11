@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
 from common_kube import KubeTest
 
 
@@ -41,7 +42,6 @@ class NamespaceTest(KubeTest):
         self.assertEqual(resources[0]['status']['phase'], 'Active')
 
         if self.recording:
-            import time
             time.sleep(1)
 
         client = factory().client('Core', 'V1')

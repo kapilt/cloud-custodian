@@ -27,6 +27,7 @@ from c7n_kube.resources.core import (
 
 from c7n_kube.resources.apps import (
     daemonset,
+    deployment,
     replicaset,
     statefulset)
 
@@ -34,6 +35,7 @@ log = logging.getLogger('custodian.k8s')
 
 ALL = [
     configmap,
+    deployment,
     namespace,
     node,
     pod,
