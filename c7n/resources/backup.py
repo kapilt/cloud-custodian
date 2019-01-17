@@ -23,8 +23,8 @@ class BackupPlan(QueryResourceManager):
 
     class resource_type(object):
         service = 'backup'
-        enum_spec = ('BackupPlansList', 'BackupPlansList', None)
-        detail_spec = ('')
+        enum_spec = ('list_backup_plans', 'BackupPlansList', None)
+        detail_spec = ('get_backup_plan', 'BackupPlanId', 'BackupPlanId', 'BackupPlan')
         id = 'BackupPlanName'
         name = 'BackupPlanId'
         dimension = None
@@ -35,7 +35,8 @@ class BackupPlan(QueryResourceManager):
         return [r['BackupPlanArn'] for r in resources]
 
     def augment(self, resources):
-        client = local_session(self.manager.session_factory)
+        super(BackupPlan, self).augment(resources)
+        client = local_session(self.session_factory).client('backup')
         results = []
         for r in resources:
             try:
