@@ -30,3 +30,9 @@ class BackupTest(BaseTest):
             plan['Tags'],
             [{'Name': 'App', 'Value': 'Backups'}])
         self.assertTrue('Rules' in plan)
+
+        self.assertEqual(
+            p.resource_manager.get_arns([plan]),
+            [plan['BackupPlanArn']])
+        resources = p.resource_manager.get_resources([plan['BackupPlanId']])
+        self.assertEqual(len(resources), 1)

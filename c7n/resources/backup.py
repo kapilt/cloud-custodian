@@ -47,9 +47,9 @@ class BackupPlan(QueryResourceManager):
             results.append(r)
 
         return results
-            
+
     def get_resources(self, resource_ids, cache=True):
-        client = local_session(self.manager.session_factory)
+        client = local_session(self.session_factory).client('backup')
         resources = []
 
         for rid in resource_ids:
@@ -59,5 +59,3 @@ class BackupPlan(QueryResourceManager):
             except client.exceptions.ResourceNotFoundException:
                 continue
         return resources
-
-    
