@@ -18,15 +18,21 @@ of a resource.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import json
 import six
 
-from botocore.exceptions import ClientError
 from dateutil.parser import parse as parse_date
 from dateutil.tz import tzlocal, tzutc
 
-from c7n.filters import Filter, FilterValidationError
-from c7n.utils import local_session, type_schema, camelResource
+from c7n.exceptions import PolicyValidationError, ClientError
+from c7n.filters import Filter
+from c7n.manager import resources
+from c7n.utils import local_session, type_schema
+
+try:
+    import jsonpatch
+    HAVE_JSONPATH = True
+except ImportError:
+    HAVE_JSONPATH = False
 
 
 ErrNotFound = "ResourceNotDiscoveredException"
@@ -59,13 +65,14 @@ class Diff(Filter):
     def validate(self):
         if 'selector' in self.data and self.data['selector'] == 'date':
             if 'selector_value' not in self.data:
-                raise FilterValidationError(
-                    "Date version selector requires specification of date")
+                raise PolicyValidationError(
+                    "Date version selector requires specification of date on %s" % (
+                        self.manager.data))
             try:
                 parse_date(self.data['selector_value'])
             except ValueError:
-                raise FilterValidationError(
-                    "Invalid date for selector_value")
+                raise PolicyValidationError(
+                    "Invalid date for selector_value on %s" % (self.manager.data))
 
         elif 'selector' in self.data and self.data['selector'] == 'locked':
             idx = self.manager.data['filters'].index(self.data)
@@ -76,8 +83,9 @@ class Diff(Filter):
                 if isinstance(n, six.string_types) and n == 'locked':
                     found = True
             if not found:
-                raise FilterValidationError(
-                    "locked selector needs previous use of is-locked filter")
+                raise PolicyValidationError(
+                    "locked selector needs previous use of is-locked filter on %s" % (
+                        self.manager.data))
         return self
 
     def process(self, resources, event=None):
@@ -148,7 +156,44 @@ class Diff(Filter):
     def transform_revision(self, revision):
         """make config revision look like describe output."""
         config = self.manager.get_source('config')
-        return config.augment([camelResource(json.loads(revision['configuration']))])[0]
+        return config.load_resource(revision)
 
     def diff(self, source, target):
         raise NotImplementedError("Subclass responsibility")
+
+
+class JsonDiff(Diff):
+
+    schema = type_schema(
+        'json-diff',
+        selector={'enum': ['previous', 'date', 'locked']},
+        # For date selectors allow value specification
+        selector_value={'type': 'string'})
+
+    def diff(self, source, target):
+        source, target = (
+            self.sanitize_revision(source), self.sanitize_revision(target))
+        patch = jsonpatch.JsonPatch.from_diff(source, target)
+        return list(patch)
+
+    def sanitize_revision(self, rev):
+        sanitized = dict(rev)
+        for k in [k for k in sanitized if 'c7n' in k]:
+            sanitized.pop(k)
+        return sanitized
+
+    @classmethod
+    def register_resources(klass, registry, resource_class):
+        """ meta model subscriber on resource registration.
+
+        We watch for new resource types being registered and if they
+        support aws config, automatically register the jsondiff filter.
+        """
+        config_type = getattr(resource_class.resource_type, 'config_type', None)
+        if config_type is None:
+            return
+        resource_class.filter_registry.register('json-diff', klass)
+
+
+if HAVE_JSONPATH:
+    resources.subscribe(resources.EVENT_REGISTER, JsonDiff.register_resources)

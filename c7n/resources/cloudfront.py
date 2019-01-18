@@ -14,11 +14,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
+import re
 
 from c7n.actions import BaseAction
 from c7n.filters import MetricsFilter, ShieldMetrics, Filter
 from c7n.manager import resources
-from c7n.query import QueryResourceManager
+from c7n.query import QueryResourceManager, DescribeSource
 from c7n.tags import universal_augment
 from c7n.utils import generate_arn, local_session, type_schema, get_retry
 
@@ -27,7 +28,6 @@ from c7n.resources.shield import IsShieldProtected, SetShieldProtection
 
 @resources.register('distribution')
 class Distribution(QueryResourceManager):
-
     class resource_type(object):
         service = 'cloudfront'
         type = 'distribution'
@@ -38,8 +38,9 @@ class Distribution(QueryResourceManager):
         dimension = "DistributionId"
         universal_taggable = True
         filter_name = None
-
-    augment = universal_augment
+        config_type = "AWS::CloudFront::Distribution"
+        # Denotes this resource type exists across regions
+        global_resource = True
 
     def get_arn(self, r):
         return r['ARN']
@@ -57,10 +58,20 @@ class Distribution(QueryResourceManager):
                 separator='/')
         return self._generate_arn
 
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeDistribution(self)
+        return super(Distribution, self).get_source(source_type)
+
+
+class DescribeDistribution(DescribeSource):
+
+    def augment(self, resources):
+        return universal_augment(self.manager, resources)
+
 
 @resources.register('streaming-distribution')
 class StreamingDistribution(QueryResourceManager):
-
     class resource_type(object):
         service = 'cloudfront'
         type = 'streaming-distribution'
@@ -73,8 +84,7 @@ class StreamingDistribution(QueryResourceManager):
         dimension = "DistributionId"
         universal_taggable = True
         filter_name = None
-
-    augment = universal_augment
+        config_type = "AWS::CloudFront::StreamingDistribution"
 
     def get_arn(self, r):
         return r['ARN']
@@ -91,6 +101,17 @@ class StreamingDistribution(QueryResourceManager):
                 resource_type=self.get_model().type,
                 separator='/')
         return self._generate_arn
+
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeStreamingDistribution(self)
+        return super(StreamingDistribution, self).get_source(source_type)
+
+
+class DescribeStreamingDistribution(DescribeSource):
+
+    def augment(self, resources):
+        return universal_augment(self.manager, resources)
 
 
 Distribution.filter_registry.register('shield-metrics', ShieldMetrics)
@@ -105,7 +126,7 @@ class DistributionMetrics(MetricsFilter):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: cloudfront-distribution-errors
@@ -159,9 +180,80 @@ class IsWafEnabled(Filter):
         return results
 
 
+@Distribution.filter_registry.register('mismatch-s3-origin')
+class MismatchS3Origin(Filter):
+    """Check for existence of S3 bucket referenced by Cloudfront,
+       and verify whether owner is different from Cloudfront account owner.
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: mismatch-s3-origin
+                resource: distribution
+                filters:
+                  - type: mismatch-s3-origin
+                    check_custom_origins: true
+   """
+
+    s3_prefix = re.compile('.*(?=\.s3(-.*)?\.amazonaws.com)')
+    s3_suffix = re.compile('^([^.]+\.)?s3(-.*)?\.amazonaws.com')
+
+    schema = type_schema(
+        'mismatch-s3-origin',
+        check_custom_origins={'type': 'boolean'})
+
+    permissions = ('s3:ListBuckets',)
+    retry = staticmethod(get_retry(('Throttling',)))
+
+    def is_s3_domain(self, x):
+        bucket_match = self.s3_prefix.match(x['DomainName'])
+
+        if bucket_match:
+            return bucket_match.group()
+
+        domain_match = self.s3_suffix.match(x['DomainName'])
+
+        if domain_match:
+            value = x['OriginPath']
+
+            if value.startswith('/'):
+                value = value.replace("/", "", 1)
+
+            return value
+
+        return None
+
+    def process(self, resources, event=None):
+        results = []
+
+        s3_client = local_session(self.manager.session_factory).client(
+            's3', region_name=self.manager.config.region)
+
+        buckets = {b['Name'] for b in s3_client.list_buckets()['Buckets']}
+
+        for r in resources:
+            r['c7n:mismatched-s3-origin'] = []
+            for x in r['Origins']['Items']:
+                if 'S3OriginConfig' in x:
+                    bucket_match = self.s3_prefix.match(x['DomainName'])
+                    if bucket_match:
+                        target_bucket = self.s3_prefix.match(x['DomainName']).group()
+                elif 'CustomOriginConfig' in x and self.data.get('check_custom_origins'):
+                    target_bucket = self.is_s3_domain(x)
+
+                if target_bucket is not None and target_bucket not in buckets:
+                    self.log.debug("Bucket %s not found in distribution %s hosting account."
+                                   % (target_bucket, r['Id']))
+                    r['c7n:mismatched-s3-origin'].append(target_bucket)
+                    results.append(r)
+
+        return results
+
+
 @Distribution.action_registry.register('set-waf')
 class SetWaf(BaseAction):
-
     permissions = ('cloudfront:UpdateDistribution', 'waf:ListWebACLs')
     schema = type_schema(
         'set-waf', required=['web-acl'], **{
@@ -203,7 +295,7 @@ class DistributionDisableAction(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: distribution-delete
@@ -221,12 +313,13 @@ class DistributionDisableAction(BaseAction):
                    "distribution:UpdateDistribution",)
 
     def process(self, distributions):
-        with self.executor_factory(max_workers=2) as w:
-            list(w.map(self.process_distribution, distributions))
-
-    def process_distribution(self, distribution):
         client = local_session(
             self.manager.session_factory).client(self.manager.get_model().service)
+
+        for d in distributions:
+            self.process_distribution(client, d)
+
+    def process_distribution(self, client, distribution):
         try:
             res = client.get_distribution_config(
                 Id=distribution[self.manager.get_model().id])
@@ -249,7 +342,7 @@ class StreamingDistributionDisableAction(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: streaming-distribution-delete
@@ -267,12 +360,12 @@ class StreamingDistributionDisableAction(BaseAction):
                    "streaming-distribution:UpdateStreamingDistribution",)
 
     def process(self, distributions):
-        with self.executor_factory(max_workers=2) as w:
-            list(w.map(self.process_distribution, distributions))
-
-    def process_distribution(self, distribution):
         client = local_session(
             self.manager.session_factory).client(self.manager.get_model().service)
+        for d in distributions:
+            self.process_distribution(client, d)
+
+    def process_distribution(self, client, distribution):
         try:
             res = client.get_streaming_distribution_config(
                 Id=distribution[self.manager.get_model().id])
@@ -295,7 +388,7 @@ class DistributionSSLAction(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: distribution-set-ssl
@@ -331,12 +424,12 @@ class DistributionSSLAction(BaseAction):
                    "distribution:UpdateDistribution",)
 
     def process(self, distributions):
-        with self.executor_factory(max_workers=2) as w:
-            list(w.map(self.process_distribution, distributions))
+        client = local_session(self.manager.session_factory).client(
+            self.manager.get_model().service)
+        for d in distributions:
+            self.process_distribution(client, d)
 
-    def process_distribution(self, distribution):
-        client = local_session(
-            self.manager.session_factory).client(self.manager.get_model().service)
+    def process_distribution(self, client, distribution):
         try:
             res = client.get_distribution_config(
                 Id=distribution[self.manager.get_model().id])

@@ -13,21 +13,24 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from botocore.exceptions import ClientError
-
-import boto3
 import copy
-from datetime import datetime
+import csv
+from datetime import datetime, timedelta
 import functools
 import json
 import itertools
 import logging
 import os
 import random
+import re
 import threading
 import time
-import ipaddress
 import six
+import sys
+
+
+from c7n.exceptions import ClientError
+from c7n import ipaddress
 
 # Try to place nice in lambda exec environment
 # where we don't require yaml
@@ -48,17 +51,25 @@ else:
 log = logging.getLogger('custodian.utils')
 
 
+class UnicodeWriter:
+    """utf8 encoding csv writer."""
+
+    def __init__(self, f, dialect=csv.excel, **kwds):
+        self.writer = csv.writer(f, dialect=dialect, **kwds)
+        if sys.version_info.major == 3:
+            self.writerows = self.writer.writerows
+            self.writerow = self.writer.writerow
+
+    def writerow(self, row):
+        self.writer.writerow([s.encode("utf-8") for s in row])
+
+    def writerows(self, rows):
+        for row in rows:
+            self.writerow(row)
+
+
 class VarsSubstitutionError(Exception):
     pass
-
-
-class Bag(dict):
-
-    def __getattr__(self, k):
-        try:
-            return self[k]
-        except KeyError:
-            raise AttributeError(k)
 
 
 def load_file(path, format=None, vars=None):
@@ -82,12 +93,7 @@ def load_file(path, format=None, vars=None):
                 raise VarsSubstitutionError(msg)
 
         if format == 'yaml':
-            try:
-                return yaml_load(contents)
-            except yaml.YAMLError as e:
-                log.error('Error while loading yaml file %s', path)
-                log.error('Skipping this file.  Error message below:\n%s', e)
-                return None
+            return yaml_load(contents)
         elif format == 'json':
             return loads(contents)
 
@@ -111,6 +117,13 @@ def dumps(data, fh=None, indent=0):
 
 def format_event(evt):
     return json.dumps(evt, indent=2)
+
+
+def filter_empty(d):
+    for k, v in list(d.items()):
+        if not v:
+            del d[k]
+    return d
 
 
 def type_schema(
@@ -219,6 +232,12 @@ def get_account_id_from_sts(session):
     return response.get('Account')
 
 
+def get_account_alias_from_sts(session):
+    response = session.client('iam').list_account_aliases()
+    aliases = response.get('AccountAliases', ())
+    return aliases and aliases[0] or ''
+
+
 def query_instances(session, client=None, **query):
     """Return a list of ec2 instances for the query.
     """
@@ -236,20 +255,22 @@ CONN_CACHE = threading.local()
 
 def local_session(factory):
     """Cache a session thread local for up to 45m"""
-    s = getattr(CONN_CACHE, 'session', None)
-    t = getattr(CONN_CACHE, 'time', 0)
+    factory_region = getattr(factory, 'region', 'global')
+    s = getattr(CONN_CACHE, factory_region, {}).get('session')
+    t = getattr(CONN_CACHE, factory_region, {}).get('time')
+
     n = time.time()
     if s is not None and t + (60 * 45) > n:
         return s
     s = factory()
-    CONN_CACHE.session = s
-    CONN_CACHE.time = n
+
+    setattr(CONN_CACHE, factory_region, {'session': s, 'time': n})
     return s
 
 
 def reset_session_cache():
-    setattr(CONN_CACHE, 'session', None)
-    setattr(CONN_CACHE, 'time', 0)
+    for k in [k for k in dir(CONN_CACHE) if not k.startswith('_')]:
+        setattr(CONN_CACHE, k, {})
 
 
 def annotation(i, k):
@@ -311,7 +332,7 @@ def snapshot_identifier(prefix, db_identifier):
     """Return an identifier for a snapshot of a database or cluster.
     """
     now = datetime.now()
-    return '%s-%s-%s' % (prefix, db_identifier, now.strftime('%Y-%m-%d'))
+    return '%s-%s-%s' % (prefix, db_identifier, now.strftime('%Y-%m-%d-%H-%M'))
 
 
 def get_retry(codes=(), max_attempts=8, min_delay=1, log_retries=False):
@@ -381,6 +402,8 @@ class IPv4Network(ipaddress.IPv4Network):
 
     # Override for net 2 net containment comparison
     def __contains__(self, other):
+        if other is None:
+            return False
         if isinstance(other, ipaddress._BaseNetwork):
             return self.supernet_of(other)
         return super(IPv4Network, self).__contains__(other)
@@ -401,7 +424,7 @@ def worker(f):
     def _f(*args, **kw):
         try:
             return f(*args, **kw)
-        except:
+        except Exception:
             worker_log.exception(
                 'Error invoking %s',
                 "%s.%s" % (f.__module__, f.__name__))
@@ -430,14 +453,89 @@ def reformat_schema(model):
     return ret
 
 
-_profile_session = None
+# from botocore.utils avoiding runtime dependency for botocore for other providers.
+# license apache 2.0
+def set_value_from_jmespath(source, expression, value, is_first=True):
+    # This takes a (limited) jmespath-like expression & can set a value based
+    # on it.
+    # Limitations:
+    # * Only handles dotted lookups
+    # * No offsets/wildcards/slices/etc.
+    bits = expression.split('.', 1)
+    current_key, remainder = bits[0], bits[1] if len(bits) > 1 else ''
+
+    if not current_key:
+        raise ValueError(expression)
+
+    if remainder:
+        if current_key not in source:
+            # We've got something in the expression that's not present in the
+            # source (new key). If there's any more bits, we'll set the key
+            # with an empty dictionary.
+            source[current_key] = {}
+
+        return set_value_from_jmespath(
+            source[current_key],
+            remainder,
+            value,
+            is_first=False
+        )
+
+    # If we're down to a single key, set it.
+    source[current_key] = value
 
 
-def get_profile_session(options):
-    global _profile_session
-    if _profile_session:
-        return _profile_session
+def format_string_values(obj, err_fallback=(IndexError, KeyError), *args, **kwargs):
+    """
+    Format all string values in an object.
+    Return the updated object
+    """
+    if isinstance(obj, dict):
+        new = {}
+        for key in obj.keys():
+            new[key] = format_string_values(obj[key], *args, **kwargs)
+        return new
+    elif isinstance(obj, list):
+        new = []
+        for item in obj:
+            new.append(format_string_values(item, *args, **kwargs))
+        return new
+    elif isinstance(obj, six.string_types):
+        try:
+            return obj.format(*args, **kwargs)
+        except err_fallback:
+            return obj
+    else:
+        return obj
 
-    profile = getattr(options, 'profile', None)
-    _profile_session = boto3.Session(profile_name=profile)
-    return _profile_session
+
+class FormatDate(object):
+    """a datetime wrapper with extended pyformat syntax"""
+
+    date_increment = re.compile('\+[0-9]+[Mdh]')
+
+    def __init__(self, d=None):
+        self._d = d
+
+    @classmethod
+    def utcnow(cls):
+        return cls(datetime.utcnow())
+
+    def __getattr__(self, k):
+        return getattr(self._d, k)
+
+    def __format__(self, fmt=None):
+        d = self._d
+        increments = self.date_increment.findall(fmt)
+        for i in increments:
+            p = {}
+            if i[-1] == 'M':
+                p['minutes'] = float(i[1:-1])
+            if i[-1] == 'h':
+                p['hours'] = float(i[1:-1])
+            if i[-1] == 'd':
+                p['days'] = float(i[1:-1])
+            d = d + timedelta(**p)
+        if increments:
+            fmt = self.date_increment.sub("", fmt)
+        return d.__format__(fmt)

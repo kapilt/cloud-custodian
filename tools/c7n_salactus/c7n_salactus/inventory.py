@@ -32,13 +32,14 @@ from c7n.utils import chunks
 def load_manifest_file(client, bucket, schema, versioned, ifilters, key_info):
     """Given an inventory csv file, return an iterator over keys
     """
-    # to avoid thundering herd downloads
+    # To avoid thundering herd downloads, we do an immediate yield for
+    # interspersed i/o
     yield None
 
     # Inline these values to avoid the local var lookup, they are constants
-    #rKey = schema['Key'] # 1
-    #rIsLatest = schema['IsLatest'] # 3
-    #rVersionId = schema['VersionId'] # 2
+    # rKey = schema['Key'] # 1
+    # rIsLatest = schema['IsLatest'] # 3
+    # rVersionId = schema['VersionId'] # 2
 
     with tempfile.NamedTemporaryFile() as fh:
         client.download_fileobj(Bucket=bucket, Key=key_info['key'], Fileobj=fh)
@@ -50,8 +51,7 @@ def load_manifest_file(client, bucket, schema, versioned, ifilters, key_info):
                 k = kr[1]
                 if inventory_filter(ifilters, schema, kr):
                     continue
-                if '%' in k:
-                    k = unquote_plus(k)
+                k = unquote_plus(k)
                 if versioned:
                     if kr[3] == 'true':
                         keys.append((k, kr[2], True))
@@ -63,6 +63,9 @@ def load_manifest_file(client, bucket, schema, versioned, ifilters, key_info):
 
 
 def inventory_filter(ifilters, ischema, kr):
+    if 'IsDeleteMarker' in ischema and kr[ischema['IsDeleteMarker']] == 'true':
+        return True
+
     for f in ifilters:
         if f(ischema, kr):
             return True

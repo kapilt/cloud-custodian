@@ -13,24 +13,33 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
+import jmespath
 import json
+import six
+
 from botocore.exceptions import ClientError
+from botocore.paginate import Paginator
+from concurrent.futures import as_completed
 
 from c7n.actions import ActionRegistry, BaseAction, RemovePolicyBase
 from c7n.filters import CrossAccountAccessFilter, FilterRegistry, ValueFilter
 import c7n.filters.vpc as net_filters
 from c7n.manager import resources
-from c7n.query import QueryResourceManager
-from c7n.tags import RemoveTag, Tag, TagActionFilter, TagDelayedAction
-from c7n.utils import get_retry, local_session, type_schema
+from c7n import query
+from c7n.tags import (
+    RemoveTag, Tag, TagActionFilter, TagDelayedAction, universal_augment)
+from c7n.utils import get_retry, local_session, type_schema, generate_arn
 
 filters = FilterRegistry('lambda.filters')
 actions = ActionRegistry('lambda.actions')
 filters.register('marked-for-op', TagActionFilter)
 
+ErrAccessDenied = "AccessDeniedException"
+
 
 @resources.register('lambda')
-class AWSLambda(QueryResourceManager):
+class AWSLambda(query.QueryResourceManager):
 
     class resource_type(object):
         service = 'lambda'
@@ -40,43 +49,51 @@ class AWSLambda(QueryResourceManager):
         filter_name = None
         date = 'LastModified'
         dimension = 'FunctionName'
+        config_type = "AWS::Lambda::Function"
 
     filter_registry = filters
     action_registry = actions
     retry = staticmethod(get_retry(('Throttled',)))
 
-    def augment(self, functions):
-        resources = super(AWSLambda, self).augment(functions)
-        return list(filter(None, _lambda_function_tags(
-            self.get_model(),
-            resources,
-            self.session_factory,
-            self.executor_factory,
-            self.retry,
-            self.log)))
+    @property
+    def generate_arn(self):
+        """ Generates generic arn if ID is not already arn format.
+        """
+        if self._generate_arn is None:
+            self._generate_arn = functools.partial(
+                generate_arn,
+                self.get_model().service,
+                region=self.config.region,
+                account_id=self.account_id,
+                resource_type=self.get_model().type,
+                separator=':')
+        return self._generate_arn
+
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeLambda(self)
+        elif source_type == 'config':
+            return ConfigLambda(self)
+        raise ValueError("Unsupported source: %s for %s" % (
+            source_type, self.resource_type.config_type))
 
 
-def _lambda_function_tags(
-        model, functions, session_factory, executor_factory, retry, log):
-    """ Augment Lambda function with their respective tags
-    """
+class DescribeLambda(query.DescribeSource):
 
-    def process_tags(function):
-        client = local_session(session_factory).client('lambda')
-        arn = function['FunctionArn']
-        try:
-            tag_dict = retry(client.list_tags, Resource=arn)['Tags']
-        except ClientError as e:
-            log.warning("Exception getting Lambda tags  \n %s", e)
-            return None
-        tag_list = []
-        for k, v in tag_dict.items():
-            tag_list.append({'Key': k, 'Value': v})
-        function['Tags'] = tag_list
-        return function
+    def augment(self, resources):
+        return universal_augment(
+            self.manager, super(DescribeLambda, self).augment(resources))
 
-    with executor_factory(max_workers=2) as w:
-        return list(w.map(process_tags, functions))
+
+class ConfigLambda(query.ConfigSource):
+
+    def load_resource(self, item):
+        resource = super(ConfigLambda, self).load_resource(item)
+        resource['Tags'] = [
+            {u'Key': k, u'Value': v} for k, v in item.get('tags', {}).items()]
+        resource['c7n:Policy'] = item[
+            'supplementaryConfiguration'].get('Policy')
+        return resource
 
 
 def tag_function(session_factory, functions, tags, log):
@@ -107,7 +124,83 @@ class SubnetFilter(net_filters.SubnetFilter):
     RelatedIdsExpression = "VpcConfig.SubnetIds[]"
 
 
+@filters.register('vpc')
+class VpcFilter(net_filters.VpcFilter):
+
+    RelatedIdsExpression = "VpcConfig.VpcId"
+
+
 filters.register('network-location', net_filters.NetworkLocation)
+
+
+@filters.register('reserved-concurrency')
+class ReservedConcurrency(ValueFilter):
+
+    annotation_key = "c7n:FunctionInfo"
+    value_key = '"c7n:FunctionInfo".Concurrency.ReservedConcurrentExecutions'
+    schema = type_schema('reserved-concurrency', rinherit=ValueFilter.schema)
+    permissions = ('lambda:GetFunction',)
+
+    def validate(self):
+        self.data['key'] = self.value_key
+        return super(ReservedConcurrency, self).validate()
+
+    def process(self, resources, event=None):
+        self.data['key'] = self.value_key
+        client = local_session(self.manager.session_factory).client('lambda')
+
+        def _augment(r):
+            try:
+                r[self.annotation_key] = self.manager.retry(
+                    client.get_function, FunctionName=r['FunctionArn'])
+                r[self.annotation_key].pop('ResponseMetadata')
+            except ClientError as e:
+                if e.response['Error']['Code'] == ErrAccessDenied:
+                    self.log.warning(
+                        "Access denied getting lambda:%s",
+                        r['FunctionName'])
+                raise
+            return r
+
+        with self.executor_factory(max_workers=3) as w:
+            resources = list(filter(None, w.map(_augment, resources)))
+            return super(ReservedConcurrency, self).process(resources, event)
+
+
+def get_lambda_policies(client, executor_factory, resources, log):
+
+    def _augment(r):
+        try:
+            r['c7n:Policy'] = client.get_policy(
+                FunctionName=r['FunctionName'])['Policy']
+        except client.exceptions.ResourceNotFoundException:
+            return None
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'AccessDeniedException':
+                log.warning(
+                    "Access denied getting policy lambda:%s",
+                    r['FunctionName'])
+        return r
+
+    results = []
+    futures = {}
+
+    with executor_factory(max_workers=3) as w:
+        for r in resources:
+            if 'c7n:Policy' in r:
+                results.append(r)
+                continue
+            futures[w.submit(_augment, r)] = r
+
+        for f in as_completed(futures):
+            if f.exception():
+                log.warning("Error getting policy for:%s err:%s",
+                            r['FunctionName'], f.exception())
+                r = futures[f]
+                continue
+            results.append(f.result())
+
+    return filter(None, results)
 
 
 @filters.register('event-source')
@@ -120,27 +213,12 @@ class LambdaEventSource(ValueFilter):
     permissions = ('lambda:GetPolicy',)
 
     def process(self, resources, event=None):
-        def _augment(r):
-            if 'c7n:Policy' in r:
-                return
-            client = local_session(
-                self.manager.session_factory).client('lambda')
-            try:
-                r['c7n:Policy'] = client.get_policy(
-                    FunctionName=r['FunctionName'])['Policy']
-                return r
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'AccessDeniedException':
-                    self.log.warning(
-                        "Access denied getting policy lambda:%s",
-                        r['FunctionName'])
-
+        client = local_session(self.manager.session_factory).client('lambda')
         self.log.debug("fetching policy for %d lambdas" % len(resources))
+        resources = get_lambda_policies(
+            client, self.executor_factory, resources, self.log)
         self.data['key'] = self.annotation_key
-
-        with self.executor_factory(max_workers=3) as w:
-            resources = list(filter(None, w.map(_augment, resources)))
-            return super(LambdaEventSource, self).process(resources, event)
+        return super(LambdaEventSource, self).process(resources, event)
 
     def __call__(self, r):
         if 'c7n:Policy' not in r:
@@ -157,9 +235,6 @@ class LambdaEventSource(ValueFilter):
         return self.match(r)
 
 
-ErrAccessDenied = "AccessDeniedException"
-
-
 @filters.register('cross-account')
 class LambdaCrossAccountAccessFilter(CrossAccountAccessFilter):
     """Filters lambda functions with cross-account permissions
@@ -172,7 +247,7 @@ class LambdaCrossAccountAccessFilter(CrossAccountAccessFilter):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-cross-account
@@ -185,25 +260,13 @@ class LambdaCrossAccountAccessFilter(CrossAccountAccessFilter):
     """
     permissions = ('lambda:GetPolicy',)
 
+    policy_attribute = 'c7n:Policy'
+
     def process(self, resources, event=None):
-
-        def _augment(r):
-            client = local_session(
-                self.manager.session_factory).client('lambda')
-            try:
-                r['Policy'] = client.get_policy(
-                    FunctionName=r['FunctionName'])['Policy']
-                return r
-            except ClientError as e:
-                if e.response['Error']['Code'] == ErrAccessDenied:
-                    self.log.warning(
-                        "Access denied getting policy lambda:%s",
-                        r['FunctionName'])
-
+        client = local_session(self.manager.session_factory).client('lambda')
         self.log.debug("fetching policy for %d lambdas" % len(resources))
-        with self.executor_factory(max_workers=3) as w:
-            resources = list(filter(None, w.map(_augment, resources)))
-
+        resources = get_lambda_policies(
+            client, self.executor_factory, resources, self.log)
         return super(LambdaCrossAccountAccessFilter, self).process(
             resources, event)
 
@@ -214,7 +277,7 @@ class RemovePolicyStatement(RemovePolicyBase):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-remove-cross-accounts
@@ -242,25 +305,25 @@ class RemovePolicyStatement(RemovePolicyBase):
             try:
                 if self.process_resource(client, r):
                     results.append(r)
-            except:
+            except Exception:
                 self.log.exception(
                     "Error processing lambda %s", r['FunctionArn'])
         return results
 
     def process_resource(self, client, resource):
-        if 'Policy' not in resource:
+        if 'c7n:Policy' not in resource:
             try:
-                resource['Policy'] = client.get_policy(
+                resource['c7n:Policy'] = client.get_policy(
                     FunctionName=resource['FunctionName']).get('Policy')
             except ClientError as e:
                 if e.response['Error']['Code'] != ErrAccessDenied:
                     raise
-                resource['Policy'] = None
+                resource['c7n:Policy'] = None
 
-        if not resource['Policy']:
+        if not resource['c7n:Policy']:
             return
 
-        p = json.loads(resource['Policy'])
+        p = json.loads(resource['c7n:Policy'])
 
         statements, found = self.process_policy(
             p, resource, CrossAccountAccessFilter.annotation_key)
@@ -279,7 +342,7 @@ class TagDelayedAction(TagDelayedAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-delete-unused
@@ -306,7 +369,7 @@ class Tag(Tag):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-add-owner-tag
@@ -331,7 +394,7 @@ class RemoveTag(RemoveTag):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-remove-old-tag
@@ -352,13 +415,68 @@ class RemoveTag(RemoveTag):
             client.untag_resource(Resource=arn, TagKeys=tag_keys)
 
 
+@actions.register('set-concurrency')
+class SetConcurrency(BaseAction):
+    """Set lambda function concurrency to the desired level.
+
+    Can be used to set the reserved function concurrency to an exact value,
+    to delete reserved concurrency, or to set the value to an attribute of
+    the resource.
+    """
+
+    schema = type_schema(
+        'set-concurrency',
+        required=('value',),
+        **{'expr': {'type': 'boolean'},
+           'value': {'oneOf': [
+               {'type': 'string'},
+               {'type': 'integer'},
+               {'type': 'null'}]}})
+
+    permissions = ('lambda:DeleteFunctionConcurrency',
+                   'lambda:PutFunctionConcurrency')
+
+    def validate(self):
+        if self.data.get('expr', False) and not isinstance(self.data['value'], six.text_type):
+            raise ValueError("invalid value expression %s" % self.data['value'])
+        return self
+
+    def process(self, functions):
+        client = local_session(self.manager.session_factory).client('lambda')
+        is_expr = self.data.get('expr', False)
+        value = self.data['value']
+        if is_expr:
+            value = jmespath.compile(value)
+
+        none_type = type(None)
+
+        for function in functions:
+            fvalue = value
+            if is_expr:
+                fvalue = value.search(function)
+                if isinstance(fvalue, float):
+                    fvalue = int(fvalue)
+                if isinstance(value, int) or isinstance(value, none_type):
+                    self.policy.log.warning(
+                        "Function: %s Invalid expression value for concurrency: %s",
+                        function['FunctionName'], fvalue)
+                    continue
+            if fvalue is None:
+                client.delete_function_concurrency(
+                    FunctionName=function['FunctionName'])
+            else:
+                client.put_function_concurrency(
+                    FunctionName=function['FunctionName'],
+                    ReservedConcurrentExecutions=fvalue)
+
+
 @actions.register('delete')
 class Delete(BaseAction):
     """Delete a lambda function (including aliases and older versions).
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: lambda-delete-dotnet-functions
@@ -381,3 +499,151 @@ class Delete(BaseAction):
                     continue
                 raise
         self.log.debug("Deleted %d functions", len(functions))
+
+
+@resources.register('lambda-layer')
+class LambdaLayerVersion(query.QueryResourceManager):
+    """Note custodian models the lambda layer version.
+
+    Layers end up being a logical asset, the physical asset for use
+    and management is the layer verison.
+
+    To ease that distinction, we support querying just the latest
+    layer version or having a policy against all layer versions.
+
+    By default we query all versions, the following is an example
+    to query just the latest.
+
+    .. code-block:: yaml
+
+        policies:
+          - name: lambda-layer
+            query:
+              - version: latest
+
+    """
+
+    class resource_type(object):
+        service = 'lambda'
+        type = 'function'
+        enum_spec = ('list_layers', 'Layers', None)
+        name = id = 'LayerName'
+        filter_name = None
+        date = 'CreatedDate'
+        dimension = None
+        config_type = None
+
+    def augment(self, resources):
+        versions = {}
+        for r in resources:
+            versions[r['LayerName']] = v = r['LatestMatchingVersion']
+            v['LayerName'] = r['LayerName']
+
+        if {'version': 'latest'} in self.data.get('query', []):
+            return list(versions.values())
+
+        layer_names = list(versions)
+        client = local_session(self.session_factory).client('lambda')
+
+        versions = []
+        for layer_name in layer_names:
+            pager = get_layer_version_paginator(client)
+            for v in pager.paginate(
+                    LayerName=layer_name).build_full_result().get('LayerVersions'):
+                v['LayerName'] = layer_name
+                versions.append(v)
+        return versions
+
+
+def get_layer_version_paginator(client):
+    pager = Paginator(
+        client.list_layer_versions,
+        {'input_token': 'NextToken',
+         'output_token': 'NextToken',
+         'result_key': 'LayerVersions'},
+        client.meta.service_model.operation_model('ListLayerVersions'))
+    pager.PAGE_ITERATOR_CLS = query.RetryPageIterator
+    return pager
+
+
+@LambdaLayerVersion.filter_registry.register('cross-account')
+class LayerCrossAccount(CrossAccountAccessFilter):
+
+    permissions = ('lambda:GetLayerVersionPolicy',)
+
+    def process(self, resources, event=None):
+        client = local_session(self.manager.session_factory).client('lambda')
+        for r in resources:
+            r['c7n:Policy'] = self.manager.retry(
+                client.get_layer_version_policy,
+                LayerName=r['LayerName'],
+                VersionNumber=r['Version']).get('Policy')
+        return super(LayerCrossAccount, self).process(resources)
+
+    def get_resource_policy(self, r):
+        return r['c7n:Policy']
+
+
+@LambdaLayerVersion.action_registry.register('remove-statements')
+class LayerRemovePermissions(RemovePolicyBase):
+
+    schema = type_schema(
+        'remove-statements',
+        required=['statement_ids'],
+        statement_ids={'oneOf': [
+            {'enum': ['matched']},
+            {'type': 'array', 'items': {'type': 'string'}}]})
+
+    permissions = (
+        "lambda:GetLayerVersionPolicy",
+        "lambda:RemoveLayerVersionPermission")
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('lambda')
+        for r in resources:
+            self.process_resource(client, r)
+
+    def process_resource(self, client, r):
+        if 'c7n:Policy' not in r:
+            try:
+                r['c7n:Policy'] = self.manager.retry(
+                    client.get_layer_version_policy,
+                    LayerName=r['LayerName'],
+                    VersionNumber=r['Version'])
+            except client.exceptions.ResourceNotFound:
+                return
+
+        p = json.loads(r['c7n:Policy'])
+
+        statements, found = self.process_policy(
+            p, r, CrossAccountAccessFilter.annotation_key)
+
+        if not found:
+            return
+
+        for f in found:
+            self.manager.retry(
+                client.remove_layer_version_permission,
+                LayerName=r['LayerName'],
+                StatementId=f['Sid'],
+                VersionNumber=r['Version'])
+
+
+@LambdaLayerVersion.action_registry.register('delete')
+class DeleteLayerVersion(BaseAction):
+
+    schema = type_schema('delete')
+    permissions = ('lambda:DeleteLayerVersion',)
+
+    def process(self, resources):
+        client = local_session(
+            self.manager.session_factory).client('lambda')
+
+        for r in resources:
+            try:
+                self.manager.retry(
+                    client.delete_layer_version,
+                    LayerName=r['LayerName'],
+                    VersionNumber=r['Version'])
+            except client.exceptions.ResourceNotFound:
+                continue

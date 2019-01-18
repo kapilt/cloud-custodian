@@ -77,7 +77,7 @@ class CloudWatchEvents(object):
 
         'CreateTable': {
             'ids': 'requestParameters.tableName',
-            'source': 'dynamodb.amazonaws.com"'},
+            'source': 'dynamodb.amazonaws.com'},
 
         'RunInstances': {
             'ids': 'responseElements.instancesSet.items[].instanceId',
@@ -132,8 +132,11 @@ class CloudWatchEvents(object):
             id_query = e.get('ids')
             if not id_query:
                 raise ValueError("No id query configured")
-            resource_ids = jmespath.search(
-                id_query, event.get('detail', {}))
+            evt = event
+            # be forgiving for users specifying with details or without
+            if not id_query.startswith('detail.'):
+                evt = event.get('detail', {})
+            resource_ids = jmespath.search(id_query, evt)
             if resource_ids:
                 break
         return resource_ids

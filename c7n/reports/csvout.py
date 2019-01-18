@@ -43,7 +43,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from concurrent.futures import as_completed
 
-import csv
 from datetime import datetime
 import gzip
 import io
@@ -59,7 +58,7 @@ from dateutil.parser import parse as date_parse
 
 from c7n.executor import ThreadPoolExecutor
 from c7n.utils import local_session, dumps
-
+from c7n.utils import UnicodeWriter
 
 log = logging.getLogger('custodian.reports')
 
@@ -78,14 +77,16 @@ def report(policies, start_date, options, output_fh, raw_output_fh=None):
 
     records = []
     for policy in policies:
-        if policy.ctx.output.use_s3():
+        # initialize policy execution context for output access
+        policy.ctx.initialize()
+        if policy.ctx.output.type == 's3':
             policy_records = record_set(
                 policy.session_factory,
                 policy.ctx.output.bucket,
                 policy.ctx.output.key_prefix,
                 start_date)
         else:
-            policy_records = fs_record_set(policy.ctx.output_path, policy.name)
+            policy_records = fs_record_set(policy.ctx.log_dir, policy.name)
 
         log.debug("Found %d records for region %s", len(policy_records), policy.options.region)
 
@@ -97,7 +98,7 @@ def report(policies, start_date, options, output_fh, raw_output_fh=None):
 
     rows = formatter.to_csv(records)
     if options.format == 'csv':
-        writer = csv.writer(output_fh, formatter.headers())
+        writer = UnicodeWriter(output_fh, formatter.headers())
         writer.writerow(formatter.headers())
         writer.writerows(rows)
     else:

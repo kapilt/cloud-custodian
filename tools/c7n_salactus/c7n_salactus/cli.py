@@ -33,12 +33,13 @@ from rq.queue import Queue, FailedQueue
 from rq.worker import Worker
 import tabulate
 
+from c7n.config import Bag
 from c7n import utils
 from c7n_salactus import worker, db
 
 # side-effect serialization patches...
 try:
-    from c7n_salactus import rqworker
+    from c7n_salactus import rqworker # NOQA F401
     HAVE_BIN_LIBS = True
 except ImportError:
     # we want the cli to work in lambda and we might not package up
@@ -60,7 +61,7 @@ CONFIG_SCHEMA = {
                 'glacier': {'type': 'boolean'},
                 'key-id': {'type': 'string'},
                 'crypto': {'type': 'string', 'enum': ['AES256', 'aws:kms']}
-                }
+            }
         },
 
         'inventory': {
@@ -77,7 +78,7 @@ CONFIG_SCHEMA = {
                 'id-selector': {
                     'description': (
                         'Only use inventories with the given id.'),
-                        'default': 'salactus',
+                    'default': 'salactus',
                     'type': 'string'},
             }
         },
@@ -99,8 +100,8 @@ CONFIG_SCHEMA = {
                 'type': {'type': 'string', 'enum': ['object-acl']},
                 'report-only': {'type': 'boolean'},
                 'allow-log': {'type': 'boolean'},
-#                'allow-permissions': {'type': 'array', 'item': {'type': 'string', 'enum': ''}}
-                'whitelist-accounts': {'type': 'array', 'item': {'type': 'string'}}
+                'whitelist-accounts': {'type': 'array', 'item': {'type': 'string'}},
+                # 'allow-permissions': {'type': 'array', 'item': {'type': 'string', 'enum': ''}}
             }
         },
 
@@ -149,7 +150,7 @@ def debug(f):
             f(*args, **kw)
         except (SystemExit, KeyboardInterrupt):
             raise
-        except:
+        except Exception:
             import traceback, sys, pdb
             traceback.print_exc()
             pdb.post_mortem(sys.exc_info()[-1])
@@ -178,11 +179,15 @@ def validate(config):
               help='scan only the given accounts', multiple=True)
 @click.option('--bucket', '-b',
               help='scan only the given buckets', multiple=True)
+@click.option('--not-account',
+              help='exclude the given accounts from scan', multiple=True)
+@click.option('--not-bucket',
+              help='exclude the given buckets from scan', multiple=True)
 @click.option('--debug', is_flag=True, default=False,
               help='synchronous scanning, no workers')
 @click.option('--region', multiple=True,
               help='limit scanning to specified regions')
-def run(config, tag, bucket, account, debug, region):
+def run(config, tag, bucket, account, not_bucket, not_account, debug, region):
     """Run across a set of accounts and buckets."""
     logging.basicConfig(
         level=logging.INFO,
@@ -191,7 +196,7 @@ def run(config, tag, bucket, account, debug, region):
 
     if debug:
         def invoke(f, *args, **kw):
-            #if f.func_name == 'process_keyset':
+            # if f.func_name == 'process_keyset':
             #    key_count = len(args[-1])
             #    print("debug skip keyset %d" % key_count)
             #    return
@@ -205,21 +210,26 @@ def run(config, tag, bucket, account, debug, region):
                 continue
             if account and account_info['name'] not in account:
                 continue
+            if not_account and account_info['name'] in not_account:
+                continue
             if 'inventory' in data and 'inventory' not in account_info:
                 account_info['inventory'] = data['inventory']
             if 'visitors' in data and 'visitors' not in account_info:
                 account_info['visitors'] = data['visitors']
             if 'object-reporting' in data and 'object-reporting' not in account_info:
                 account_info['object-reporting'] = data['object-reporting']
-                account_info['object-reporting']['record-prefix'] = datetime.utcnow().strftime('%Y/%m/%d')
+                account_info['object-reporting'][
+                    'record-prefix'] = datetime.utcnow().strftime('%Y/%m/%d')
             if bucket:
                 account_info['buckets'] = bucket
+            if not_bucket:
+                account_info['not-buckets'] = not_bucket
             if region:
                 account_info['regions'] = region
 
             try:
                 worker.invoke(worker.process_account, account_info)
-            except:
+            except Exception:
                 if not debug:
                     raise
                 import pdb, traceback, sys
@@ -239,8 +249,8 @@ def save(dbpath):
 
 @cli.command()
 # todo check redis version if >=4 support this
-#@click.option('--async/--sync', default=False)
-def reset(async=None):
+# @click.option('--async/--sync', default=False)
+def reset(c7n_async=None):
     """Delete all persistent cluster state.
     """
     click.echo('Delete db? Are you Sure? [yn] ', nl=False)
@@ -320,16 +330,16 @@ def format_accounts_plain(accounts, fh):
 @click.option('--not-region',
               help="only consider buckets not from the given region",
               multiple=True)
-@click.option('--exclude',
+@click.option('--not-bucket',
               help="Exclude bucket", multiple=True)
 def accounts(dbpath, output, format, account,
              config=None, tag=None, tagprefix=None, region=(),
-             not_region=(), exclude=None):
+             not_region=(), not_bucket=None):
     """Report on stats by account"""
     d = db.db(dbpath)
     accounts = d.accounts()
-    formatter = (format == 'csv' and format_accounts_csv
-                 or format_accounts_plain)
+    formatter = (
+        format == 'csv' and format_accounts_csv or format_accounts_plain)
 
     if region:
         for a in accounts:
@@ -341,9 +351,9 @@ def accounts(dbpath, output, format, account,
             a.buckets = [b for b in a.buckets if b.region not in not_region]
         accounts = [a for a in accounts if a.bucket_count]
 
-    if exclude:
+    if not_bucket:
         for a in accounts:
-            a.buckets = [b for b in a.buckets if b.name not in exclude]
+            a.buckets = [b for b in a.buckets if b.name not in not_bucket]
     if config and tagprefix:
         account_map = {account.name: account for account in accounts}
 
@@ -455,13 +465,13 @@ def format_csv(buckets, fh, keys=()):
               help="sort output by column")
 @click.option('--tagprefix',
               help="include account tag value by prefix")
-@click.option('--exclude',
+@click.option('--not-bucket',
               help="Exclude bucket", multiple=True)
 def buckets(bucket=None, account=None, matched=False, kdenied=False,
             errors=False, dbpath=None, size=None, denied=False,
             format=None, incomplete=False, oversize=False, region=(),
             not_region=(), inventory=None, output=None, config=None, sort=None,
-            tagprefix=None, exclude=None):
+            tagprefix=None, not_bucket=None):
     """Report on stats by bucket"""
 
     d = db.db(dbpath)
@@ -484,7 +494,7 @@ def buckets(bucket=None, account=None, matched=False, kdenied=False,
                     key=operator.attrgetter('bucket_id')):
         if bucket and b.name not in bucket:
             continue
-        if exclude and b.name in exclude:
+        if not_bucket and b.name in not_bucket:
             continue
         if matched and not b.matched:
             continue
@@ -549,7 +559,7 @@ def watch(limit):
             elif b.scanned == prev_buckets[b.bucket_id].scanned:
                 continue
             else:
-                b.data['gkrate'][b.bucket_id] =  (
+                b.data['gkrate'][b.bucket_id] = (
                     b.scanned - prev_buckets[b.bucket_id].scanned) / period
             progress.append(b)
 
@@ -565,12 +575,11 @@ def watch(limit):
         if limit:
             progress = progress[:limit]
 
-        progress.insert(0, utils.Bag(totals))
+        progress.insert(0, Bag(totals))
         format_plain(
             progress, None,
             explicit_only=True,
             keys=['bucket_id', 'scanned', 'gkrate', 'lrate', 'krate'])
-
 
 
 @cli.command(name='inspect-partitions')
@@ -628,7 +637,7 @@ def inspect_partitions(bucket):
     keys_scanned = sum(keyset)
     click.echo(
         "Found %d partitions %s keys scanned during partitioning" % (
-        len(partitions), keys_scanned))
+            len(partitions), keys_scanned))
     click.echo("\n".join(partitions))
 
 
@@ -666,7 +675,6 @@ def inspect_bucket(bucket):
     click.echo("Endpoint: %s" % found.data['keys-enderr'].get(found.bucket_id, 0))
 
 
-
 @cli.command(name='inspect-queue')
 @click.option('--queue', required=True)
 @click.option(
@@ -691,8 +699,8 @@ def inspect_queue(queue, state, limit, bucket):
         row = {
             'account': account,
             'bucket': bucket,
-            #'region': j.args[1]['region'],
-            #'size': j.args[1]['keycount'],
+            # 'region': j.args[1]['region'],
+            # 'size': j.args[1]['keycount'],
             'ttl': j.ttl,
             'enqueued': j.enqueued_at,
             'rtt': j.result_ttl,

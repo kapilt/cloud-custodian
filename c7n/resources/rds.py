@@ -57,12 +57,14 @@ from concurrent.futures import as_completed
 
 from c7n.actions import (
     ActionRegistry, BaseAction, ModifyVpcSecurityGroupsAction)
+from c7n.actions.securityhub import OtherResourcePostFinding
+
+from c7n.exceptions import PolicyValidationError
 from c7n.filters import (
     CrossAccountAccessFilter, FilterRegistry, Filter, ValueFilter, AgeFilter,
-    OPERATORS, FilterValidationError)
+    OPERATORS)
 
 from c7n.filters.offhours import OffHour, OnHour
-from c7n.filters.health import HealthEventFilter
 import c7n.filters.vpc as net_filters
 from c7n.manager import resources
 from c7n.query import QueryResourceManager, DescribeSource, ConfigSource
@@ -78,8 +80,6 @@ log = logging.getLogger('custodian.rds')
 
 filters = FilterRegistry('rds.filters')
 actions = ActionRegistry('rds.actions')
-
-filters.register('health-event', HealthEventFilter)
 
 
 @resources.register('rds')
@@ -114,7 +114,6 @@ class RDS(QueryResourceManager):
     filter_registry = filters
     action_registry = actions
     _generate_arn = None
-    retry = staticmethod(get_retry(('Throttled',)))
 
     def __init__(self, data, options):
         super(RDS, self).__init__(data, options)
@@ -277,7 +276,7 @@ class DefaultVpc(net_filters.DefaultVpcBase):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: default-vpc-rds
@@ -303,6 +302,12 @@ class SubnetFilter(net_filters.SubnetFilter):
     RelatedIdsExpression = "DBSubnetGroup.Subnets[].SubnetIdentifier"
 
 
+@filters.register('vpc')
+class VpcFilter(net_filters.VpcFilter):
+
+    RelatedIdsExpression = "DBSubnetGroup.Subnets[].VpcId"
+
+
 filters.register('network-location', net_filters.NetworkLocation)
 
 
@@ -324,7 +329,7 @@ class AutoPatch(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: enable-rds-autopatch
@@ -368,7 +373,7 @@ class UpgradeAvailable(Filter):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-upgrade-available
@@ -413,7 +418,7 @@ class UpgradeMinor(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: upgrade-rds-minor
@@ -547,7 +552,7 @@ class Delete(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-delete
@@ -569,8 +574,9 @@ class Delete(BaseAction):
     def validate(self):
         if self.data.get('skip-snapshot', False) and self.data.get(
                 'copy-restore-info'):
-            raise FilterValidationError(
-                "skip-snapshot cannot be specified with copy-restore-info")
+            raise PolicyValidationError(
+                "skip-snapshot cannot be specified with copy-restore-info on %s" % (
+                    self.manager.data,))
         return self
 
     def process(self, dbs):
@@ -637,13 +643,65 @@ class Delete(BaseAction):
             Tags=tags)
 
 
+@actions.register('set-snapshot-copy-tags')
+class CopySnapshotTags(BaseAction):
+    """Enables copying tags from rds instance to snapshot
+
+        .. code-block: yaml
+
+            policies:
+              - name: enable-rds-snapshot-tags
+                resource: rds
+                filters:
+                  - type: value
+                    key: Engine
+                    value: aurora
+                    op: eq
+                actions:
+                  - type: set-snapshot-copy-tags
+                    enable: True
+    """
+
+    schema = type_schema(
+        'set-snapshot-copy-tags',
+        enable={'type': 'boolean'})
+    permissions = ('rds:ModifyDBInstances',)
+
+    def process(self, resources):
+        with self.executor_factory(max_workers=2) as w:
+            futures = []
+            for r in resources:
+                futures.append(w.submit(
+                    self.set_snapshot_tags, r))
+            for f in as_completed(futures):
+                if f.exception():
+                    self.log.error(
+                        'Exception updating rds CopyTagsToSnapshot  \n %s',
+                        f.exception())
+        return resources
+
+    def set_snapshot_tags(self, r):
+        c = local_session(self.manager.session_factory).client('rds')
+        self.manager.retry(c.modify_db_instance(
+            DBInstanceIdentifier=r['DBInstanceIdentifier'],
+            CopyTagsToSnapshot=self.data.get('enable', True)))
+
+
+@RDS.action_registry.register("post-finding")
+class DbInstanceFinding(OtherResourcePostFinding):
+    fields = [
+        {'key': 'DBSubnetGroupName', 'expr': 'DBSubnetGroup.DBSubnetGroupName'},
+        {'key': 'VpcId', 'expr': 'DBSubnetGroup.VpcId'},
+    ]
+
+
 @actions.register('snapshot')
 class Snapshot(BaseAction):
     """Creates a manual snapshot of a RDS instance
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-snapshot
@@ -687,11 +745,12 @@ class ResizeInstance(BaseAction):
 
     :example:
 
-       This will find databases using over 85% of their allocated
-       storage, and resize them to have an additional 30% storage
-       the resize here is async during the next maintenance.
+    This will find databases using over 85% of their allocated
+    storage, and resize them to have an additional 30% storage
+    the resize here is async during the next maintenance.
 
-       .. code-block: yaml
+    .. code-block:: yaml
+
             policies:
               - name: rds-snapshot-retention
                 resource: rds
@@ -707,11 +766,12 @@ class ResizeInstance(BaseAction):
                     percent: 30
 
 
-       This will find databases using under 20% of their allocated
-       storage, and resize them to be 30% smaller, the resize here
-       is configured to be immediate.
+    This will find databases using under 20% of their allocated
+    storage, and resize them to be 30% smaller, the resize here
+    is configured to be immediate.
 
-       .. code-block: yaml
+    .. code-block:: yaml
+
             policies:
               - name: rds-snapshot-retention
                 resource: rds
@@ -754,7 +814,7 @@ class RetentionWindow(BaseAction):
     enforce (min, max, exact) sets retention days occordingly.
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-snapshot-retention
@@ -830,6 +890,48 @@ class RetentionWindow(BaseAction):
             DBInstanceIdentifier=resource['DBInstanceIdentifier'],
             BackupRetentionPeriod=retention,
             CopyTagsToSnapshot=copy_tags)
+
+
+@actions.register('set-public-access')
+class RDSSetPublicAvailability(BaseAction):
+    """
+    This action allows for toggling an RDS instance
+    'PubliclyAccessible' flag to true or false
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: disable-rds-public-accessibility
+                resource: rds
+                filters:
+                  - PubliclyAccessible: true
+                actions:
+                  - type: set-public-access
+                    state: false
+    """
+
+    schema = type_schema(
+        "set-public-access",
+        state={'type': 'boolean'})
+    permissions = ('rds:ModifyDBInstance',)
+
+    def set_accessibility(self, r):
+        client = local_session(self.manager.session_factory).client('rds')
+        client.modify_db_instance(
+            DBInstanceIdentifier=r['DBInstanceIdentifier'],
+            PubliclyAccessible=self.data.get('state', False))
+
+    def process(self, rds):
+        with self.executor_factory(max_workers=2) as w:
+            futures = {w.submit(self.set_accessibility, r): r for r in rds}
+            for f in as_completed(futures):
+                if f.exception():
+                    self.log.error(
+                        "Exception setting public access on %s  \n %s",
+                        futures[f]['DBInstanceIdentifier'], f.exception())
+        return rds
 
 
 @resources.register('rds-subscription')
@@ -946,7 +1048,7 @@ class RDSSnapshotAge(AgeFilter):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-snapshot-expired
@@ -999,13 +1101,14 @@ class RestoreInstance(BaseAction):
 
     def validate(self):
         found = False
-        for f in self.manager.filters:
+        for f in self.manager.iter_filters():
             if isinstance(f, LatestSnapshot):
                 found = True
         if not found:
             # do we really need this...
-            raise FilterValidationError(
-                "must filter by latest to use restore action")
+            raise PolicyValidationError(
+                "must filter by latest to use restore action %s" % (
+                    self.manager.data,))
         return self
 
     def process(self, resources):
@@ -1158,9 +1261,9 @@ class RegionCopySnapshot(BaseAction):
 
     def validate(self):
         if self.data.get('target_region') and self.manager.data.get('mode'):
-            raise FilterValidationError(
+            raise PolicyValidationError(
                 "cross region snapshot may require waiting for "
-                "longer then lambda runtime allows")
+                "longer then lambda runtime allows %s" % (self.manager.data,))
         return self
 
     def process(self, resources):
@@ -1227,7 +1330,7 @@ class RDSSnapshotDelete(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-snapshot-delete-stale
@@ -1273,7 +1376,7 @@ class RDSModifyVpcSecurityGroups(ModifyVpcSecurityGroupsAction):
         replication_group_map = {}
         client = local_session(self.manager.session_factory).client('rds')
         groups = super(RDSModifyVpcSecurityGroups, self).get_groups(
-            rds_instances, metadata_key='VpcSecurityGroupId')
+            rds_instances)
 
         # either build map for DB cluster or modify DB instance directly
         for idx, i in enumerate(rds_instances):
@@ -1308,15 +1411,104 @@ class RDSSubnetGroup(QueryResourceManager):
         dimension = None
         date = None
 
+    def augment(self, resources):
+        _db_subnet_group_tags(
+            resources, self.session_factory, self.executor_factory, self.retry)
+        return resources
+
+
+def _db_subnet_group_tags(subnet_groups, session_factory, executor_factory, retry):
+
+    def process_tags(subnet_group):
+        client = local_session(session_factory).client('rds')
+
+        arn = subnet_group['DBSubnetGroupArn']
+        tag_list = None
+
+        try:
+            tag_list = client.list_tags_for_resource(ResourceName=arn)['TagList']
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'InvalidParameterValue':
+                log.warning("Exception getting db subnet group tags\n %s", e)
+            return None
+
+        subnet_group['Tags'] = tag_list or []
+        return subnet_group
+
+    with executor_factory(max_workers=1) as w:
+        list(w.map(process_tags, subnet_groups))
+
+
+@RDSSubnetGroup.action_registry.register('delete')
+class RDSSubnetGroupDeleteAction(BaseAction):
+    """Action to delete RDS Subnet Group
+
+    It is recommended to apply a filter to the delete policy to avoid unwanted
+    deletion of any rds subnet groups.
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: rds-subnet-group-delete-unused
+                resource: rds-subnet-group
+                filters:
+                  - Instances: []
+                actions:
+                  - delete
+    """
+
+    schema = type_schema('delete')
+    permissions = ('rds:DeleteDBSubnetGroup',)
+
+    def process(self, subnet_group):
+        with self.executor_factory(max_workers=2) as w:
+            list(w.map(self.process_subnetgroup, subnet_group))
+
+    def process_subnetgroup(self, subnet_group):
+        client = local_session(self.manager.session_factory).client('rds')
+        client.delete_db_subnet_group(DBSubnetGroupName=subnet_group['DBSubnetGroupName'])
+
+
+@RDSSubnetGroup.filter_registry.register('unused')
+class UnusedRDSSubnetGroup(Filter):
+    """Filters all launch rds subnet groups that are not in use but exist
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: rds-subnet-group-delete-unused
+                resource: rds-subnet-group
+                filters:
+                  - unused
+    """
+
+    schema = type_schema('unused')
+
+    def get_permissions(self):
+        return self.manager.get_resource_manager('rds').get_permissions()
+
+    def process(self, configs, event=None):
+        rds = self.manager.get_resource_manager('rds').resources()
+        self.used = set([
+            r.get('DBSubnetGroupName', r['DBInstanceIdentifier'])
+            for r in rds])
+        return super(UnusedRDSSubnetGroup, self).process(configs)
+
+    def __call__(self, config):
+        return config['DBSubnetGroupName'] not in self.used
+
 
 @filters.register('db-parameter')
 class ParameterFilter(ValueFilter):
     """
     Applies value type filter on set db parameter values.
-
     :example:
 
-        .. code-block: yaml
+    .. code-block:: yaml
 
             policies:
               - name: rds-pg
@@ -1391,3 +1583,104 @@ class ParameterFilter(ValueFilter):
                     results.append(resource)
                     break
         return results
+
+
+@actions.register('modify-db')
+class ModifyDb(BaseAction):
+    """Modifies an RDS instance based on specified parameter
+    using ModifyDbInstance.
+
+    'Update' is an array with with key value pairs that should be set to
+    the property and value you wish to modify.
+    'Immediate" determines whether the modification is applied immediately
+    or not. If 'immediate' is not specified, default is false.
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: disable-rds-deletion-protection
+                resource: rds
+                filters:
+                  - DeletionProtection: true
+                  - PubliclyAccessible: true
+                actions:
+                  - type: modify-db
+                    update:
+                      - property: 'DeletionProtection'
+                        value: false
+                      - property: 'PubliclyAccessible'
+                        value: false
+                    immediate: true
+    """
+
+    schema = type_schema(
+        'modify-db',
+        immediate={"type": 'boolean'},
+        update={
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'property': {'type': 'string', 'enum': [
+                        'AllocatedStorage',
+                        'DBInstanceClass',
+                        'DBSubnetGroupName',
+                        'DBSecurityGroups',
+                        'VpcSecurityGroupIds',
+                        'MasterUserPassword',
+                        'DBParameterGroupName',
+                        'BackupRetentionPeriod',
+                        'PreferredBackupWindow',
+                        'PreferredMaintenanceWindow',
+                        'MultiAZ',
+                        'EngineVersion',
+                        'AllowMajorVersionUpgrade',
+                        'AutoMinorVersionUpgrade',
+                        'LicenseModel',
+                        'Iops',
+                        'OptionGroupName',
+                        'NewDBInstanceIdentifier',
+                        'StorageType',
+                        'TdeCredentialArn',
+                        'TdeCredentialPassword',
+                        'CACertificateIdentifier',
+                        'Domain',
+                        'CopyTagsToSnapshot',
+                        'MonitoringInterval',
+                        'DBPortNumber',
+                        'PubliclyAccessible',
+                        'DomainIAMRoleName',
+                        'PromotionTier',
+                        'EnableIAMDatabaseAuthentication',
+                        'EnablePerformanceInsights',
+                        'PerformanceInsightsKMSKeyId',
+                        'PerformanceInsightsRetentionPeriod',
+                        'CloudwatchLogsExportConfiguration',
+                        'UseDefaultProcessorFeatures',
+                        'DeletionProtection']},
+                    'value': {}
+                },
+            },
+        },
+        required=('update',))
+
+    permissions = ('rds:ModifyDBInstance',)
+
+    def process(self, resources):
+        c = local_session(self.manager.session_factory).client('rds')
+
+        for r in resources:
+            param = {}
+            for update in self.data.get('update'):
+                if r[update['property']] != update['value']:
+                    param[update['property']] = update['value']
+            if not param:
+                continue
+            param['ApplyImmediately'] = self.data.get('immediate', False)
+            param['DBInstanceIdentifier'] = r['DBInstanceIdentifier']
+            try:
+                c.modify_db_instance(**param)
+            except c.exceptions.DBInstanceNotFoundFault:
+                raise

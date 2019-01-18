@@ -13,9 +13,13 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from botocore.exceptions import ClientError
+
+from c7n.actions import BaseAction
+from c7n.filters.vpc import SubnetFilter, SecurityGroupFilter, VpcFilter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
-from c7n.utils import get_retry
+from c7n.utils import local_session, get_retry, type_schema
 
 
 @resources.register('codecommit')
@@ -28,12 +32,46 @@ class CodeRepository(QueryResourceManager):
         enum_spec = ('list_repositories', 'repositories', None)
         batch_detail_spec = (
             'batch_get_repositories', 'repositoryNames', 'repositoryName',
-            'repositories')
+            'repositories', None)
         id = 'repositoryId'
         name = 'repositoryName'
         date = 'creationDate'
         dimension = None
         filter_name = None
+
+
+@CodeRepository.action_registry.register('delete')
+class DeleteRepository(BaseAction):
+    """Action to delete code commit
+
+    It is recommended to use a filter to avoid unwanted deletion of repos
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: codecommit-delete
+                resource: codecommit
+                actions:
+                  - delete
+    """
+
+    schema = type_schema('delete')
+    permissions = ("codecommit:DeleteRepository",)
+
+    def process(self, repositories):
+        client = local_session(
+            self.manager.session_factory).client('codecommit')
+        for r in repositories:
+            self.process_repository(client, r)
+
+    def process_repository(self, client, repository):
+        try:
+            client.delete_repository(repositoryName=repository['repositoryName'])
+        except ClientError as e:
+            self.log.exception(
+                "Exception deleting repo:\n %s" % e)
 
 
 @resources.register('codebuild')
@@ -43,11 +81,64 @@ class CodeBuildProject(QueryResourceManager):
         service = 'codebuild'
         enum_spec = ('list_projects', 'projects', None)
         batch_detail_spec = (
-            'batch_get_projects', 'names', None, 'projects')
-        name = id = 'project'
+            'batch_get_projects', 'names', None, 'projects', None)
+        name = id = 'name'
         date = 'created'
         dimension = None
         filter_name = None
+        config_type = "AWS::CodeBuild::Project"
+
+
+@CodeBuildProject.filter_registry.register('subnet')
+class BuildSubnetFilter(SubnetFilter):
+
+    RelatedIdsExpression = "vpcConfig.subnets[]"
+
+
+@CodeBuildProject.filter_registry.register('security-group')
+class BuildSecurityGroupFilter(SecurityGroupFilter):
+
+    RelatedIdsExpression = "vpcConfig.securityGroupIds[]"
+
+
+@CodeBuildProject.filter_registry.register('vpc')
+class BuildVpcFilter(VpcFilter):
+
+    RelatedIdsExpression = "vpcConfig.vpcId"
+
+
+@CodeBuildProject.action_registry.register('delete')
+class DeleteProject(BaseAction):
+    """Action to delete code build
+
+    It is recommended to use a filter to avoid unwanted deletion of builds
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: codebuild-delete
+                resource: codebuild
+                actions:
+                  - delete
+    """
+
+    schema = type_schema('delete')
+    permissions = ("codebuild:DeleteProject",)
+
+    def process(self, projects):
+        client = local_session(self.manager.session_factory).client('codebuild')
+        for p in projects:
+            self.process_project(client, p)
+
+    def process_project(self, client, project):
+
+        try:
+            client.delete_project(name=project['name'])
+        except ClientError as e:
+            self.log.exception(
+                "Exception deleting project:\n %s" % e)
 
 
 @resources.register('codepipeline')

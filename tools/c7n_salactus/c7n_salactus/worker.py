@@ -67,7 +67,6 @@ from botocore.exceptions import (
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from c7n.credentials import assumed_session
-#from c7n.executor import MainThreadExecutor
 from c7n.resources.s3 import EncryptExtantKeys
 from c7n.utils import chunks, dumps
 
@@ -90,6 +89,7 @@ def patch_ssl():
         # no pyopenssl support used / needed / available
         pass
     setattr(CONN_CACHE, 'patched', True)
+
 
 # We use a connection cache for sts role assumption
 CONN_CACHE = threading.local()
@@ -304,6 +304,10 @@ def process_account(account_info):
     buckets = [n['Name'] for n in buckets
                if not account_buckets or
                n['Name'] in account_buckets]
+    account_not_buckets = account_info.pop('not-buckets', None)
+    buckets = [n for n in buckets
+               if not account_not_buckets or
+               n not in account_not_buckets]
     log.info("processing %d buckets in account %s",
              len(buckets), account_info['name'])
     for bucket_set in chunks(buckets, 50):
@@ -360,7 +364,7 @@ def process_bucket_set(account_info, buckets):
 
             try:
                 info['keycount'] = bucket_key_count(cw, info)
-            except:
+            except Exception:
                 raise
             else:
                 connection.hset('bucket-sizes', bid, info['keycount'])
@@ -788,12 +792,12 @@ def get_key_visitors(account_info):
     for v in account_info.get('visitors'):
         if v['type'] == 'encrypt-keys':
             vi = EncryptExtantKeys(v)
-            vi.name = 'encrypt-keys'
+            vi.visitor_name = 'encrypt-keys'
             vi.inventory_filter = filter_encrypted
             visitors.append(vi)
         elif v['type'] == 'object-acl':
             vi = ObjectAclCheck(v)
-            vi.name = 'object-acl'
+            vi.visitor_name = 'object-acl'
             vi.inventory_filter = None
             visitors.append(vi)
     return visitors
@@ -825,12 +829,10 @@ def process_keyset(bid, key_set):
     key_count = len(key_set)
     start_time = time.time()
 
-    objects = {v.name: [] for v in visitors}
+    objects = {v.visitor_name: [] for v in visitors}
     objects['objects_denied'] = []
 
     with bucket_ops(bid, 'key'):
-        #MainThreadExecutor.async = False
-        #with MainThreadExecutor(max_workers=10) as w:
         with ThreadPoolExecutor(max_workers=10) as w:
             futures = {}
             for kchunk in chunks(key_set, 100):
@@ -839,7 +841,7 @@ def process_keyset(bid, key_set):
                         v.process_version or v.process_key)
                     futures[w.submit(
                         process_key_chunk, s3, bucket, kchunk,
-                        processor, bool(object_reporting))] = v.name
+                        processor, bool(object_reporting))] = v.visitor_name
 
             for f in as_completed(futures):
                 if f.exception():
@@ -901,10 +903,10 @@ def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
     for k in kchunk:
         if isinstance(k, str):
             k = {'Key': k}
-        elif isinstance(k, list) and len(k) == 2:
-            k = {'Key': k[0], 'VersionId': k[1], 'IsLatest': False}
+        elif isinstance(k, (list, tuple)) and len(k) == 2:
+            k = {'Key': k[0], 'VersionId': k[1] or 'null', 'IsLatest': False}
         else:
-            k = {'Key': k[0], 'VersionId': k[1], 'IsLatest': True}
+            k = {'Key': k[0], 'VersionId': k[1] or 'null', 'IsLatest': True}
         try:
             result = processor(s3, bucket_name=bucket, key=k)
         except EndpointConnectionError:
@@ -914,7 +916,7 @@ def process_key_chunk(s3, bucket, kchunk, processor, object_reporting):
         except ClientError as e:
             #  https://goo.gl/HZLv9b
             code = e.response['Error']['Code']
-            if code in ('403', 'AccessDenied'):  # Permission Denied
+            if code in ('403', 'AccessDenied', '405', 'MethodNotAllowed'):  # Permission Denied
                 stats['denied'] += 1
                 if object_reporting:
                     stats['objects_denied'].append(k)

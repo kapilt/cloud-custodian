@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import copy
 import json
 import os
 
@@ -40,17 +41,19 @@ def dispatch(event, context):
 
 def get_archive(config):
     archive = PythonPackageArchive(
-        'c7n_mailer', 'ldap3', 'pyasn1', 'jinja2', 'markupsafe', 'yaml',
-        'redis')
+        'c7n_mailer', 'ldap3', 'pyasn1', 'jinja2', 'markupsafe', 'ruamel',
+        'redis', 'datadog', 'requests')
 
-    template_dir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', 'msg-templates'))
+    for d in set(config['templates_folders']):
+        if not os.path.exists(d):
+            continue
+        for t in [f for f in os.listdir(d) if os.path.splitext(f)[1] == '.j2']:
+            with open(os.path.join(d, t)) as fh:
+                archive.add_contents('msg-templates/%s' % t, fh.read())
 
-    for t in os.listdir(template_dir):
-        with open(os.path.join(template_dir, t)) as fh:
-            archive.add_contents('msg-templates/%s' % t, fh.read())
-
-    archive.add_contents('config.json', json.dumps(config))
+    function_config = copy.deepcopy(config)
+    function_config['templates_folders'] = ['msg-templates/']
+    archive.add_contents('config.json', json.dumps(function_config))
     archive.add_contents('periodic.py', entry_source)
 
     archive.close()
@@ -59,10 +62,11 @@ def get_archive(config):
 
 def provision(config, session_factory):
     func_config = dict(
-        name='cloud-custodian-mailer',
-        description='Cloud Custodian Mailer',
+        name=config.get('lambda_name', 'cloud-custodian-mailer'),
+        description=config.get('lambda_description', 'Cloud Custodian Mailer'),
+        tags=config.get('lambda_tags', {}),
         handler='periodic.dispatch',
-        runtime='python2.7',
+        runtime=config['runtime'],
         memory_size=config['memory'],
         timeout=config['timeout'],
         role=config['role'],
@@ -72,9 +76,8 @@ def provision(config, session_factory):
         events=[
             CloudWatchEventSource(
                 {'type': 'periodic',
-                 'schedule': 'rate(5 minutes)'},
-                session_factory,
-                prefix="")
+                 'schedule': config.get('lambda_schedule', 'rate(5 minutes)')},
+                session_factory)
         ])
 
     archive = get_archive(config)
