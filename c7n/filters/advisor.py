@@ -36,7 +36,7 @@ class TrustedAdvisorBase(Filter):
             language=self.language)['result']
         self.check_advisor_refresh(client, checks)
         return self.extract_check_resources(checks)
-    
+
     def check_advisor_refresh(self, client, checks):
         delta = timedelta(self.data.get('refresh-period', 1))
         check_date = parse_date(checks['timestamp'])
