@@ -18,6 +18,7 @@ from dateutil import tz as tzutil
 
 from .common import BaseTest
 from botocore.exceptions import ClientError
+from c7n.exceptions import PolicyValidationError
 from c7n.resources.asg import NotEncryptedFilter
 
 
@@ -261,6 +262,17 @@ class AutoScalingTest(BaseTest):
             t["Key"]: (t["Value"], t["PropagateAtLaunch"]) for t in result["Tags"]
         }
         self.assertFalse("CustomerId" in tag_map)
+
+    def test_asg_mark_for_op_invalid(self):
+        self.assertRaises(
+            PolicyValidationError,
+            self.load_policy,
+            {'name': 'asg-mark-invalid',
+             'resource': 'asg',
+             'actions': [{'type': 'mark-for-op',
+                          'op': 'invalidate',
+                          'days': 1}]},
+            validate=True)
 
     def test_asg_mark_for_op(self):
         factory = self.replay_flight_data("test_asg_mark_for_op")
