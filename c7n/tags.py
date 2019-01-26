@@ -59,9 +59,9 @@ def register_ec2_tags(filters, actions):
 
 def register_universal_tags(filters, actions, compatibility=True):
     filters.register('marked-for-op', TagActionFilter)
-    filters.register('tag-count', TagCountFilter)
 
     if compatibility:
+        filters.register('tag-count', TagCountFilter)
         actions.register('mark', UniversalTag)
 
     actions.register('tag', UniversalTag)
@@ -71,6 +71,7 @@ def register_universal_tags(filters, actions, compatibility=True):
     if compatibility:
         actions.register('unmark', UniversalUntag)
         actions.register('untag', UniversalUntag)
+
     actions.register('remove-tag', UniversalUntag)
 
 
