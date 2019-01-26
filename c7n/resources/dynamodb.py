@@ -23,7 +23,7 @@ from c7n.filters import FilterRegistry
 from c7n.filters.kms import KmsRelatedFilter
 from c7n import query
 from c7n.manager import resources
-from c7n.tags import TagDelayedAction, RemoveTag, TagActionFilter, Tag
+from c7n.tags import TagDelayedAction, RemoveTag, TagActionFilter, Tag, universal_augment
 from c7n.utils import (
     local_session, get_retry, chunks, type_schema, snapshot_identifier)
 from c7n.filters.vpc import SecurityGroupFilter, SubnetFilter
@@ -62,37 +62,10 @@ class Table(query.QueryResourceManager):
 
 class DescribeTable(query.DescribeSource):
 
-    def augment(self, tables):
-        resources = super(DescribeTable, self).augment(tables)
-        return list(filter(None, _dynamodb_table_tags(
-            self.manager.get_model(),
-            resources,
-            self.manager.session_factory,
-            self.manager.executor_factory,
-            self.manager.retry,
-            self.manager.log)))
-
-
-def _dynamodb_table_tags(
-        model, tables, session_factory, executor_factory, retry, log):
-    """ Augment DynamoDB tables with their respective tags
-    """
-
-    def process_tags(table):
-        client = local_session(session_factory).client('dynamodb')
-        arn = table['TableArn']
-        try:
-            tag_list = retry(
-                client.list_tags_of_resource,
-                ResourceArn=arn)['Tags']
-        except ClientError as e:
-            log.warning("Exception getting DynamoDB tags  \n %s", e)
-            return None
-        table['Tags'] = tag_list or []
-        return table
-
-    with executor_factory(max_workers=2) as w:
-        return list(w.map(process_tags, tables))
+    def augment(self, resources):
+        return universal_augment(
+            self.manager,
+            super(DescribeTable, self).augment(resources))
 
 
 class StatusFilter(object):

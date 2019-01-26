@@ -31,7 +31,7 @@ class DynamodbTest(BaseTest):
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        self.assertEqual(resources[0]["TableName"], "rolltop")
+        self.assertEqual(resources[0]["TableName"], "test-table-kms-filter")
         self.assertEqual(resources[0]["TableStatus"], "ACTIVE")
 
     def test_invoke_action(self):
