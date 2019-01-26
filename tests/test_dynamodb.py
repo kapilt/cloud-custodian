@@ -72,7 +72,8 @@ class DynamodbTest(BaseTest):
                 "filters": [{"tag:test_key": "test_value"}],
             },
             session_factory=session_factory,
-        )
+            config={'region': 'us-west-2', 'account_id': '644160558196'})
+
         resources = p.run()
         self.assertEqual(len(resources), 1)
         arn = resources[0]["TableArn"]
