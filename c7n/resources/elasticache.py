@@ -39,7 +39,7 @@ log = logging.getLogger('custodian.elasticache')
 filters = FilterRegistry('elasticache.filters')
 actions = ActionRegistry('elasticache.actions')
 
-TTYPE = re.compile('cache.t1')
+TTYPE = re.compile(r'cache.t1')
 
 
 @resources.register('cache-cluster')

@@ -271,7 +271,7 @@ class PortsRangeHelper(object):
             1. port number < 65535
             2. range start < range end
         """
-        pattern = re.compile('^\\d+(-\\d+)?(,\\d+(-\\d+)?)*$')
+        pattern = re.compile(r'^\\d+(-\\d+)?(,\\d+(-\\d+)?)*$')
         if pattern.match(ports) is None:
             return False
 
