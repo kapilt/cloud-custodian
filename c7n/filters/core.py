@@ -357,7 +357,7 @@ class ValueFilter(Filter):
             'value_type': {'enum': [
                 'age', 'integer', 'expiration', 'normalize', 'size',
                 'cidr', 'cidr_size', 'swap', 'resource_count', 'expr',
-                'unique_size']},
+                'unique_size', 'basename']},
             'default': {'type': 'object'},
             'value_from': ValuesFrom.schema,
             'value': {'oneOf': [
@@ -534,6 +534,8 @@ class ValueFilter(Filter):
                 value = int(value.strip())
             except ValueError:
                 value = 0
+        elif self.vtype == 'basename':
+            value = value.rsplit('/', 1)[-1]
         elif self.vtype == 'size':
             try:
                 return sentinel, len(value)
