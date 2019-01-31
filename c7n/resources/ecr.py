@@ -36,6 +36,11 @@ class ECR(QueryResourceManager):
         filter_name = 'repositoryNames'
         filter_type = 'list'
 
+    def augment(self, resources):
+        client = local_session(self.session_factory).client('ecr')
+        for r in resources:
+            r['Tags'] = client.list_tags_for_resource(resourceArn=r['repositoryArn']).get('tags')
+
 
 ErrPolicyNotFound = 'RepositoryPolicyNotFoundException'
 
