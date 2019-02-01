@@ -141,6 +141,7 @@ class MetricsOutput(Metrics):
     def __init__(self, ctx, config=None):
         super(MetricsOutput, self).__init__(ctx, config)
         self.namespace = self.config.get('namespace', DEFAULT_NAMESPACE)
+        self.target = self.config['url'].netloc
 
     def _format_metric(self, key, value, unit, dimensions):
         d = {
@@ -152,11 +153,21 @@ class MetricsOutput(Metrics):
             {"Name": "Policy", "Value": self.ctx.policy.name},
             {"Name": "ResType", "Value": self.ctx.policy.resource_type}]
         for k, v in dimensions.items():
+            if self.target and k == 'Scope':
+                continue
             d['Dimensions'].append({"Name": k, "Value": v})
+
+        if self.target:
+            d['Dimensions'].append({'Name': 'Account', 'Value': self.ctx.account_id})
+
         return d
 
     def _put_metrics(self, ns, metrics):
-        watch = utils.local_session(self.ctx.session_factory).client('cloudwatch')
+        assume = True
+        if self.target:
+            assume = False
+        watch = utils.local_session(
+            self.ctx.session_factory, assume=assume).client('cloudwatch')
         return self.retry(
             watch.put_metric_data, Namespace=ns, MetricData=metrics)
 
