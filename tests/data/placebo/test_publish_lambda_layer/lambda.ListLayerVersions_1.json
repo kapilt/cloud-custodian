@@ -1,0 +1,18 @@
+{
+    "status_code": 200,
+    "data": {
+        "ResponseMetadata": {
+            "RequestId": "1e3c4741-27c8-11e9-acfe-6d1f54e8200a",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "date": "Sun, 03 Feb 2019 15:26:46 GMT",
+                "content-type": "application/json",
+                "content-length": "38",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "1e3c4741-27c8-11e9-acfe-6d1f54e8200a"
+            },
+            "RetryAttempts": 0
+        },
+        "LayerVersions": []
+    }
+}

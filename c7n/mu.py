@@ -20,6 +20,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import abc
 import base64
+import contextlib
 import hashlib
 import importlib
 import io
@@ -36,8 +37,8 @@ from concurrent.futures import ThreadPoolExecutor
 from c7n.exceptions import ClientError
 from c7n.cwe import CloudWatchEvents
 from c7n.logs_support import _timestamp_from_string
-from c7n.utils import parse_s3, local_session
-
+from c7n.utils import parse_s3, local_session, get_retry
+from c7n import version
 
 log = logging.getLogger('custodian.serverless')
 
@@ -46,29 +47,24 @@ class PythonPackageArchive(object):
     """Creates a zip file for python lambda functions.
 
     :param tuple modules: the Python modules to add to the archive
-
-    Amazon doesn't give us straightforward docs here, only `an example
-    <http://docs.aws.amazon.com/lambda/latest/dg/with-s3-example-deployment-pkg.html#with-s3-example-deployment-pkg-python>`_,
-    from which we can infer that they simply unzip the file into a directory on
-    ``sys.path``. So what we do is locate all of the ``modules`` specified, and
-    add all of the ``.py`` files we find for these modules to a zip file.
+    :param string preifx: A folder prefix in the zip to add contents to.
 
     In addition to the modules specified during instantiation, you can add
     arbitrary additional files to the archive using :py:func:`add_file` and
     :py:func:`add_contents`. For example, since we only add ``*.py`` files for
     you, you'll need to manually add files for any compiled extension modules
     that your Lambda requires.
-
     """
 
     zip_compression = zipfile.ZIP_DEFLATED
 
-    def __init__(self, *modules):
+    def __init__(self, modules=(), prefix=None):
         self._temp_archive_file = tempfile.NamedTemporaryFile()
         self._zip_file = zipfile.ZipFile(
             self._temp_archive_file, mode='w',
             compression=self.zip_compression)
         self._closed = False
+        self.prefix = prefix
         self.add_modules(None, *modules)
 
     @property
@@ -181,6 +177,8 @@ class PythonPackageArchive(object):
         """
         assert not self._closed, "Archive closed"
         if not isinstance(dest, zipfile.ZipInfo):
+            if self.prefix:
+                dest = os.path.join(self.prefix, dest)
             dest = zinfo(dest)  # see for some caveats
         # Ensure we apply the compression
         dest.compress_type = self.zip_compression
@@ -191,12 +189,16 @@ class PythonPackageArchive(object):
 
         Note underlying tempfile is removed when archive is garbage collected.
         """
-        self._closed = True
+        if self._closed:
+            return self
+
         self._zip_file.close()
+        self._closed = True
+
         log.debug(
             "Created custodian serverless archive size: %0.2fmb",
-            (os.path.getsize(self._temp_archive_file.name) / (
-                1024.0 * 1024.0)))
+            (self.size / (1024.0 * 1024.0)))
+
         return self
 
     @staticmethod
@@ -206,6 +208,7 @@ class PythonPackageArchive(object):
     def remove(self):
         """Dispose of the temp file for garbage collection."""
         if self._temp_archive_file:
+            self._temp_archive_file.close()
             self._temp_archive_file = None
 
     def get_checksum(self, encoder=base64.b64encode, hasher=hashlib.sha256):
@@ -247,7 +250,7 @@ def checksum(fh, hasher, blocksize=65536):
     return hasher.digest()
 
 
-def custodian_archive(packages=None):
+def custodian_archive(packages=None, prefix=None):
     """Create a lambda code archive for running custodian.
 
     Lambda archive currently always includes `c7n` and
@@ -270,7 +273,7 @@ def custodian_archive(packages=None):
     modules = {'c7n', 'pkg_resources'}
     if packages:
         modules = filter(None, modules.union(packages))
-    return PythonPackageArchive(*sorted(modules))
+    return PythonPackageArchive(sorted(modules), prefix)
 
 
 class LambdaManager(object):
@@ -718,6 +721,14 @@ class LambdaFunction(AbstractLambdaFunction):
     def layers(self):
         return self.func_data.get('layers', ())
 
+    @layers.setter
+    def layers(self, layers):
+        self.func_data['layers'] = layers
+
+    @property
+    def packages(self):
+        return self.func_data.get('packages', ())
+
     @property
     def concurrency(self):
         return self.func_data.get('concurrency')
@@ -777,7 +788,7 @@ class PolicyLambda(AbstractLambdaFunction):
 
     def __init__(self, policy):
         self.policy = policy
-        self.archive = custodian_archive(packages=self.packages)
+        self.archive = None
 
     @property
     def name(self):
@@ -845,9 +856,15 @@ class PolicyLambda(AbstractLambdaFunction):
     def layers(self):
         return self.policy.data['mode'].get('layers', ())
 
+    @layers.setter
+    def layers(self, layers):
+        mode = dict(self.policy.data['mode'])
+        mode['layers'] = layers
+        self.policy.data['mode'] = mode
+
     @property
     def packages(self):
-        return self.policy.data['mode'].get('packages')
+        return self.policy.data['mode'].get('packages', ())
 
     def get_events(self, session_factory):
         events = []
@@ -861,6 +878,14 @@ class PolicyLambda(AbstractLambdaFunction):
         return events
 
     def get_archive(self):
+        if self.archive:
+            return self.archive
+
+        if self.layers:
+            self.archive = PythonPackageArchive()
+        else:
+            self.archive = custodian_archive(packages=self.packages)
+
         self.archive.add_contents(
             'config.json', json.dumps(
                 {'policies': [self.policy.data]}, indent=2))
@@ -887,6 +912,78 @@ def zinfo(fname):
     # http://unix.stackexchange.com/questions/14705/
     info.external_attr = 0o644 << 16
     return info
+
+
+class LayerPublisher(object):
+
+    spdx_identifier = "Apache-2.0"
+    default_packages = ()
+    retry = get_retry(('ThrottlingException',))
+
+    def __init__(self, session_factory, region=None):
+        self.session_factory = session_factory
+        self.region = region
+
+    def publish(self, collection):
+        funcs = [f for f in collection if not f.layers]
+        packages = self.get_packages(funcs)
+        archive = self.get_archive(packages)
+        layer_name = self.get_layer_name(packages)
+
+        layer_arn = self._create_or_update(layer_name, archive, self.region)
+        for f in funcs:
+            f.layers = [layer_arn]
+
+        archive.remove()
+        return layer_arn
+
+    def get_packages(self, funcs):
+        packages = set()
+        packages.update(self.default_packages)
+        for f in funcs:
+            packages.update(f.packages)
+        return packages
+
+    def get_archive(self, packages):
+        archive = custodian_archive(packages, prefix='python')
+        archive.close()
+        return archive
+
+    def get_layer_name(self, packages):
+        return "c7n-{}-{}".format(
+            version.version.replace('.', '_'),
+            hashlib.sha256("-".join(sorted(packages)).encode('utf8')).hexdigest()[:16])
+
+    def _create_or_update(self, layer_name, archive, region):
+        client = local_session(
+            self.session_factory).client('lambda', region_name=region)
+
+        layer = self.get_layer(client, layer_name)
+        if layer is not None and (
+                layer['Content']['CodeSha256'] == archive.get_checksum()):
+            return layer['LayerVersionArn']
+
+        log.debug("Publishing custodian layer region:%s layer:%s", region, layer_name)
+        return client.publish_layer_version(
+            LayerName=layer_name,
+            Description="Custodian Runtime {version}".format(version=version.version),
+            CompatibleRuntimes=["python3.7"],
+            LicenseInfo=self.spdx_identifier,
+            Content={'ZipFile': archive.get_bytes()})['LayerVersionArn']
+
+    def get_layer(self, client, layer_name):
+        try:
+            versions = client.list_layer_versions(
+                CompatibleRuntime="python3.7",
+                MaxItems=1,
+                LayerName=layer_name).get("LayerVersions")
+        except client.exceptions.ResourceNotFoundException:
+            versions = []
+        if not versions:
+            return None
+        return client.get_layer_version(
+            LayerName=layer_name,
+            VersionNumber=versions[0]['Version'])
 
 
 class CloudWatchEventSource(object):

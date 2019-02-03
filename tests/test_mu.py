@@ -32,6 +32,7 @@ from c7n.mu import (
     custodian_archive,
     LambdaFunction,
     LambdaManager,
+    LayerPublisher,
     PolicyLambda,
     PythonPackageArchive,
     CloudWatchLogSubscription,
@@ -76,6 +77,35 @@ class Publish(BaseTest):
         self.addCleanup(mgr.remove, func)
         result = mgr.publish(func)
         self.assertEqual(result["CodeSize"], 169)
+
+    def test_publish_lambda_layer(self):
+        session_factory = self.replay_flight_data('test_publish_lambda_layer')
+        publisher = LayerPublisher(session_factory, 'us-east-1')
+        func = self.make_func()
+        client = session_factory().client('lambda')
+
+        output = self.capture_logging('custodian.serverless', level=logging.DEBUG)
+        layer_arn = publisher.publish([func])
+        self.addCleanup(client.delete_layer_version,
+                        LayerName=layer_arn.rsplit(':', 2)[1],
+                        VersionNumber=int(layer_arn.rsplit(':', 2)[-1]))
+
+        latest_versions = {
+            l['LatestMatchingVersion']['LayerVersionArn']
+            for l in client.list_layers(
+                CompatibleRuntime="python3.7").get("Layers")}
+
+        self.assertIn(layer_arn, latest_versions)
+
+        lines = output.getvalue().strip().split("\n")
+        self.assertIn(
+            'Publishing custodian layer region:us-east-1 layer:c7n-0_8_40_0-e3b0c44298fc1c14',
+            lines)
+
+        # idempotent wrt to provisioning
+        output = self.capture_logging('custodian.serverless', level=logging.DEBUG)
+        layer_arn_2 = publisher.publish([func])
+        self.assertEqual(layer_arn, layer_arn_2)
 
     def test_publish_a_lambda_with_layer_and_concurrency(self):
         factory = self.replay_flight_data('test_lambda_layer_concurrent_publish')

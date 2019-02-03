@@ -1,0 +1,31 @@
+{
+    "status_code": 200,
+    "data": {
+        "ResponseMetadata": {
+            "RequestId": "215f31a1-27c8-11e9-91df-858e453053c3",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "date": "Sun, 03 Feb 2019 15:26:51 GMT",
+                "content-type": "application/json",
+                "content-length": "1640",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "215f31a1-27c8-11e9-91df-858e453053c3"
+            },
+            "RetryAttempts": 0
+        },
+        "Content": {
+            "Location": "https://prod-04-2014-layers.s3.amazonaws.com/snapshots/619193117841/c7n-0_8_40_0-e3b0c44298fc1c14-5da3a03b-d23e-4252-bb9c-18f0619acc89?versionId=XteBPX6Uz8pY0mHEl8uorifUb.bKIC7W&X-Amz-Security-Token=FQoGZXIvYXdzEJH%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDPrWoxkSrjYv1kqORSK3A0mfyeIx%2FF9yx0wmwzuXCqzuurD%2FiXVqjD%2BES05T2ILq0w1IVeqTz3SNscegMWLMihLDrFTDlQc8qPUVArYabrvvZycqY%2FVCwUOc71MJSRyr4ic9ZPIEDweeaMCcURe8%2BGMUIVF3REoEqZzoYuzsUsU2Bcbexfq3funa6erxrw4UuUMqtuBmmItY0NOSimEWT8ZWxXZn4OpK8yGHQx4SqjcAipK8bZELASvdIc6KbUbf9azSXfcA4AdXJpJ9mpB%2FS0abHcrCLtB2kaSCiMm0Wyg9Wqowo9DMdoyMJYQVFYe8VI%2FSvMbrqM2D8vjYiww25O8sqq%2FZSvZ3FDMuHc14z%2ByA5T7ym2kME3n2ICd%2BACBWygSHsdYJnh3MaOtC%2Bifz%2BHC9f9axj%2F3sPt5dhdjHK%2BdcLYMsq0plOdfc5Ejz5QYr2vYMAoqtfZUwr9zKEopnNk5vSJOK%2FQMcQrm8q5%2B9cZmZVbIPEAXIBW7fWgv5s1OK3aOcSQDOqIUH5XoZHnZvUiZWl6GNc6kdwRi6Gr3rcdsfTWSG9iyse7G4VcSFBxLtmNu6hrnI5eNNBHSZFT23XNmUlL%2BzjPYo4Ivc4gU%3D&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20190203T152651Z&X-Amz-SignedHeaders=host&X-Amz-Expires=600&X-Amz-Credential=ASIA25DCYHY33QBVMEMK%2F20190203%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=e9174ea460c4690034d8c692faa9916c75f4dcddccf8a21968161613e70f5d84",
+            "CodeSha256": "pYWhkQNeCchA2xNrymp7OH8Ch80+AHkwftnl16fKPHI=",
+            "CodeSize": 541439
+        },
+        "LayerArn": "arn:aws:lambda:us-east-1:619193117841:layer:c7n-0_8_40_0-e3b0c44298fc1c14",
+        "LayerVersionArn": "arn:aws:lambda:us-east-1:619193117841:layer:c7n-0_8_40_0-e3b0c44298fc1c14:6",
+        "Description": "Custodian Runtime 0.8.40.0",
+        "CreatedDate": "2019-02-03T15:26:51.457+0000",
+        "Version": 6,
+        "CompatibleRuntimes": [
+            "python3.7"
+        ],
+        "LicenseInfo": "Apache-2.0"
+    }
+}

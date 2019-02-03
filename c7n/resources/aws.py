@@ -1,4 +1,4 @@
-# Copyright 2018 Capital One Services, LLC
+# Copyright 2018-2019 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ from c7n.credentials import SessionFactory
 from c7n.config import Bag
 from c7n.exceptions import PolicyValidationError
 from c7n.log import CloudWatchLogHandler
+from c7n.mu import LayerPublisher, PolicyLambda
 
 # Import output registries aws provider extends.
 from c7n.output import (
@@ -370,13 +371,14 @@ class S3Output(DirectoryOutput):
         return "/".join([s.strip('/') for s in parts])
 
     def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
-        from boto3.s3.transfer import S3Transfer
+        from boto3.s3.transfer import S3Transfer, TransferConfig
         if exc_type is not None:
             log.exception("Error while executing policy")
         log.debug("Uploading policy logs")
         self.compress()
         self.transfer = S3Transfer(
-            self.ctx.session_factory(assume=False).client('s3'))
+            self.ctx.session_factory(assume=False).client('s3'),
+            TransferConfig(use_threads=False))
         self.upload()
         shutil.rmtree(self.root_dir)
         log.debug("Policy Logs uploaded")
@@ -394,6 +396,43 @@ class S3Output(DirectoryOutput):
                     extra_args={
                         'ACL': 'bucket-owner-full-control',
                         'ServerSideEncryption': 'AES256'})
+
+
+class PolicyLayerPublisher(LayerPublisher):
+
+    default_packages = (
+        'boto3', 'botocore', 'urllib3', 'c7n', 'pkg_resources')
+
+    def publish(self, collection):
+        regions = {}
+
+        # Collect regions and policy lambdas
+        for p in collection:
+            if p.provider_name != 'aws':
+                continue
+            if p.execution_mode == 'pull':
+                continue
+
+            p_lambda = PolicyLambda(p)
+
+            # if the user is explicitly defining layers, skip
+            # automatic layer construction.
+            if p_lambda.layers:
+                continue
+
+            regions.setdefault(p.options.region, []).append(p_lambda)
+
+        # Publish layer per region
+        packages = self.get_packages(itertools.chain(*regions.values()))
+        archive = self.get_archive(packages)
+        layer_name = self.get_layer_name(packages)
+
+        for r in regions:
+            layer_arn = self._create_or_update(layer_name, archive, r)
+
+            # Update lambda policies to use layer
+            for p_lambda in regions[r]:
+                p_lambda.layers = [layer_arn]
 
 
 @clouds.register('aws')
@@ -473,15 +512,20 @@ class AWS(object):
                     options_copy.output_dir = (
                         options.output_dir.rstrip('/') + '/%s' % region)
                 policies.append(
-                    Policy(p.data, options_copy,
+                    Policy(dict(p.data), options_copy,
                            session_factory=policy_collection.session_factory()))
 
-        return PolicyCollection(
+        initialized_policies = PolicyCollection(
             # order policies by region to minimize local session invalidation.
             # note relative ordering of policies must be preserved, python sort
             # is stable.
             sorted(policies, key=operator.attrgetter('options.region')),
             options)
+
+        if not options.dryrun:
+            publisher = PolicyLayerPublisher(self.get_session_factory(options))
+            publisher.publish(initialized_policies)
+        return initialized_policies
 
 
 def fake_session():

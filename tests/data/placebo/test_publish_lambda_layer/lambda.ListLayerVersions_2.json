@@ -1,0 +1,29 @@
+{
+    "status_code": 200,
+    "data": {
+        "ResponseMetadata": {
+            "RequestId": "21571b8d-27c8-11e9-8cc7-b35bbaf8a25d",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "date": "Sun, 03 Feb 2019 15:26:51 GMT",
+                "content-type": "application/json",
+                "content-length": "297",
+                "connection": "keep-alive",
+                "x-amzn-requestid": "21571b8d-27c8-11e9-8cc7-b35bbaf8a25d"
+            },
+            "RetryAttempts": 0
+        },
+        "LayerVersions": [
+            {
+                "LayerVersionArn": "arn:aws:lambda:us-east-1:619193117841:layer:c7n-0_8_40_0-e3b0c44298fc1c14:6",
+                "Version": 6,
+                "Description": "Custodian Runtime 0.8.40.0",
+                "CreatedDate": "2019-02-03T15:26:51.457+0000",
+                "CompatibleRuntimes": [
+                    "python3.7"
+                ],
+                "LicenseInfo": "Apache-2.0"
+            }
+        ]
+    }
+}
