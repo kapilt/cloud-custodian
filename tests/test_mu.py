@@ -175,7 +175,7 @@ class PolicyLambdaProvision(BaseTest):
                 'eventTypeCategory': ['scheduledChange'],
                 'eventTypeCode': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED']},
              'source': ['aws.health']}
-            )
+        )
 
     def test_cwl_subscriber(self):
         self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
