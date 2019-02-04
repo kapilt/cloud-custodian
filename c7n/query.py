@@ -61,9 +61,9 @@ class ResourceQuery(object):
     def _invoke_client_enum(self, client, enum_op, params, path, retry=None):
         if client.can_paginate(enum_op):
             p = client.get_paginator(enum_op)
-            results = p.paginate(**params)
             if retry:
                 p.PAGE_ITERATOR_CLS = RetryPageIterator
+            results = p.paginate(**params)
             data = results.build_full_result()
         else:
             op = getattr(client, enum_op)
@@ -156,7 +156,7 @@ class ChildResourceQuery(ResourceQuery):
         # Have to query separately for each parent's children.
         results = []
         for parent_id in parent_ids:
-            merged_params = dict(params, **{parent_key: parent_id})
+            merged_params = self.get_parent_parameters(params, parent_id, parent_key)
             subset = self._invoke_client_enum(
                 client, enum_op, merged_params, path, retry=self.manager.retry)
             if annotate_parent:
@@ -167,6 +167,9 @@ class ChildResourceQuery(ResourceQuery):
             elif subset:
                 results.extend(subset)
         return results
+
+    def get_parent_parameters(self, params, parent_id, parent_key):
+        return dict(params, **{parent_key: parent_id})
 
 
 class QueryMeta(type):
@@ -210,9 +213,11 @@ sources = PluginRegistry('sources')
 @sources.register('describe')
 class DescribeSource(object):
 
+    QueryFactory = ResourceQuery
+
     def __init__(self, manager):
         self.manager = manager
-        self.query = ResourceQuery(self.manager.session_factory)
+        self.query = self.QueryFactory(self.manager.session_factory)
 
     def get_resources(self, ids, cache=True):
         return self.query.get(self.manager, ids)
@@ -348,6 +353,7 @@ class QueryResourceManager(ResourceManager):
             'ThrottlingException',
             'RequestLimitExceeded',
             'Throttled',
+            'Throttling',
             'Client.RequestLimitExceeded')))
 
     def __init__(self, data, options):
@@ -388,27 +394,27 @@ class QueryResourceManager(ResourceManager):
         }
 
     def resources(self, query=None):
-        key = self.get_cache_key(query)
+        cache_key = self.get_cache_key(query)
+        resources = None
+
         if self._cache.load():
-            resources = self._cache.get(key)
+            resources = self._cache.get(cache_key)
             if resources is not None:
                 self.log.debug("Using cached %s: %d" % (
                     "%s.%s" % (self.__class__.__module__,
                                self.__class__.__name__),
                     len(resources)))
-                return self.filter_resources(resources)
 
-        if query is None:
-            query = {}
-
-        with self.ctx.tracer.subsegment('resource-fetch'):
-            resources = self.source.resources(query)
-        with self.ctx.tracer.subsegment('resource-augment'):
-            resources = self.augment(resources)
+        if resources is None:
+            if query is None:
+                query = {}
+            with self.ctx.tracer.subsegment('resource-fetch'):
+                resources = self.source.resources(query)
+            with self.ctx.tracer.subsegment('resource-augment'):
+                resources = self.augment(resources)
+            self._cache.save(cache_key, resources)
 
         resource_count = len(resources)
-        self._cache.save(key, resources)
-
         with self.ctx.tracer.subsegment('filter'):
             resources = self.filter_resources(resources)
 
@@ -489,9 +495,16 @@ class QueryResourceManager(ResourceManager):
 
     def get_arns(self, resources):
         arns = []
+
+        m = self.get_model()
+        arn_key = getattr(m, 'arn', None)
+        id_key = m.id
+
         for r in resources:
-            _id = r[self.get_model().id]
-            if 'arn' in _id[:3]:
+            _id = r[id_key]
+            if arn_key:
+                arns.append(r[arn_key])
+            elif 'arn' in _id[:3]:
                 arns.append(_id)
             else:
                 arns.append(self.generate_arn(_id))

@@ -345,8 +345,10 @@ class LambdaMode(ServerlessExecutionMode):
             'execution-options': {'type': 'object'},
             'function-prefix': {'type': 'string'},
             'member-role': {'type': 'string'},
-            'packages': {'type': 'array'},
+            'packages': {'type': 'array', 'items': {'type': 'string'}},
             # Lambda passthrough config
+            'layers': {'type': 'array', 'items': {'type': 'string'}},
+            'concurrency': {'type': 'integer'},
             'runtime': {'enum': ['python2.7', 'python3.6', 'python3.7']},
             'role': {'type': 'string'},
             'timeout': {'type': 'number'},
@@ -360,6 +362,14 @@ class LambdaMode(ServerlessExecutionMode):
             'subnets': {'type': 'array'}
         }
     }
+
+    def validate(self):
+        super(LambdaMode, self).validate()
+        prefix = self.policy.data.get('function-prefix', 'custodian-')
+        if len(prefix + self.policy.name) > 64:
+            raise PolicyValidationError(
+                "Custodian Lambda policies have a max length with prefix of 64"
+                " policy:%s prefix:%s" % (prefix, self.policy.name))
 
     def get_metrics(self, start, end, period):
         from c7n.mu import LambdaManager, PolicyLambda
@@ -483,7 +493,7 @@ class LambdaMode(ServerlessExecutionMode):
                 manager = mu.LambdaManager(
                     lambda assume=False: self.policy.session_factory(assume))
             return manager.publish(
-                mu.PolicyLambda(self.policy), 'current',
+                mu.PolicyLambda(self.policy),
                 role=self.policy.options.assume_role)
 
     def get_logs(self, start, end):
@@ -576,6 +586,7 @@ class CloudTrailMode(LambdaMode):
         rinherit=LambdaMode.schema)
 
     def validate(self):
+        super(CloudTrailMode, self).validate()
         from c7n import query
         events = self.policy.data['mode'].get('events')
         assert events, "cloud trail mode requires specifiying events to subscribe"
@@ -645,6 +656,7 @@ class GuardDutyMode(LambdaMode):
         return resources
 
     def validate(self):
+        super(GuardDutyMode, self).validate()
         if self.policy.data['resource'] not in self.supported_resources:
             raise ValueError(
                 "Policy:%s resource:%s Guard duty mode only supported for %s" % (

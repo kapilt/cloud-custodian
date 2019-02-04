@@ -16,8 +16,9 @@ from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.actions import ActionRegistry, BaseAction
 from c7n.filters import FilterRegistry
-from c7n.tags import Tag, TagDelayedAction, RemoveTag
+from c7n.tags import Tag, TagDelayedAction, RemoveTag, coalesce_copy_user_tags, TagActionFilter
 from c7n.utils import local_session, type_schema
+from c7n.filters.kms import KmsRelatedFilter
 
 
 @resources.register('fsx')
@@ -81,6 +82,11 @@ class DeleteBackup(BaseAction):
                 self.log.warning(
                     'Unable to delete backup for: %s - %s - %s' % (
                         r['FileSystemId'], r['BackupId'], e))
+
+
+FSxBackup.filter_registry.register('marked-for-op', TagActionFilter)
+
+FSx.filter_registry.register('marked-for-op', TagActionFilter)
 
 
 @FSxBackup.action_registry.register('mark-for-op')
@@ -185,6 +191,20 @@ class BackupFileSystem(BaseAction):
                   copy-tags: True
                   tags:
                     BackupSource: CloudCustodian
+
+            - name: backup-fsx-resource-copy-specific-tags
+              comment: |
+                  creates a backup of fsx resources and
+                  copies tags from file system to the backup
+              resource: fsx
+              actions:
+                - type: backup
+                  copy-tags:
+                    - Application
+                    - Owner
+                    # or use '*' to specify all tags
+                  tags:
+                    BackupSource: CloudCustodian
     """
 
     permissions = ('fsx:CreateBackup',)
@@ -196,24 +216,157 @@ class BackupFileSystem(BaseAction):
                 'type': 'object'
             },
             'copy-tags': {
-                'type': 'boolean'
+                'oneOf': [
+                    {
+                        'type': 'boolean'
+                    },
+                    {
+                        'type': 'array',
+                        'items': {
+                            'type': 'string'
+                        }
+                    }
+                ]
             }
         }
     )
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('fsx')
-        tags = [{'Key': k, 'Value': v} for k, v in self.data.get('tags', {}).items()]
+        user_tags = self.data.get('tags', {})
         copy_tags = self.data.get('copy-tags', True)
         for r in resources:
-            new_tags = tags
-            if copy_tags:
-                new_tags.extend(r['Tags'])
+            tags = coalesce_copy_user_tags(r, copy_tags, user_tags)
             try:
-                client.create_backup(
-                    FileSystemId=r['FileSystemId'],
-                    Tags=new_tags
-                )
+                if tags:
+                    client.create_backup(
+                        FileSystemId=r['FileSystemId'],
+                        Tags=tags
+                    )
+                else:
+                    client.create_backup(
+                        FileSystemId=r['FileSystemId']
+                    )
             except client.exceptions.BackupInProgress as e:
                 self.log.warning(
                     'Unable to create backup for: %s - %s' % (r['FileSystemId'], e))
+
+
+@FSx.action_registry.register('delete')
+class DeleteFileSystem(BaseAction):
+    """
+    Delete Filesystems
+
+    :example:
+
+    .. code-block: yaml
+
+        policies:
+            - name: delete-fsx-instance-with-snapshot
+              resource: fsx
+              filters:
+                - FileSystemId: fs-1234567890123
+              actions:
+                - type: delete
+                  copy-tags:
+                    - Application
+                    - Owner
+                  tags:
+                    DeletedBy: CloudCustodian
+
+            - name: delete-fsx-instance-skip-snapshot
+              resource: fsx
+              filters:
+                - FileSystemId: fs-1234567890123
+              actions:
+                - type: delete
+                  skip-snapshot: True
+
+    """
+
+    permissions = ('fsx:DeleteFileSystem',)
+
+    schema = type_schema(
+        'delete',
+        **{
+            'skip-snapshot': {'type': 'boolean'},
+            'tags': {'type': 'object'},
+            'copy-tags': {
+                'oneOf': [
+                    {
+                        'type': 'array',
+                        'items': {
+                            'type': 'string'
+                        }
+                    },
+                    {
+                        'type': 'boolean'
+                    }
+                ]
+            }
+        }
+    )
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('fsx')
+
+        skip_snapshot = self.data.get('skip-snapshot', False)
+        copy_tags = self.data.get('copy-tags', True)
+        user_tags = self.data.get('tags', [])
+
+        for r in resources:
+            tags = coalesce_copy_user_tags(r, copy_tags, user_tags)
+            config = {'SkipFinalBackup': skip_snapshot}
+            if tags and not skip_snapshot:
+                config['FinalBackupTags'] = tags
+            try:
+                client.delete_file_system(
+                    FileSystemId=r['FileSystemId'],
+                    WindowsConfiguration=config
+                )
+            except client.exceptions.BadRequest as e:
+                self.log.warning('Unable to delete: %s - %s' % (r['FileSystemId'], e))
+
+
+@FSx.filter_registry.register('kms-key')
+class KmsFilter(KmsRelatedFilter):
+    """
+    Filter a resource by its associcated kms key and optionally the aliasname
+    of the kms key by using 'c7n:AliasName'
+
+    :example:
+
+        .. code-block:: yaml
+
+            policies:
+                - name: fsx-kms-key-filters
+                  resource: fsx
+                  filters:
+                    - type: kms-key
+                      key: c7n:AliasName
+                      value: "^(alias/aws/fsx)"
+                      op: regex
+    """
+    RelatedIdsExpression = 'KmsKeyId'
+
+
+@FSxBackup.filter_registry.register('kms-key')
+class KmsFilterFsxBackup(KmsRelatedFilter):
+    """
+    Filter a resource by its associcated kms key and optionally the aliasname
+    of the kms key by using 'c7n:AliasName'
+
+    :example:
+
+        .. code-block:: yaml
+
+            policies:
+                - name: fsx-backup-kms-key-filters
+                  resource: fsx-backup
+                  filters:
+                    - type: kms-key
+                      key: c7n:AliasName
+                      value: "^(alias/aws/fsx)"
+                      op: regex
+    """
+    RelatedIdsExpression = 'KmsKeyId'
