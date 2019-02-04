@@ -21,7 +21,7 @@ import shutil
 import tempfile
 
 from c7n import policy, manager
-from c7n.exceptions import ResourceLimitExceeded
+from c7n.exceptions import ResourceLimitExceeded, PolicyValidationError
 from c7n.resources.aws import AWS
 from c7n.resources.ec2 import EC2
 from c7n.utils import dumps
@@ -873,10 +873,20 @@ class GuardModeTest(BaseTest):
             validate=True,
         )
 
+    def test_lambda_policy_validate_name(self):
+        name = "ec2-instance-guard-D8488F01-0E3E-4772-A3CB-E66EEBB9BDF4"
+        with self.assertRaises(PolicyValidationError) as e_cm:
+            self.load_policy(
+                {"name": name,
+                 "resource": "ec2",
+                 "mode": {"type": "guard-duty"}},
+                validate=True)
+        self.assertTrue("max length with prefix" in str(e_cm.exception))
+
     @mock.patch("c7n.mu.LambdaManager.publish")
     def test_ec2_guard_event_pattern(self, publish):
 
-        def assert_publish(policy_lambda, alias, role):
+        def assert_publish(policy_lambda, role):
             events = policy_lambda.get_events(mock.MagicMock())
             self.assertEqual(len(events), 1)
             pattern = json.loads(events[0].render_event_pattern())
@@ -900,7 +910,7 @@ class GuardModeTest(BaseTest):
     @mock.patch("c7n.mu.LambdaManager.publish")
     def test_iam_guard_event_pattern(self, publish):
 
-        def assert_publish(policy_lambda, alias, role):
+        def assert_publish(policy_lambda, role):
             events = policy_lambda.get_events(mock.MagicMock())
             self.assertEqual(len(events), 1)
             pattern = json.loads(events[0].render_event_pattern())
