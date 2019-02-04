@@ -929,10 +929,8 @@ class CloudWatchEventSource(object):
             payload['detail-type'] = events
         elif event_type == 'phd':
             payload['source'] = ['aws.health']
-            events = []
-            for e in self.data.get('events', []):
-                events.append(e)
-            payload['detail'] = {'eventTypeCode': [events]}
+            payload['detail'] = {
+                'eventTypeCode': list(self.data['events'])}
             if self.data.get('categories', []):
                 payload['detail']['eventTypeCategory'] = self.data['categories']
         elif event_type == 'periodic':

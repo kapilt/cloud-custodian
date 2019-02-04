@@ -136,12 +136,23 @@ class PolicyLambdaProvision(BaseTest):
             {'name': 'ec2-retire',
              'resource': 'ec2',
              'mode': {
+                 'categories': ['scheduledChange'],
                  'events': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED'],
                  'type': 'phd'}}, session_factory=factory)
         mode = p.get_execution_mode()
         event = event_data('event-phd-ec2-retire.json')
         resources = mode.run(event, None)
         self.assertEqual(len(resources), 1)
+
+        p_lambda = PolicyLambda(p)
+        events = p_lambda.get_events(factory)
+        self.assertEqual(
+            json.loads(events[0].render_event_pattern()),
+            {'detail': {
+                'eventTypeCategory': ['scheduledChange'],
+                'eventTypeCode': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED']},
+             'source': ['aws.health']}
+            )
 
     def test_cwl_subscriber(self):
         self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
