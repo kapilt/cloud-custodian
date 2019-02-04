@@ -534,6 +534,9 @@ class PHDMode(LambdaMode):
             'enum': ['open', 'upcoming', 'closed']}})
 
     def validate(self):
+        super(PHDMode, self).validate()
+        if self.policy.resource_type == 'account':
+            return
         if 'health-event' not in self.policy.resource_manager.filter_registry:
             raise PolicyValidationError(
                 "policy:%s phd event mode not supported for resource: %s" % (

@@ -153,6 +153,21 @@ class PolicyLambdaProvision(BaseTest):
         resources = mode.run(event, None)
         self.assertEqual(len(resources), 1)
 
+    def test_phd_account_mode(self):
+        factory = self.replay_flight_data('test_phd_event_mode')
+        p = self.load_policy(
+            {'name': 'ec2-retire',
+             'resource': 'account',
+             'mode': {
+                 'categories': ['scheduledChange'],
+                 'events': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED'],
+                 'type': 'phd'}}, session_factory=factory)
+        mode = p.get_execution_mode()
+        event = event_data('event-phd-ec2-retire.json')
+        resources = mode.run(event, None)
+        self.assertEqual(len(resources), 1)
+        self.assertTrue('c7n:HealthEvent' in resources[0])
+
     def test_phd_mode(self):
         factory = self.replay_flight_data('test_phd_event_mode')
         p = self.load_policy(
