@@ -10,7 +10,7 @@
     "affectedEntities": [
       {
         "tags": {},
-        "entityValue": "i-0c608386538544578"
+        "entityValue": "i-00ddbf07ce6372082"
       }
     ],
     "eventDescription": [
@@ -25,8 +25,8 @@
   "source": "aws.health",
   "account": "011122335622",
   "version": "0",
-  "resources": [
-    "i-0c608386538544578"
+    "resources": [
+	"i-00ddbf07ce6372082"
   ],
   "detail-type": "AWS Health Event"
 }

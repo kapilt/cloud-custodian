@@ -141,7 +141,7 @@ class PolicyLambdaProvision(BaseTest):
         mode = p.get_execution_mode()
         event = event_data('event-phd-ec2-retire.json')
         resources = mode.run(event, None)
-        self.assertEqual(len(resources), 0)
+        self.assertEqual(len(resources), 1)
 
     def test_cwl_subscriber(self):
         self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
