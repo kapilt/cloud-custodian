@@ -21,6 +21,7 @@ snapshots).
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import Counter
 from concurrent.futures import as_completed
 
 from datetime import datetime, timedelta
@@ -28,10 +29,12 @@ from dateutil import tz as tzutil
 from dateutil.parser import parse
 
 import itertools
+import jmespath
 import time
 
+from c7n.manager import resources as aws_resources
 from c7n.actions import BaseAction as Action, AutoTagUser
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from c7n.filters import Filter, OPERATORS
 from c7n.filters.offhours import Time
 from c7n import utils
@@ -571,7 +574,7 @@ class TagDelayedAction(Action):
 
     .. code-block :: yaml
 
-      - policies:
+      policies:
         - name: ec2-mark-for-stop-in-future
           resource: ec2
           filters:
@@ -915,6 +918,142 @@ class UniversalTagDelayedAction(TagDelayedAction):
         arns = self.manager.get_arns(resource_set)
         return universal_retry(
             client.tag_resources, ResourceARNList=arns, Tags=tags)
+
+
+class CopyRelatedResourceTag(Tag):
+    """
+    Copy a related resource tag to its associated resource
+
+    In some scenarios, resource tags from a related resource should be applied
+    to its child resource. For example, EBS Volume tags propogating to their
+    snapshots. To use this action, specify the resource type that contains the
+    tags that are to be copied, which can be found by using the
+    `custodian schema` command.
+
+    Then, specify the key on the resource that references the related resource.
+    In the case of ebs-snapshot, the VolumeId attribute would be the key that
+    identifies the related resource, ebs.
+
+    Finally, specify a list of tag keys to copy from the related resource onto
+    the original resource. The special character "*" can be used to signify that
+    all tags from the related resource should be copied to the original resource.
+
+    To raise an error when related resources cannot be found, use the
+    `skip_missing` option. By default, this is set to True.
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+                - name: copy-tags-from-ebs-volume-to-snapshot
+                  resource: ebs-snapshot
+                  actions:
+                    - type: copy-related-tag
+                      resource: ebs
+                      skip_missing: True
+                      key: VolumeId
+                      tags: '*'
+    """
+
+    schema = utils.type_schema(
+        'copy-related-tag',
+        resource={'type': 'string'},
+        skip_missing={'type': 'boolean'},
+        key={'type': 'string'},
+        tags={'oneOf': [
+            {'enum': ['*']},
+            {'type': 'array'}
+        ]},
+        required=['tags', 'key', 'resource']
+    )
+    schema_alias = True
+
+    def get_permissions(self):
+        return self.manager.action_registry.get('tag').permissions
+
+    def validate(self):
+        related_resource = self.data['resource']
+        if related_resource not in aws_resources.keys():
+            raise PolicyValidationError(
+                "Error: Invalid resource type selected: %s" % related_resource
+            )
+        # ideally should never raise here since we shouldn't be applying this
+        # action to a resource if it doesn't have a tag action implemented
+        if self.manager.action_registry.get('tag') is None:
+            raise PolicyValidationError(
+                "Error: Tag action missing on resource"
+            )
+        return self
+
+    def process(self, resources):
+        related_resources = dict(
+            zip(jmespath.search('[].%s' % self.data['key'], resources), resources))
+        related_ids = set(related_resources)
+        related_tag_map = self.get_resource_tag_map(self.data['resource'], related_ids)
+
+        missing_related_tags = related_ids.difference(related_tag_map.keys())
+        if not self.data.get('skip_missing', True) and missing_related_tags:
+            raise PolicyExecutionError(
+                "Unable to find all %d %s related resources tags %d missing" % (
+                    len(related_ids), self.data['resource'], len(missing_related_tags)))
+
+        # rely on resource manager tag action implementation as it can differ between resources
+        tag_action = self.manager.action_registry.get('tag')({}, self.manager)
+        tag_action.id_key = tag_action.manager.get_model().id
+
+        stats = Counter()
+
+        for related, r in related_resources.items():
+            if related in missing_related_tags or not related_tag_map[related]:
+                stats['missing'] += 1
+            elif self.process_resource(
+                    r, related_tag_map[related], self.data['tags'], tag_action):
+                stats['tagged'] += 1
+            else:
+                stats['unchanged'] += 1
+
+        self.log.info(
+            'Tagged %d resources from related, missing-skipped %d unchanged %d',
+            stats['tagged'], stats['missing'], stats['unchanged'])
+
+    def process_resource(self, r, related_tags, tag_keys, tag_action):
+        tags = {}
+        resource_tags = {t['Key']: t['Value'] for t in r.get('Tags', [])}
+        if tag_keys == '*':
+            tags = {k: v for k, v in related_tags.items()
+                    if resource_tags.get(k) != v}
+        else:
+            tags = {k: v for k, v in related_tags.items()
+                    if k in tag_keys and resource_tags.get(k) != v}
+        if not tags:
+            return
+        tag_action.process_resource_set(
+            resource_set=[r],
+            tags=[{'Key': k, 'Value': v} for k, v in tags.items()])
+        return True
+
+    def get_resource_tag_map(self, r_type, ids):
+        """
+        Returns a mapping of {resource_id: {tagkey: tagvalue}}
+        """
+        manager = self.manager.get_resource_manager(r_type)
+        r_id = manager.resource_type.id
+        # TODO only fetch resource with the given ids.
+        return {
+            r[r_id]: {t['Key']: t['Value'] for t in r.get('Tags', [])}
+            for r in manager.resources() if r[r_id] in ids
+        }
+
+    @classmethod
+    def register_resources(klass, registry, resource_class):
+        if not resource_class.action_registry.get('tag'):
+            return
+        resource_class.action_registry.register('copy-related-tag', klass)
+
+
+aws_resources.subscribe(
+    aws_resources.EVENT_REGISTER, CopyRelatedResourceTag.register_resources)
 
 
 def universal_retry(method, ResourceARNList, **kw):
