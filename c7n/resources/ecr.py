@@ -40,6 +40,7 @@ class ECR(QueryResourceManager):
         client = local_session(self.session_factory).client('ecr')
         for r in resources:
             r['Tags'] = client.list_tags_for_resource(resourceArn=r['repositoryArn']).get('tags')
+        return resources
 
 
 ErrPolicyNotFound = 'RepositoryPolicyNotFoundException'
