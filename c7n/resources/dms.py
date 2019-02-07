@@ -321,8 +321,8 @@ class ModifyDmsEndpoint(BaseAction):
                 - type: modify-endpoint
                   SslMode: require
 
-    AWS ModifyEndpoint Documentation: 
-      https://docs.aws.amazon.com/dms/latest/APIReference/API_ModifyEndpoint.html
+    AWS ModifyEndpoint Documentation
+    https://docs.aws.amazon.com/dms/latest/APIReference/API_ModifyEndpoint.html
     """
     schema = {
         'type': 'object',

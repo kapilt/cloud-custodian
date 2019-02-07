@@ -53,7 +53,8 @@ class AutoTagUser(EventAction):
     attempting to tag it.
 
     References
-     - CloudTrail User
+
+     CloudTrail User
      https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html
     """ # NOQA
 
