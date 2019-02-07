@@ -168,8 +168,9 @@ actions.register('set-shield', SetShieldProtection)
 class AppElbMetrics(MetricsFilter):
     """Filter app load balancer by metric values.
 
-    See available metrics here:
-     https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+    See available metrics here
+    https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+
     Custodian defaults to specifying dimensions for the app elb only.
     Target Group dimension not supported atm.
     """
