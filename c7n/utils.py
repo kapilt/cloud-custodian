@@ -156,7 +156,7 @@ def type_schema(
                 'type': {'enum': type_names}}}
 
     # Ref based inheritance and additional properties don't mix well.
-    # http://goo.gl/8UyRvQ
+    # https://stackoverflow.com/questions/22689900/json-schema-allof-with-additionalproperties
     if not inherits:
         s['additionalProperties'] = False
 

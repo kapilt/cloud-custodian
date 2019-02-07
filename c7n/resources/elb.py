@@ -108,7 +108,8 @@ class SetELBShieldProtection(SetShieldProtection):
 
     def clear_stale(self, client, protections):
         # elbs arns need extra discrimination to distinguish
-        # from app load balancer arns. See https://goo.gl/pE7TQb
+        # from app load balancer arns. See
+        # https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-elb-application
         super(SetELBShieldProtection, self).clear_stale(
             client,
             [p for p in protections if p['ResourceArn'].count('/') == 1])

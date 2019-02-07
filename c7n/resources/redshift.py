@@ -354,7 +354,7 @@ class Snapshot(BaseAction):
 class EnhancedVpcRoutine(BaseAction):
     """Action to enable enhanced vpc routing on a redshift cluster
 
-    More: https://goo.gl/espcOF
+    More: https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-routing.html
 
     :example:
 

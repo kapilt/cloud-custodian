@@ -125,7 +125,8 @@ class DescribeEC2(query.DescribeSource):
         various resources, it may also silently fail to do so unless a tag
         is used as a filter.
 
-        See footnote on http://goo.gl/YozD9Q for official documentation.
+        See footnote on for official documentation.
+        https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#Using_Tags_CLI
 
         Apriori we may be using custodian to ensure tags (including
         name), so there isn't a good default to ensure that we will
@@ -233,7 +234,9 @@ class StateTransitionFilter(object):
     filtering elements (filters or actions) to the instances states
     they are valid for.
 
-    For more details see http://goo.gl/TZH9Q5
+    For more details see
+     https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html
+
     """
     valid_origin_states = ()
 

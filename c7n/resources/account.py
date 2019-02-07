@@ -780,7 +780,7 @@ class EnableDataEvents(BaseAction):
     """Ensure all buckets in account are setup to log data events.
 
     Note this works via a single trail for data events per
-    (https://goo.gl/1ux7RG).
+    https://aws.amazon.com/about-aws/whats-new/2017/09/aws-cloudtrail-enables-option-to-add-all-amazon-s3-buckets-to-data-events/
 
     This trail should NOT be used for api management events, the
     configuration here is soley for data events. If directed to create

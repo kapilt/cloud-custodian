@@ -1466,7 +1466,8 @@ class MarkForOp(Tag):
 class Suspend(Action):
     """Action to suspend ASG processes and instances
 
-    AWS ASG suspend/resume and process docs https://goo.gl/XYtKQ8
+    AWS ASG suspend/resume and process docs
+     https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html
 
     :example:
 
