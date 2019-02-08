@@ -17,7 +17,7 @@ from c7n.manager import resources
 from c7n.query import QueryResourceManager
 from c7n.utils import local_session
 from c7n.filters.vpc import SecurityGroupFilter, SubnetFilter, VpcFilter
-from c7n.tags import Tag, RemoveTag
+from c7n.tags import Tag, RemoveTag, universal_augment
 
 
 @resources.register('directory')
@@ -125,8 +125,12 @@ class CloudDirectory(QueryResourceManager):
 
     class resource_type(object):
         service = "clouddirectory"
-        enum_spec = ("list_directories", "Directories", None)
-        id = "DirectoryArn"
+        enum_spec = ("list_directories", "Directories", {'state': 'ENABLED'})
+        arn = id = "DirectoryArn"
         name = "Name"
         dimension = None
         filter_name = None
+        type = "directory"
+        universal_taggable = object()
+
+    augment = universal_augment
