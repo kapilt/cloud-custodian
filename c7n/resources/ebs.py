@@ -353,7 +353,7 @@ class SnapshotDelete(BaseAction):
 class CopySnapshot(BaseAction):
     """Copy a snapshot across regions
 
-    http://goo.gl/CP3dq
+    https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-copy-snapshot.html
 
     :example:
 
@@ -1145,11 +1145,13 @@ class Delete(BaseAction):
 class ModifyableVolume(Filter):
     """Check if an ebs volume is modifyable online.
 
-    Considerations - https://goo.gl/CBhfqV
+    Considerations:
+     https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/limitations.html
 
     Consideration Summary
       - only current instance types are supported (one exception m3.medium)
-        Current Generation Instances (2017-2) https://goo.gl/iuNjPZ
+        Current Generation Instances (2017-2)
+        https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html#current-gen-instances
 
       - older magnetic volume types are not supported
       - shrinking volumes is not supported
@@ -1244,9 +1246,12 @@ class ModifyVolume(BaseAction):
 
     **Note this action requires use of modifyable filter**
 
-    Intro Blog & Use Cases - https://goo.gl/E3u4Ue
-    Docs - https://goo.gl/DJM4T0
-    Considerations - https://goo.gl/CBhfqV
+    Intro Blog & Use Cases:
+     https://aws.amazon.com/blogs/aws/amazon-ebs-update-new-elastic-volumes-change-everything/
+    Docs:
+     https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-modify-volume.html
+    Considerations:
+     https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/limitations.html
 
     :example:
 

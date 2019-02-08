@@ -792,9 +792,7 @@ class GroupTagTrim(TagTrim):
     max_tag_count = 10
     permissions = ('autoscaling:DeleteTags',)
 
-    def process_tag_removal(self, resource, candidates):
-        client = local_session(
-            self.manager.session_factory).client('autoscaling')
+    def process_tag_removal(self, client, resource, candidates):
         tags = []
         for t in candidates:
             tags.append(
@@ -1066,10 +1064,13 @@ class RemoveTag(Action):
     def process(self, asgs):
         error = False
         key = self.data.get('key', DEFAULT_TAG)
-        with self.executor_factory(max_workers=3) as w:
+        client = local_session(self.manager.session_factory).client('autoscaling')
+
+        with self.executor_factory(max_workers=2) as w:
             futures = {}
             for asg_set in chunks(asgs, self.batch_size):
-                futures[w.submit(self.process_asg_set, asg_set, key)] = asg_set
+                futures[w.submit(
+                    self.process_asg_set, client, asg_set, key)] = asg_set
             for f in as_completed(futures):
                 asg_set = futures[f]
                 if f.exception():
@@ -1083,9 +1084,7 @@ class RemoveTag(Action):
         if error:
             raise error
 
-    def process_asg_set(self, asgs, key):
-        session = local_session(self.manager.session_factory)
-        client = session.client('autoscaling')
+    def process_asg_set(self, client, asgs, key):
         tags = [dict(
             Key=key, ResourceType='auto-scaling-group',
             ResourceId=a['AutoScalingGroupName']) for a in asgs]
@@ -1139,11 +1138,14 @@ class Tag(Action):
 
     def tag(self, asgs, key, value):
         error = None
+
+        client = local_session(self.manager.session_factory).client('autoscaling')
+
         with self.executor_factory(max_workers=3) as w:
             futures = {}
             for asg_set in chunks(asgs, self.batch_size):
                 futures[w.submit(
-                    self.process_asg_set, asg_set, key, value)] = asg_set
+                    self.process_asg_set, client, asg_set, key, value)] = asg_set
             for f in as_completed(futures):
                 asg_set = futures[f]
                 if f.exception():
@@ -1156,9 +1158,7 @@ class Tag(Action):
         if error:
             raise error
 
-    def process_asg_set(self, asgs, key, value):
-        session = local_session(self.manager.session_factory)
-        client = session.client('autoscaling')
+    def process_asg_set(self, client, asgs, key, value):
         propagate = self.data.get('propagate_launch', True)
         tags = [
             dict(Key=key, ResourceType='auto-scaling-group', Value=value,
@@ -1208,7 +1208,7 @@ class PropagateTags(Action):
             return
         if self.data.get('trim', False):
             self.instance_map = self.get_instance_map(asgs)
-        with self.executor_factory(max_workers=10) as w:
+        with self.executor_factory(max_workers=3) as w:
             instance_count = sum(list(w.map(self.process_asg, asgs)))
             self.log.info("Applied tags to %d instances" % instance_count)
 
@@ -1466,7 +1466,8 @@ class MarkForOp(Tag):
 class Suspend(Action):
     """Action to suspend ASG processes and instances
 
-    AWS ASG suspend/resume and process docs https://goo.gl/XYtKQ8
+    AWS ASG suspend/resume and process docs
+     https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html
 
     :example:
 

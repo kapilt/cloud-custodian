@@ -108,7 +108,8 @@ class SetELBShieldProtection(SetShieldProtection):
 
     def clear_stale(self, client, protections):
         # elbs arns need extra discrimination to distinguish
-        # from app load balancer arns. See https://goo.gl/pE7TQb
+        # from app load balancer arns. See
+        # https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-elb-application
         super(SetELBShieldProtection, self).clear_stale(
             client,
             [p for p in protections if p['ResourceArn'].count('/') == 1])
@@ -136,15 +137,6 @@ class TagDelayedAction(tags.TagDelayedAction):
                     days: 7
     """
 
-    batch_size = 1
-    permissions = ('elasticloadbalancing:AddTags',)
-
-    def process_resource_set(self, resource_set, tags):
-        client = local_session(self.manager.session_factory).client('elb')
-        client.add_tags(
-            LoadBalancerNames=[r['LoadBalancerName'] for r in resource_set],
-            Tags=tags)
-
 
 @actions.register('tag')
 class Tag(tags.Tag):
@@ -168,9 +160,7 @@ class Tag(tags.Tag):
     batch_size = 1
     permissions = ('elasticloadbalancing:AddTags',)
 
-    def process_resource_set(self, resource_set, tags):
-        client = local_session(
-            self.manager.session_factory).client('elb')
+    def process_resource_set(self, client, resource_set, tags):
         client.add_tags(
             LoadBalancerNames=[r['LoadBalancerName'] for r in resource_set],
             Tags=tags)
@@ -197,9 +187,7 @@ class RemoveTag(tags.RemoveTag):
     batch_size = 1
     permissions = ('elasticloadbalancing:RemoveTags',)
 
-    def process_resource_set(self, resource_set, tag_keys):
-        client = local_session(
-            self.manager.session_factory).client('elb')
+    def process_resource_set(self, client, resource_set, tag_keys):
         client.remove_tags(
             LoadBalancerNames=[r['LoadBalancerName'] for r in resource_set],
             Tags=[{'Key': k for k in tag_keys}])

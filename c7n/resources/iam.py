@@ -144,8 +144,7 @@ class UserTag(Tag):
 
     permissions = ('iam:TagUser',)
 
-    def process_resource_set(self, users, tags):
-        client = local_session(self.manager.session_factory).client('iam')
+    def process_resource_set(self, client, users, tags):
         for u in users:
             try:
                 client.tag_user(UserName=u['UserName'], Tags=tags)
@@ -159,8 +158,7 @@ class UserRemoveTag(RemoveTag):
 
     permissions = ('iam:UntagUser',)
 
-    def process_resource_set(self, users, tags):
-        client = local_session(self.manager.session_factory).client('iam')
+    def process_resource_set(self, client, users, tags):
         for u in users:
             try:
                 client.untag_user(UserName=u['UserName'], TagKeys=tags)
@@ -170,14 +168,7 @@ class UserRemoveTag(RemoveTag):
 
 @User.action_registry.register('mark-for-op')
 class UserTagDelayedAction(TagDelayedAction):
-
-    # inherit __doc__ from base class
-
-    permissions = ('iam:TagUser',)
-
-    def process_resource_set(self, users, tags):
-        tagger = self.manager.action_registry['tag']({}, self.manager)
-        tagger.process_resource_set(users, tags)
+    pass
 
 
 User.filter_registry.register('marked-for-op', TagActionFilter)
@@ -791,10 +782,12 @@ class UnusedInstanceProfiles(IamRoleUsage):
 class CredentialReport(Filter):
     """Use IAM Credential report to filter users.
 
-    The IAM Credential report ( https://goo.gl/sbEPtM ) aggregates
-    multiple pieces of information on iam users. This makes it highly
-    efficient for querying multiple aspects of a user that would
-    otherwise require per user api calls.
+    The IAM Credential report aggregates multiple pieces of
+    information on iam users. This makes it highly efficient for
+    querying multiple aspects of a user that would otherwise require
+    per user api calls.
+
+    https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html
 
     For example if we wanted to retrieve all users with mfa who have
     never used their password but have active access keys from the
