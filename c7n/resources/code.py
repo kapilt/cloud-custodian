@@ -104,7 +104,9 @@ class CodeBuildProject(QueryResourceManager):
 class DescribeBuild(DescribeSource):
 
     def augment(self, resources):
-        return universal_augment(self.manager, resources)
+        return universal_augment(
+            self.manager,
+            super(DescribeBuild, self).augment(resources))
 
 
 @CodeBuildProject.filter_registry.register('subnet')
