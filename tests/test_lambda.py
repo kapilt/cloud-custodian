@@ -16,7 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 
 from botocore.exceptions import ClientError
-from .common import BaseTest, functional, TestConfig as Config
+from .common import BaseTest, functional
 from c7n.executor import MainThreadExecutor
 from c7n.resources.awslambda import AWSLambda, ReservedConcurrency
 from c7n.mu import PythonPackageArchive
