@@ -273,7 +273,7 @@ class SetSslListenerPolicy(BaseAction):
                 if f.exception():
                     log.error(
                         "set-ssl-listener-policy error on lb:%s error:%s",
-                        futures[lb][rid], f.exception())
+                        futures[f][rid], f.exception())
                     error = f.exception()
 
         if error is not None:
