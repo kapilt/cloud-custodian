@@ -205,7 +205,6 @@ class SSLPolicyTest(BaseTest):
         session_factory = self.replay_flight_data("test_set_ssl_listener")
         self.patch(SetSslListenerPolicy, 'process_elb', lambda self, client, elb: elb.xyz)
 
-        client = session_factory().client("elb")
         policy = self.load_policy({
             "name": "test-set-ssl-listerner",
             "resource": "elb",
