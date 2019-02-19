@@ -967,9 +967,10 @@ class Start(BaseAction, StateTransitionFilter):
                 if e.response['Error']['Code'] in retryable:
                     # we maxed out on our retries
                     return True
-                if e.response['Error']['Code'] == 'IncorrectInstanceState':
+                elif e.response['Error']['Code'] == 'IncorrectInstanceState':
                     instance_ids.remove(extract_instance_id(e))
-                raise
+                else:
+                    raise
 
 
 def extract_instance_id(state_error):
