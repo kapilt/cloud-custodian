@@ -55,7 +55,7 @@ class RDSTest(BaseTest):
             {
                 "name": "rds-stop",
                 "resource": "rds",
-                "filters": [{"DBInstanceIdentifier": db_instance_id, 'Engine': 'mysql'}],
+                "filters": [{"DBInstanceIdentifier": db_instance_id}],
                 "actions": ["stop"],
             },
             session_factory=session_factory,
@@ -74,8 +74,7 @@ class RDSTest(BaseTest):
             {
                 "name": "rds-start",
                 "resource": "rds",
-                "filters": [{"DBInstanceIdentifier": db_instance_id,
-                             'Engine': 'postgres', 'MultiAz': True}],
+                "filters": [{"DBInstanceIdentifier": db_instance_id}],
                 "actions": ["start"],
             },
             session_factory=session_factory,
@@ -535,15 +534,27 @@ class RDSTest(BaseTest):
         self.assertEqual(resources[0]["c7n-rds-engine-upgrade"], "5.6.35")
 
     def test_rds_eligible_start_stop(self):
-        resource = {"DBInstanceIdentifier": "ABC", "DBInstanceStatus": "available"}
+        resource = {"DBInstanceIdentifier": "ABC",
+                    "DBInstanceStatus": "available",
+                    "Engine": "mysql"}
         self.assertTrue(rds._eligible_start_stop(resource, "available"))
 
-        resource = {"DBInstanceIdentifier": "ABC", "DBInstanceStatus": "stopped"}
+        resource = {"DBInstanceIdentifier": "ABC",
+                    "DBInstanceStatus": "stopped",
+                    "Engine": "mysql"}
         self.assertFalse(rds._eligible_start_stop(resource, "available"))
 
         resource = {
             "DBInstanceIdentifier": "ABC",
             "DBInstanceStatus": "available",
+            "Engine": "postgres",
+            "MultiAZ": True,
+        }
+        self.assertTrue(rds._eligible_start_stop(resource))
+        resource = {
+            "DBInstanceIdentifier": "ABC",
+            "DBInstanceStatus": "available",
+            "Engine": "sqlserver-ee",
             "MultiAZ": True,
         }
         self.assertFalse(rds._eligible_start_stop(resource))
@@ -551,6 +562,14 @@ class RDSTest(BaseTest):
         resource = {
             "DBInstanceIdentifier": "ABC",
             "DBInstanceStatus": "available",
+            "Engine": "docdb"
+        }
+        self.assertFalse(rds._eligible_start_stop(resource))
+
+        resource = {
+            "DBInstanceIdentifier": "ABC",
+            "DBInstanceStatus": "available",
+            "Engine": "postgres",
             "ReadReplicaDBInstanceIdentifiers": ["sbbdevslave"],
         }
         self.assertFalse(rds._eligible_start_stop(resource))
@@ -558,6 +577,7 @@ class RDSTest(BaseTest):
         resource = {
             "DBInstanceIdentifier": "ABC",
             "DBInstanceStatus": "available",
+            "Engine": "mysql",
             "ReadReplicaSourceDBInstanceIdentifier": "sbbdev",
         }
         self.assertFalse(rds._eligible_start_stop(resource))
