@@ -949,8 +949,7 @@ class Start(BaseAction, StateTransitionFilter):
         if failures:
             fail_count = sum(map(len, failures.values()))
             msg = "Could not start %d of %d instances %s" % (
-                fail_count, len(instances),
-                utils.dumps(failures))
+                fail_count, len(instances), utils.dumps(failures))
             self.log.warning(msg)
             raise RuntimeError(msg)
 
@@ -962,13 +961,16 @@ class Start(BaseAction, StateTransitionFilter):
         instance_ids = [i['InstanceId'] for i in instances]
         while instance_ids:
             try:
-                return retry(client.start_instances, InstanceIds=instance_ids)
+                result = retry(client.start_instances, InstanceIds=instance_ids)
+                break
             except ClientError as e:
                 if e.response['Error']['Code'] in retryable:
                     return True
                 if e.response['Error']['Code'] == 'IncorrectInstanceState':
                     instance_ids.remove(extract_instance_id(e))
                 raise
+        return [i for i in result['StartingInstances']
+                if i['CurrentState']['Name'] not in ('pending', 'running')]
 
 
 def extract_instance_id(state_error):
