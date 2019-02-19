@@ -475,11 +475,17 @@ class TagTrim(tags.TagTrim):
 
 
 def _eligible_start_stop(db, state="available"):
-
+    # See conditions noted here
+    # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html
+    # Note that this doesn't really specify what happens for all the nosql engines
+    # that are available as rds engines.
     if db.get('DBInstanceStatus') != state:
         return False
 
-    if db.get('MultiAZ'):
+    if db.get('MultiAZ') and db['Engine'].startswith('sqlserver-'):
+        return False
+
+    if db['Engine'] in ('docdb', 'neptune'):
         return False
 
     if db.get('ReadReplicaDBInstanceIdentifiers'):
