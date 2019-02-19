@@ -867,7 +867,7 @@ class TestStart(BaseTest):
         })
 
         client = mock.MagicMock()
-        client.return_value = ClientError(
+        client.start_instances.return_value = ClientError(
             {'Error': {
                 'Code': 'IncorrectInstanceState',
                 'Message': "The instance 'i-abc123' is not in a state from which it can be started"

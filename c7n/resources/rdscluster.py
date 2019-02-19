@@ -205,6 +205,16 @@ class SubnetFilter(net_filters.SubnetFilter):
 filters.register('network-location', net_filters.NetworkLocation)
 
 
+def _eligible_start_stop(db_cluster, state="available"):
+    # See conditions noted here
+    # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html
+    # Note that this doesn't really specify what happens for all the nosql engines
+    # that are available as rds engines.
+    if db_cluster.get('DBInstanceStatus') != state:
+        return False
+    return True
+
+
 @actions.register('delete')
 class Delete(BaseAction):
     """Action to delete a RDS cluster
