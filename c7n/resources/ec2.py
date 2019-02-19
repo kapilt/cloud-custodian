@@ -44,6 +44,8 @@ from c7n import utils
 from c7n.utils import type_schema, filter_empty
 
 
+RE_ERROR_INSTANCE_ID = re.compile("'(?P<instance_id>i-.*?)'")
+
 filters = FilterRegistry('ec2.filters')
 actions = ActionRegistry('ec2.actions')
 
@@ -958,12 +960,25 @@ class Start(BaseAction, StateTransitionFilter):
                      'Client.RequestLimitExceeded'),
         retry = utils.get_retry(retryable, max_attempts=5)
         instance_ids = [i['InstanceId'] for i in instances]
-        try:
-            retry(client.start_instances, InstanceIds=instance_ids)
-        except ClientError as e:
-            if e.response['Error']['Code'] in retryable:
-                return True
-            raise
+        while instance_ids:
+            try:
+                return retry(client.start_instances, InstanceIds=instance_ids)
+            except ClientError as e:
+                if e.response['Error']['Code'] in retryable:
+                    return True
+                if e.response['Error']['Code'] == 'IncorrectInstanceState':
+                    instance_ids.remove(extract_instance_id(e))
+                raise
+
+def extract_instance_id(state_error):
+    "Extract an instance id from an error"
+    instance_id = None
+    match = RE_ERROR_INSTANCE_ID.search(str(state_error))
+    if match:
+        instance_id = match.groupdict().get('instance_id')
+    if match is None or instance_id is None:
+        raise ValueError("Could not extract instance id from error: %s" % state_error)
+    return instance_id
 
 
 @actions.register('resize')
@@ -1102,17 +1117,12 @@ class Stop(BaseAction, StateTransitionFilter):
         return instances
 
     def _run_instances_op(self, op, instance_ids):
-        while True:
+        while instance_ids:
             try:
                 return self.manager.retry(op, InstanceIds=instance_ids)
             except ClientError as e:
                 if e.response['Error']['Code'] == 'IncorrectInstanceState':
-                    msg = e.response['Error']['Message']
-                    e_instance_id = msg[msg.find("'") + 1:msg.rfind("'")]
-                    instance_ids.remove(e_instance_id)
-                    if not instance_ids:
-                        return
-                    continue
+                    instance_ids.remove(extract_instance_id(e))
                 raise
 
 

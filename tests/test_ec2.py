@@ -844,6 +844,20 @@ class TestReboot(BaseTest):
 
 class TestStart(BaseTest):
 
+    def test_invalid_state_extract(self):
+        self.assertEqual(
+            ec2.extract_instance_id(
+                ("An error occurred (IncorrectInstanceState) when calling "
+                 "the StartInstances operation: The instance 'i-abc123' is "
+                 "not in a state from which it can be started.")),
+            'i-abc123')
+        self.assertRaises(
+            ValueError,
+            ec2.extract_instance_id,
+            ("An error occurred (IncorrectInstanceState) when calling "
+             "the StartInstances operation: The instance is "
+             "not in a state from which it can be started."))
+
     def test_ec2_start(self):
         session_factory = self.replay_flight_data("test_ec2_start")
         policy = self.load_policy(
