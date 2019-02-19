@@ -970,6 +970,7 @@ class Start(BaseAction, StateTransitionFilter):
                     instance_ids.remove(extract_instance_id(e))
                 raise
 
+
 def extract_instance_id(state_error):
     "Extract an instance id from an error"
     instance_id = None
