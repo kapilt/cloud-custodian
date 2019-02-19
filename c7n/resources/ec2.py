@@ -961,7 +961,7 @@ class Start(BaseAction, StateTransitionFilter):
         instance_ids = [i['InstanceId'] for i in instances]
         while instance_ids:
             try:
-                result = retry(client.start_instances, InstanceIds=instance_ids)
+                retry(client.start_instances, InstanceIds=instance_ids)
                 break
             except ClientError as e:
                 if e.response['Error']['Code'] in retryable:

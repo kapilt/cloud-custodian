@@ -877,7 +877,7 @@ class TestStart(BaseTest):
         self.assertEqual(
             start_action.process_instance_set(
                 client, [{'InstanceId': 'i-08270b9cfb568a1c4'}], 'm5.xlarge', 'us-east-1a'),
-            [])
+            None)
 
     def test_ec2_start(self):
         session_factory = self.replay_flight_data("test_ec2_start")
