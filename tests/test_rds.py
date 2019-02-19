@@ -55,7 +55,7 @@ class RDSTest(BaseTest):
             {
                 "name": "rds-stop",
                 "resource": "rds",
-                "filters": [{"DBInstanceIdentifier": db_instance_id}],
+                "filters": [{"DBInstanceIdentifier": db_instance_id, 'Engine': 'mysql'}],
                 "actions": ["stop"],
             },
             session_factory=session_factory,
@@ -74,7 +74,8 @@ class RDSTest(BaseTest):
             {
                 "name": "rds-start",
                 "resource": "rds",
-                "filters": [{"DBInstanceIdentifier": db_instance_id}],
+                "filters": [{"DBInstanceIdentifier": db_instance_id,
+                             'Engine': 'postgres', 'MultiAz': True}],
                 "actions": ["start"],
             },
             session_factory=session_factory,
