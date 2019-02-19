@@ -23,7 +23,7 @@ import jmespath
 from mock import mock
 from jsonschema.exceptions import ValidationError
 
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyValidationError, ClientError
 from c7n.resources import ec2
 from c7n.resources.ec2 import actions, QueryFilter
 from c7n import tags, utils
@@ -857,6 +857,27 @@ class TestStart(BaseTest):
             ("An error occurred (IncorrectInstanceState) when calling "
              "the StartInstances operation: The instance is "
              "not in a state from which it can be started."))
+
+    def test_ec2_start_handle_invalid_state(self):
+        policy = self.load_policy({
+            "name": "ec2-test-start",
+            "resource": "ec2",
+            "filters": [],
+            "actions": [{"type": "start"}],
+        })
+
+        client = mock.MagicMock()
+        client.return_value = ClientError(
+            {'Error': {
+                'Code': 'IncorrectInstanceState',
+                'Message': "The instance 'i-abc123' is not in a state from which it can be started"
+            }}, 'StartInstances')
+
+        start_action = policy.resource_manager.actions[0]
+        self.assertEqual(
+            start_action.process_instance_set(
+                client, [{'InstanceId': 'i-08270b9cfb568a1c4'}], 'm5.xlarge', 'us-east-1a'),
+            [])
 
     def test_ec2_start(self):
         session_factory = self.replay_flight_data("test_ec2_start")

@@ -965,12 +965,11 @@ class Start(BaseAction, StateTransitionFilter):
                 break
             except ClientError as e:
                 if e.response['Error']['Code'] in retryable:
+                    # we maxed out on our retries
                     return True
                 if e.response['Error']['Code'] == 'IncorrectInstanceState':
                     instance_ids.remove(extract_instance_id(e))
                 raise
-        return [i for i in result['StartingInstances']
-                if i['CurrentState']['Name'] not in ('pending', 'running')]
 
 
 def extract_instance_id(state_error):
