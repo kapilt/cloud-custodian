@@ -82,7 +82,7 @@ class Role(QueryResourceManager):
         service = 'iam'
         type = 'role'
         enum_spec = ('list_roles', 'Roles', None)
-        detail_spec = None
+        detail_spec = ('get_role', 'RoleName', 'RoleName', 'Role')
         filter_name = None
         id = name = 'RoleName'
         date = 'CreateDate'
@@ -92,10 +92,18 @@ class Role(QueryResourceManager):
         global_resource = True
         arn = 'Arn'
 
-    def get_resources(self, resource_ids, cache=True):
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeRole(self)
+        return super(Role, self).get_source(source_type)
+
+
+class DescribeRole(DescribeSource):
+
+    def get_resources(self, resource_ids, cache=True, augment=False):
         """For IAM Roles on events, resource ids are role names."""
         resources = []
-        client = local_session(self.session_factory).client('iam')
+        client = local_session(self.manager.session_factory).client('iam')
         for rid in resource_ids:
             try:
                 resources.append(client.get_role(RoleName=rid)['Role'])
