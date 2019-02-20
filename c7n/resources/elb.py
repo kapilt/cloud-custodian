@@ -219,14 +219,10 @@ class Delete(BaseAction):
     permissions = ('elasticloadbalancing:DeleteLoadBalancer',)
 
     def process(self, load_balancers):
-        with self.executor_factory(max_workers=2) as w:
-            list(w.map(self.process_elb, load_balancers))
-
-    def process_elb(self, elb):
         client = local_session(self.manager.session_factory).client('elb')
-        self.manager.retry(
-            client.delete_load_balancer,
-            LoadBalancerName=elb['LoadBalancerName'])
+        for elb in load_balancers:
+            self.manager.retry(
+                client.delete_load_balancer, LoadBalancerName=elb['LoadBalancerName'])
 
 
 @actions.register('set-ssl-listener-policy')
