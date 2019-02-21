@@ -328,6 +328,9 @@ class Stop(BaseAction):
     """Stop a running db cluster
     """
 
+    schema = type_schema('stop')
+    permissions = ('rds:StopDBCluster',)
+
     def process(self, clusters):
         client = local_session(self.manager.session_factory).client('rds')
         for c in clusters:
@@ -341,6 +344,9 @@ class Stop(BaseAction):
 class Start(BaseAction):
     """Start a stopped db cluster
     """
+
+    schema = type_schema('start')
+    permissions = ('rds:StartDBCluster',)
 
     def process(self, clusters):
         client = local_session(self.manager.session_factory).client('rds')
