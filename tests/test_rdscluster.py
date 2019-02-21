@@ -18,6 +18,8 @@ from c7n.resources.rdscluster import RDSCluster
 
 from .common import BaseTest
 
+import time
+
 
 class RDSClusterTest(BaseTest):
 
@@ -25,7 +27,7 @@ class RDSClusterTest(BaseTest):
         # This exists because we added tag augmentation after eight other tests
         # were created and I did not want to re-create the state to re-record
         # them with the extra API call. If those get re-recorded we can remove
-        # this.
+        # this. -scotwk
         self.patch(RDSCluster, "augment", lambda x, y: y)
 
     def test_rdscluster_security_group(self):
@@ -284,6 +286,26 @@ class RDSClusterTest(BaseTest):
         tags = client.list_tags_for_resource(ResourceName=arn)
         tag_map = {t["Key"]: t["Value"] for t in tags["TagList"]}
         self.assertFalse("custodian_next" in tag_map)
+
+    def test_stop(self):
+        factory = self.replay_flight_data("test_rdscluster_stop")
+        p = self.load_policy(
+            {"name": "rdscluster",
+             "resource": "rds-cluster",
+             "filters": [{'DBClusterIdentifier': 'mytest'}],
+             'actions': ['stop']},
+            session_factory=factory, config={'account_id': '644160558196'})
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['Status'], 'available')
+        client = factory().client('rds')
+
+        if self.recording:
+            time.sleep(2)
+        
+        cluster = client.describe_db_clusters(
+            DBClusterIdentifier='mytest').get('DBClusters')[0]
+        self.assertEqual(cluster['Status'], 'stopping')
 
 
 class RDSClusterSnapshotTest(BaseTest):
