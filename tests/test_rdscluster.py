@@ -294,7 +294,7 @@ class RDSClusterTest(BaseTest):
 
         # unspecified
         self.assertRaises(
-            ValueError, _run_cluster_method, foobar,  {'DBClusterIdentifier': 'mytest'})
+            ValueError, _run_cluster_method, foobar, {'DBClusterIdentifier': 'mytest'})
 
         # ignored
         try:
