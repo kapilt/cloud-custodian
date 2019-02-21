@@ -357,7 +357,7 @@ class Start(BaseAction):
                 client.exceptions.InvalidDBClusterStateFault)
 
 
-def _run_cluster_method(method, params, ignore, warn, method_name=""):
+def _run_cluster_method(method, params, ignore=(), warn=(), method_name=""):
     try:
         method(**params)
     except ignore:
