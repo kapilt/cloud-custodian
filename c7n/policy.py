@@ -682,7 +682,10 @@ class ConfigRuleMode(LambdaMode):
     """
 
     cfg_event = None
-    schema = utils.type_schema('config-rule', rinherit=LambdaMode.schema)
+    schema = utils.type_schema(
+        'config-rule',
+        rinherit=LambdaMode.schema,
+        **{"match-compliant": {'type': 'boolean'}})
 
     def resolve_resources(self, event):
         source = self.policy.resource_manager.get_source('config')
