@@ -14,24 +14,32 @@ provide the necessary permissions.
 Filters
 -------
 - Standard Value Filter (see :ref:`filters`)
+    - Model: `RoleAssignment <https://docs.microsoft.com/en-us/python/api/azure.mgmt.authorization.models.roleassignment?view=azure-python>`_
+    - Model: `RoleDefinition <https://docs.microsoft.com/en-us/python/api/azure.mgmt.authorization.models.roledefinition?view=azure-python>`_
 
-``role``
+- ``role``
   Filters Role Assignments based on name of Role Definition
 
   .. c7n-schema:: RoleFilter
       :module: c7n_azure.resources.access_control
 
-``resource-access``
+- ``resource-access``
   Filter Role Assignments based on access to an azure resource
 
   .. c7n-schema:: ResourceAccessFilter
       :module: c7n_azure.resources.access_control
 
+- ``scope``
+  Filter Role Assignments by scope access
+
+  .. c7n-schema:: ScopeFilter
+      :module: c7n_azure.resources.access_control
+
 
 Actions
 -------
-
-``delete``
+- ARM Resource Actions (see :ref:`azure_genericarmaction`)
+- ``delete``
   Deletes role assignment
 
 Example Policies
@@ -106,8 +114,6 @@ they are not returned in this filter.
 
     policies:
         - name: role-definition-permissions
-          description: |
-            Adds a tag to all virtual machines
           resource: azure.roledefinition
           filters:
             - type: value
@@ -131,3 +137,56 @@ is Owner.
               value: custodian@example.com
          actions:
             - type: delete
+
+Return all role assignments with the Subscription level scope access.
+
+.. code-block:: yaml
+
+    policies:
+       - name: assignments-subscription-scope
+         resource: azure.roleassignment
+         filters:
+            - type: scope
+              value: subscription
+
+Return all role assignments with the Resource Group level scope access.
+
+.. code-block:: yaml
+
+    policies:
+       - name: assignments-resource-group-scope
+         resource: azure.roleassignment
+         filters:
+            - type: scope
+              value: resource-group
+
+Return all role assignments with scope level access other than Subscription or Resource Group.
+
+.. code-block:: yaml
+
+    policies:
+       - name: assignments-other-level-scope
+         resource: azure.roleassignment
+         filters:
+            - not: 
+              - type: scope
+                value: subscription
+            - not:
+              - type: scope
+                value: resource-group
+
+Return all service principal role assignments with the Subscription level scope access.
+
+.. code-block:: yaml
+
+    policies:
+       - name: service-principal-assignments-subscription-scope
+         resource: azure.roleassignment
+         filters:
+            - type: value
+              key: aadType
+              op: eq
+              value: ServicePrincipal
+            - type: scope
+              value: subscription
+            

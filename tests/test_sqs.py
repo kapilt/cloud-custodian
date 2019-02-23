@@ -249,13 +249,11 @@ class TestSqsAction(BaseTest):
             },
             session_factory=factory,
         )
-
         resources = p.run()
         self.assertEqual(len(resources), 1)
         client = factory().client("sqs")
-        d2 = client.get_queue_attributes(QueueUrl=queue_url, AttributeNames=["All"])[
-            "Attributes"
-        ]
+        d2 = client.get_queue_attributes(
+            QueueUrl=queue_url, AttributeNames=["All"])["Attributes"]
         self.assertNotIn("Policy", d2)
 
     @functional
@@ -265,6 +263,9 @@ class TestSqsAction(BaseTest):
         name = "test-sqs"
         queue_url = client.create_queue(QueueName=name)["QueueUrl"]
         self.addCleanup(client.delete_queue, QueueUrl=queue_url)
+
+        if self.recording:
+            time.sleep(15)
 
         p = self.load_policy(
             {
@@ -292,9 +293,12 @@ class TestSqsAction(BaseTest):
     def test_sqs_tag(self):
         session_factory = self.replay_flight_data("test_sqs_tags")
         client = session_factory().client("sqs")
-        name = "test-sqs"
+        name = "test-sqs-5"
         queue_url = client.create_queue(QueueName=name)["QueueUrl"]
         self.addCleanup(client.delete_queue, QueueUrl=queue_url)
+
+        if self.recording:
+            time.sleep(15)
 
         p = self.load_policy(
             {
@@ -321,12 +325,15 @@ class TestSqsAction(BaseTest):
     def test_sqs_remove_tag(self):
         session_factory = self.replay_flight_data("test_sqs_remove_tag")
         client = session_factory().client("sqs")
-        name = "test-sqs"
+        name = "test-sqs-4"
         queue_url = client.create_queue(QueueName=name)["QueueUrl"]
         client.tag_queue(
             QueueUrl=queue_url, Tags={"remove-this-tag": "tag to be removed"}
         )
         self.addCleanup(client.delete_queue, QueueUrl=queue_url)
+
+        if self.recording:
+            time.sleep(15)
 
         p = self.load_policy(
             {

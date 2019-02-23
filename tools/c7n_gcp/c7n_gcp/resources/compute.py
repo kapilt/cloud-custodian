@@ -20,6 +20,8 @@ from c7n_gcp.actions import MethodAction
 from c7n_gcp.provider import resources
 from c7n_gcp.query import QueryResourceManager, TypeInfo
 
+from c7n.filters.offhours import OffHour, OnHour
+
 
 @resources.register('instance')
 class Instance(QueryResourceManager):
@@ -31,6 +33,30 @@ class Instance(QueryResourceManager):
         enum_spec = ('aggregatedList', 'items.*.instances[]', None)
         scope = 'project'
 
+        @staticmethod
+        def get(client, resource_info):
+            # The api docs for compute instance get are wrong,
+            # they spell instance as resourceId
+            return client.execute_command(
+                'get', {'project': resource_info['project_id'],
+                        'zone': resource_info['zone'],
+                        'instance': resource_info[
+                            'resourceName'].rsplit('/', 1)[-1]})
+
+
+@Instance.filter_registry.register('offhour')
+class InstanceOffHour(OffHour):
+
+    def get_tag_value(self, instance):
+        return instance.get('labels', {}).get(self.tag_key)
+
+
+@Instance.filter_registry.register('onhour')
+class InstanceOnHour(OnHour):
+
+    def get_tag_value(self, instance):
+        return instance.get('labels', {}).get(self.tag_key)
+
 
 class InstanceAction(MethodAction):
 
@@ -38,6 +64,16 @@ class InstanceAction(MethodAction):
         project, zone, instance = self.path_param_re.match(
             resource['selfLink']).groups()
         return {'project': project, 'zone': zone, 'instance': instance}
+
+
+@Instance.action_registry.register('start')
+class Start(InstanceAction):
+
+    schema = type_schema('start')
+    method_spec = {'op': 'start'}
+    path_param_re = re.compile(
+        '.*?/projects/(.*?)/zones/(.*?)/instances/(.*)')
+    attr_filter = ('status', ('TERMINATED',))
 
 
 @Instance.action_registry.register('stop')
@@ -67,6 +103,12 @@ class Image(QueryResourceManager):
         version = 'v1'
         component = 'images'
 
+        @staticmethod
+        def get(client, resource_info):
+            return client.execute_command(
+                'get', {'project': resource_info['project_id'],
+                        'resourceId': resource_info['image_id']})
+
 
 @resources.register('disk')
 class Disk(QueryResourceManager):
@@ -77,3 +119,51 @@ class Disk(QueryResourceManager):
         component = 'disks'
         scope = 'zone'
         enum_spec = ('aggregatedList', 'items.*.disks[]', None)
+
+        @staticmethod
+        def get(client, resource_info):
+            return client.execute_command(
+                'get', {'project': resource_info['project_id'],
+                        'zone': resource_info['zone'],
+                        'resourceId': resource_info['disk_id']})
+
+
+@Disk.action_registry.register('snapshot')
+class DiskSnapshot(MethodAction):
+
+    schema = type_schema('snapshot')
+    method_spec = {'op': 'createSnapshot'}
+    path_param_re = re.compile(
+        '.*?/projects/(.*?)/zones/(.*?)/instances/(.*)')
+    attr_filter = ('status', ('RUNNING',))
+
+
+@resources.register('snapshot')
+class Snapshot(QueryResourceManager):
+
+    class resource_type(TypeInfo):
+        service = 'compute'
+        version = 'v1'
+        component = 'snapshots'
+        enum_spec = ('list', 'items[]', None)
+
+        @staticmethod
+        def get(client, resource_info):
+            return client.execute_command(
+                'get', {'project': resource_info['project_id'],
+                        'snapshot_id': resource_info['snapshot_id']})
+
+
+@Snapshot.action_registry.register('delete')
+class DeleteSnapshot(MethodAction):
+
+    schema = type_schema('delete')
+    method_spec = {'op': 'delete'}
+    attr_filter = ('status', ('READY', 'UPLOADING'))
+    path_param_re = re.compile('.*?/projects/(.*?)/global/snapshots/(.*)')
+
+    def get_resource_params(self, m, r):
+        project, snapshot_id = self.path_param_re.match(r['selfLink']).groups()
+        # Docs are wrong :-(
+        # https://cloud.google.com/compute/docs/reference/rest/v1/snapshots/delete
+        return {'project': project, 'snapshot': snapshot_id}

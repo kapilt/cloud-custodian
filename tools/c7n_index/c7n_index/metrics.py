@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 
 import datetime
 import logging
@@ -547,7 +548,7 @@ def index_resources(
 if __name__ == '__main__':
     try:
         cli()
-    except Exception as e:
+    except Exception:
         import traceback, pdb, sys
-        print traceback.print_exc()
+        print(traceback.print_exc())
         pdb.post_mortem(sys.exc_info()[-1])

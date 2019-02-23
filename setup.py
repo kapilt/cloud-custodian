@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name="c7n",
-    version='0.8.28.2',
+    version='0.8.41.0',
     description="Cloud Custodian - Policy Rules Engine",
     long_description=read('README.rst'),
     classifiers=[
@@ -23,12 +23,15 @@ setup(
         'console_scripts': [
             'custodian = c7n.cli:main']},
     install_requires=[
-        "boto3>=1.7.48",
-        "botocore>=1.10.48",
-        "pyyaml",
+        "boto3>=1.9.94",
+        "botocore>=1.12.94",
+        "python-dateutil>=2.6,<3.0.0",
+        "PyYAML>=4.2b4",
         "jsonschema",
         "jsonpatch>=1.21",
         "argcomplete",
-        "tabulate"
+# Pinned due to azure-core-cli pin on tabulate
+# https://github.com/Azure/azure-cli/issues/8567
+        "tabulate==0.8.2"
     ],
 )
