@@ -92,25 +92,6 @@ class Role(QueryResourceManager):
         global_resource = True
         arn = 'Arn'
 
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeRole(self)
-        return super(Role, self).get_source(source_type)
-
-
-class DescribeRole(DescribeSource):
-
-    def get_resources(self, resource_ids, cache=True, augment=False):
-        """For IAM Roles on events, resource ids are role names."""
-        resources = []
-        client = local_session(self.manager.session_factory).client('iam')
-        for rid in resource_ids:
-            try:
-                resources.append(client.get_role(RoleName=rid)['Role'])
-            except client.exceptions.NoSuchEntityException:
-                continue
-        return resources
-
 
 @resources.register('iam-user')
 class User(QueryResourceManager):
@@ -128,24 +109,6 @@ class User(QueryResourceManager):
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'
-
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeUser(self)
-        return super(User, self).get_source(source_type)
-
-
-class DescribeUser(DescribeSource):
-
-    def get_resources(self, resource_ids, cache=True):
-        client = local_session(self.manager.session_factory).client('iam')
-        resources = []
-        for rid in resource_ids:
-            try:
-                resources.append(client.get_user(UserName=rid).get('User'))
-            except client.exceptions.NoSuchEntityException:
-                continue
-        return resources
 
 
 @User.action_registry.register('tag')
