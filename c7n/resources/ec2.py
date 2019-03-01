@@ -1788,12 +1788,13 @@ class LaunchTemplate(query.QueryResourceManager):
 
     def augment(self, resources):
         client = utils.local_session(
-            self.manager.session_factory).client('ec2')
+            self.session_factory).client('ec2')
         template_versions = []
         for r in resources:
             template_versions.extend(
                 client.describe_launch_template_versions(
-                    LaunchTemplateId=r['LaunchTemplateId']))
+                    LaunchTemplateId=r['LaunchTemplateId']).get(
+                        'LaunchTemplateVersions', ()))
         return template_versions
 
     def get_resources(self, rids, cache=True):
@@ -1829,10 +1830,12 @@ class LaunchTemplate(query.QueryResourceManager):
         results = []
         # We may end up fetching duplicates on $Latest and $Version
         for tid, tversions in t_versions.items():
-            for tversion, t in zip(
-                tversions, client.describe_launch_template_versions(
-                    LaunchTemplateId=tid, Versions=tversions).get(
-                        'LaunchTemplateVersions')):
+            ltv = client.describe_launch_template_versions(
+                LaunchTemplateId=tid, Versions=tversions).get(
+                    'LaunchTemplateVersions')
+            if not tversions:
+                tversions = [str(t['VersionNumber']) for t in ltv]
+            for tversion, t in zip(tversions, ltv):
                 if not tversion.isdigit():
                     t['c7n:VersionAlias'] = tversion
                 results.append(t)
