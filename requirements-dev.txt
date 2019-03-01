@@ -4,7 +4,7 @@
 coverage==4.5.2
 mock==2.0.0
 placebo==0.9.0
-flake8==3.7.6
+flake8==3.7.7
 pytest==4.3.0
 pytest-xdist==1.26.1
 pytest-cov==2.6.1
@@ -16,7 +16,7 @@ six >= 1.12.0
 
 # Optional feature testing in c7n
 psutil==5.5.1
-aws_xray_sdk==2.3.0
+aws_xray_sdk==2.4.1
 
 -r tools/c7n_sphinxext/requirements.txt
 -r tools/c7n_mailer/requirements.txt

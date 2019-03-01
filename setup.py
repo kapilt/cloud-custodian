@@ -32,6 +32,6 @@ setup(
         "argcomplete",
 # Pinned due to azure-core-cli pin on tabulate
 # https://github.com/Azure/azure-cli/issues/8567
-        "tabulate==0.8.2"
+        "tabulate==0.8.3"
     ],
 )
