@@ -64,7 +64,17 @@ class SnapshotQueryParse(BaseTest):
                 {'Name': 'snapshot-id', 'Values': [1]}])
 
 
-class SnapshotDescribeError(BaseTest):
+class SnapshotErrorHandler(BaseTest):
+
+    def test_remove_snapshot(self):
+        snaps = [{'SnapshotId': 'a'}, {'SnapshotId': 'b'}, {'SnapshotId': 'c'}]
+
+        t1 = list(snaps)
+        ErrorHandler.remove_snapshot('c', t1)
+        self.assertEqual([t['SnapshotId'] for t in t1], ['a', 'b'])
+
+        ErrorHandler.remove_snapshot('d', snaps)
+        self.assertEqual(len(snaps), 3)
 
     def test_get_bad_snapshot_malformed(self):
         operation_name = "DescribeSnapshots"
