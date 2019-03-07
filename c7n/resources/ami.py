@@ -24,7 +24,7 @@ from c7n.exceptions import ClientError
 from c7n.filters import (
     AgeFilter, Filter, OPERATORS, CrossAccountAccessFilter)
 from c7n.manager import resources
-from c7n.query import QueryResourceManager
+from c7n.query import QueryResourceManager, DescribeSource
 from c7n.resolver import ValuesFrom
 from c7n.utils import local_session, type_schema, chunks
 
@@ -53,6 +53,46 @@ class AMI(QueryResourceManager):
         if query.get('Owners') is None:
             query['Owners'] = ['self']
         return super(AMI, self).resources(query=query)
+
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeImageSource(self)
+        return super(AMI, self).get_source(source_type)
+
+
+class DescribeImageSource(DescribeSource):
+
+    def get_resources(self, ids, cache=True):
+        while ids:
+            try:
+                return super(DescribeImageSource, self).get_resources(ids, cache)
+            except ClientError as e:
+                bad_ami_ids = ErrorHandler.extract_bad_ami(e)
+                if bad_ami_ids:
+                    for b in bad_ami_ids:
+                        ids.remove(b)
+                    continue
+                raise
+        return []
+
+
+class ErrorHandler(object):
+
+    @staticmethod
+    def extract_bad_ami(e):
+        """Handle various client side errors when describing images"""
+        msg = e.response['Error']['Message']
+        error = e.response['Error']['Code']
+        e_ami_ids = None
+        if error == 'InvalidAMIID.NotFound':
+            e_ami_ids = [
+                e_ami_id.strip() for e_ami_id
+                in msg[msg.find("'[") + 2:msg.rfind("]'")].split(',')]
+            log.warning("Image not found %s" % e_ami_ids)
+        elif error == 'InvalidAMIID.Malformed':
+            e_ami_ids = [msg[msg.find('"') + 1:msg.rfind('"')]]
+            log.warning("Image id malformed %s" % e_ami_ids)
+        return e_ami_ids
 
 
 @AMI.action_registry.register('deregister')

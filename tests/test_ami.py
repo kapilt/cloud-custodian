@@ -16,6 +16,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import jmespath
 
 from c7n.exceptions import ClientError
+from c7n.resources.ami import ErrorHandler
+from c7n.query import DescribeSource
 from .common import BaseTest
 
 
@@ -36,6 +38,76 @@ class TestAMI(BaseTest):
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
+
+    def test_err_ami(self):
+        factory = self.replay_flight_data("test_ami_not_found_err")
+        ami_id = 'ami-123f000eee1f9f654'
+        good_ami_id = 'ami-041151726c89bed87'
+        error_response = {"Error": {
+            "Message": "The image id '[%s]' does not exist" % (ami_id),
+            "Code": "InvalidAMIID.NotFound"}}
+
+        responses = [ClientError(error_response, "DescribeSnapshots")]
+
+        def base_get_resources(self, ids, cache=True):
+            if responses:
+                raise responses.pop()
+            return factory().client('ec2').describe_images(ImageIds=ids).get('Images')
+
+        self.patch(DescribeSource, 'get_resources', base_get_resources)
+
+        p = self.load_policy(
+            {'name': 'bad-ami', 'resource': 'ami'},
+            session_factory=factory)
+        resources = p.resource_manager.get_resources([ami_id, good_ami_id])
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['ImageId'], good_ami_id)
+
+    def test_err_get_ami_invalid(self):
+        operation_name = "DescribeSnapshots"
+        error_response = {
+            "Error": {
+                "Message": 'Invalid id: "ami123f000eee1f9f654"',
+                "Code": "InvalidAMIID.Malformed",
+            }
+        }
+        e = ClientError(error_response, operation_name)
+        ami = ErrorHandler.extract_bad_ami(e)
+        self.assertEqual(ami, ["ami123f000eee1f9f654"])
+
+        operation_name = "DescribeSnapshots"
+        error_response = {
+            "Error": {
+                "Message": 'Invalid id: "ami-1234567890abcdef0"',
+                "Code": "InvalidAMIID.Malformed",
+            }
+        }
+        e = ClientError(error_response, operation_name)
+        ami = ErrorHandler.extract_bad_ami(e)
+        self.assertEqual(ami, ["ami-1234567890abcdef0"])
+
+    def test_err_get_ami_notfound(self):
+        operation_name = "DescribeSnapshots"
+        error_response = {
+            "Error": {
+                "Message": "The image id '[ami-ffffffff]' does not exist",
+                "Code": "InvalidAMIID.NotFound"
+            }
+        }
+        e = ClientError(error_response, operation_name)
+        snap = ErrorHandler.extract_bad_ami(e)
+        self.assertEqual(snap, ["ami-ffffffff"])
+
+        operation_name = "DescribeSnapshots"
+        error_response = {
+            "Error": {
+                "Message": "The image id '[ami-11111111, ami-ffffffff]' does not exist",
+                "Code": "InvalidAMIID.NotFound"
+            }
+        }
+        e = ClientError(error_response, operation_name)
+        snap = ErrorHandler.extract_bad_ami(e)
+        self.assertEqual(snap, ["ami-11111111", "ami-ffffffff"])
 
     def test_deregister_delete_snaps(self):
         factory = self.replay_flight_data('test_ami_deregister_delete_snap')
