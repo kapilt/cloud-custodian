@@ -306,7 +306,7 @@ class SetS3Logging(BaseAction):
                 resource: app-elb
                 filters:
                   - type: value
-                    key: Attributes."access_logs.s3.enabled"
+                    key: "Attributes.access_logs.s3.enabled"
                     value: False
                 actions:
                   - type: enable-s3-logging

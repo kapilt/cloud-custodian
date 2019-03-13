@@ -868,7 +868,8 @@ class Policy(object):
             'source_bucket_name': '{source_bucket_name}',
             'target_bucket_name': '{target_bucket_name}',
             'target_prefix': '{target_prefix}',
-            'LoadBalancerName': '{LoadBalancerName}'
+            'LoadBalancerName': '{LoadBalancerName}',
+            'AccountId': '{AccountId}'
         })
         return variables
 

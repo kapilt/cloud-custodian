@@ -68,6 +68,9 @@ class ASG(query.QueryResourceManager):
 
     retry = staticmethod(get_retry(('ResourceInUse', 'Throttling',)))
 
+    def get_launch_info(self):
+        return LaunchInfo(self)
+
 
 ASG.filter_registry.register('offhour', OffHour)
 ASG.filter_registry.register('onhour', OnHour)
@@ -83,10 +86,12 @@ class LaunchInfo(object):
 
     def __init__(self, manager):
         self.manager = manager
+        self._image_cache = None
 
     def initialize(self, asgs):
         self.templates = self.get_launch_templates(asgs)
         self.configs = self.get_launch_configs(asgs)
+        self._image_cache = None
         return self
 
     def get_launch_templates(self, asgs):
@@ -152,27 +157,47 @@ class LaunchInfo(object):
         return image_ids
 
     def get_image_map(self):
-        # The describe_images api historically would return errors
-        # on an unknown ami in the set of images ids passed in.
-        # It now just silently drops those items, which is actually
-        # ideally for our use case.
-        #
-        # We used to do some balancing of picking up our asgs using
-        # the resource manager abstraction to take advantage of
-        # resource caching, but then we needed to do separate api
-        # calls to intersect with third party amis. Given the new
-        # describe behavior, we'll just do the api call to fetch the
-        # amis, it doesn't seem to have any upper bound on number of
-        # ImageIds to pass (Tested with 1k+ ImageIds)
         #
         # Explicitly use a describe source. Can't use a config source
         # since it won't have state for third party ami, we auto
-        # propagate source normally. Can't use a cache either as their
-        # not in the account.
-        return {i['ImageId']: i for i in
-                self.manager.get_resource_manager(
-                    'ami').get_source('describe').get_resources(
-                        list(self.get_image_ids()), cache=False)}
+        # propagate source normally. Can't use the resource manager
+        # cache either as their not in the account. Use a separate
+        if self._image_cache is not None:
+            return self._image_cache
+        self._image_cache = {
+            i['ImageId']: i for i in
+            self.manager.get_resource_manager(
+                'ami').get_source('describe').get_resources(
+                    list(self.get_image_ids()), cache=False)}
+        return self._image_cache
+
+    def get_block_devices(
+            self, include_images=True, ebs_only=True, snapshot_only=True):
+        snapshot_ids = set()
+        if include_images:
+            for image in self.get_image_map().values():
+                for dev in image.get('BlockDeviceMappings', ()):
+                    if ebs_only and 'Ebs' in dev and 'SnapshotId' in dev['Ebs']:
+                        snapshot_ids.add(dev['Ebs']['SnapshotId'].strip())
+
+        for cid, launch_info in self.items():
+            for dev in launch_info.get('BlockDeviceMappings', ()):
+                if 'Ebs' in dev and 'SnapshotId' in dev['Ebs']:
+                    snapshot_ids.add(dev['Ebs']['SnapshotId'].strip())
+        return list(snapshot_ids)
+
+    def get_snapshot_ids(self, images=True):
+        snapshot_ids = set()
+        if images:
+            for image in self.get_image_map().values():
+                for dev in image.get('BlockDeviceMappings', ()):
+                    if 'Ebs' in dev and 'SnapshotId' in dev['Ebs']:
+                        snapshot_ids.add(dev['Ebs']['SnapshotId'].strip())
+        for cid, launch_info in self.items():
+            for dev in launch_info.get('BlockDeviceMappings', ()):
+                if 'Ebs' in dev and 'SnapshotId' in dev['Ebs']:
+                    snapshot_ids.add(dev['Ebs']['SnapshotId'].strip())
+        return list(snapshot_ids)
 
     def get_security_group_ids(self):
         # return set of security group ids for given asg
@@ -302,16 +327,11 @@ class ConfigValidFilter(Filter):
         return set(images), image_snaps
 
     def get_snapshots(self):
-        snaps = set()
-        for cid, cfg in self.launch_info.items():
-            for bd in cfg.get('BlockDeviceMappings', ()):
-                if 'Ebs' not in bd or 'SnapshotId' not in bd['Ebs']:
-                    continue
-                snaps.add(bd['Ebs']['SnapshotId'].strip())
         manager = self.manager.get_resource_manager('ebs-snapshot')
-        return set([
+        return set(
             s['SnapshotId'] for s in manager.get_resources(
-                list(snaps), cache=False)])
+                self.launch_info.get_snapshot_ids(images=False),
+                cache=False))
 
     def process(self, asgs, event=None):
         self.initialize(asgs)
