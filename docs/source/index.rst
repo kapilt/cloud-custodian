@@ -25,7 +25,6 @@ Navigate below and get started with Cloud Custodian!
    :maxdepth: 1
    :caption: Examples
 
-   quickstart/offhours
    quickstart/tagCompliance
    usecases/index
 
