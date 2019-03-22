@@ -78,7 +78,7 @@ class UpdateConfig(Action):
                 state_filtered += 1
                 continue
             client.update_cluster_config(
-                r['name'],
+                name=r['name'],
                 resourcesVpcConfig=self.data['resourcesVpcConfig'])
         if state_filtered:
             self.log.warning(
