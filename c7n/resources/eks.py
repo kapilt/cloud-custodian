@@ -58,7 +58,7 @@ class EKSVpcFilter(VpcFilter):
 class UpdateConfig(Action):
 
     schema = type_schema(
-        'update', resourcesVpcConfig={'type': 'object'},
+        'update-config', resourcesVpcConfig={'type': 'object'},
         required=('resourcesVpcConfig',))
     permissions = ('eks:UpdateClusterConfig',)
     shape = 'UpdateClusterConfigRequest'
