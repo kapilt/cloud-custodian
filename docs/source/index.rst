@@ -20,12 +20,12 @@ Navigate below and get started with Cloud Custodian!
    quickstart/index
    quickstart/usage
    quickstart/advanced
+   quickstart/policyStructure
 
 .. toctree::
    :maxdepth: 1
    :caption: Examples
 
-   quickstart/tagCompliance
    usecases/index
 
 .. toctree::
