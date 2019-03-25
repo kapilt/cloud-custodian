@@ -35,6 +35,7 @@ from c7n.actions import BaseAction
 from c7n.actions.securityhub import OtherResourcePostFinding
 from c7n.exceptions import PolicyValidationError
 from c7n.filters import ValueFilter, Filter, OPERATORS
+from c7n.filters.multiattr import MultiAttrFilter
 from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources
 from c7n.query import QueryResourceManager, DescribeSource
@@ -138,6 +139,25 @@ class User(QueryResourceManager):
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'
+
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeUser(self)
+        return super(User, self).get_source(source_type)
+
+
+class DescribeUser(DescribeSource):
+
+    def get_resources(self, resource_ids, cache=True):
+        client = local_session(self.manager.session_factory).client('iam')
+        results = []
+
+        for r in resource_ids:
+            try:
+                results.append(client.get_user(UserName=r)['User'])
+            except client.exceptions.NoSuchEntityException:
+                continue
+        return results
 
 
 @User.action_registry.register('tag')
@@ -262,6 +282,124 @@ class ServerCertificate(QueryResourceManager):
         dimension = None
         # Denotes this resource type exists across regions
         global_resource = True
+
+
+@User.filter_registry.register('usage')
+@Role.filter_registry.register('usage')
+@Group.filter_registry.register('usage')
+@Policy.filter_registry.register('usage')
+class ServiceUsage(Filter):
+    """Filter iam resources by their api/service usage.
+
+    Note recent activity (last 4hrs) may not be shown, evaluation
+    is against the last 365 days of data.
+
+    Each service access record is evaluated against all specified
+    attributes.  Attribute filters can be specified in short form k:v
+    pairs or in long form as a value type filter.
+
+    match-operator allows to specify how a resource is treated across
+    service access record matches. 'any' means a single matching
+    service record will return the policy resource as matching. 'all'
+    means all service access records have to match.
+
+
+    Find iam users that have not used any services in the last year
+
+    :example:
+
+    .. code-block:: yaml
+
+      - name: unused-users
+        resource: iam-user
+        filters:
+          - type: usage
+            match-operator: all
+            LastAuthenticated: null
+
+    Find iam users that have used dynamodb in last 30 days
+
+    :example:
+
+    .. code-block:: yaml
+
+      - name: unused-users
+        resource: iam-user
+        filters:
+          - type: usage
+            ServiceNamespace: dynamodb
+            TotalAuthenticatedEntities: 1
+            LastAuthenticated:
+              type: value
+              value_type: age
+              op: less-than
+              value: 30
+            match-operator: any
+
+    https://aws.amazon.com/blogs/security/automate-analyzing-permissions-using-iam-access-advisor/
+
+    """
+
+    JOB_COMPLETE = 'COMPLETED'
+    SERVICE_ATTR = set((
+        'ServiceName', 'ServiceNamespace', 'TotalAuthenticatedEntities',
+        'LastAuthenticated', 'LastAuthenticatedEntity'))
+
+    schema_attr = {
+        sa: {'oneOf': [
+            {'type': 'string'},
+            {'type': 'boolean'},
+            {'type': 'number'},
+            {'type': 'null'},
+            {'$ref': '#/definitions/filters/value'}]}
+        for sa in SERVICE_ATTR}
+    schema_attr['match-operator'] = {'enum': ['all', 'any']}
+    schema_attr['poll-delay'] = {'type': 'number'}
+    schema = type_schema(
+        'usage',
+        required=('match-operator',),
+        **schema_attr)
+    permissions = ('iam:GenerateServiceLastAccessedDetails',
+                   'iam:GetServiceLastAccessedDetails')
+
+    def process(self, resources, event=None):
+        client = local_session(self.manager.session_factory).client('iam')
+
+        job_resource_map = {}
+        for arn, r in zip(self.manager.get_arns(resources), resources):
+            jid = self.manager.retry(
+                client.generate_service_last_accessed_details,
+                Arn=arn)['JobId']
+            job_resource_map[jid] = r
+
+        conf = dict(self.data)
+        conf.pop('match-operator')
+        saf = MultiAttrFilter(conf)
+        saf.multi_attrs = self.SERVICE_ATTR
+
+        results = []
+        match_operator = self.data.get('match-operator', 'all')
+
+        while job_resource_map:
+            job_results_map = {}
+            for jid, r in job_resource_map.items():
+                result = self.manager.retry(
+                    client.get_service_last_accessed_details, JobId=jid)
+                if result['JobStatus'] != self.JOB_COMPLETE:
+                    continue
+                job_results_map[jid] = result['ServicesLastAccessed']
+
+            for jid, saf_results in job_results_map.items():
+                r = job_resource_map.pop(jid)
+                saf_matches = saf.process(saf_results)
+                if match_operator == 'all' and len(saf_matches) == len(saf_results):
+                    results.append(r)
+                elif saf_matches:
+                    results.append(r)
+
+            time.sleep(self.data.get('poll-delay', 2))
+
+        return results
 
 
 @User.filter_registry.register('check-permissions')
