@@ -578,8 +578,8 @@ def run(config, use, output_dir, accounts, tags, region,
     policy_counts = Counter()
     success = True
 
-    if metrics_url:
-        metrics = metrics_url
+    if metrics_uri:
+        metrics = metrics_uri
 
     if not cache_path:
         cache_path = os.path.expanduser("~/.cache/c7n-org")
