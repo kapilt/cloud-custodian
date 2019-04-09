@@ -65,6 +65,7 @@ class UpdateConfig(Action):
             {'required': ['type', 'resourcesVpcConfig']},
             {'required': ['type', 'logging', 'resourcesVpcConfig']}],
         'properties': {
+            'type': {'enum': ['update-config']},
             'logging': {'type': 'object'},
             'resourcesVpcConfig': {'type': 'object'}
         }
