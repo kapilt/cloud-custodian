@@ -45,7 +45,7 @@ class DocExampleTest(BaseTest):
     skip_condition = not (
         # Okay slightly gross, basically if we're explicitly told via
         # env var to run doc tests do it.
-        (os.environ.get("C7N_TEST_DOC") not in ('yes', 'true') or
+        (os.environ.get("C7N_TEST_DOC") in ('yes', 'true') or
          # Or for ci to avoid some tox pain, we'll auto configure here
          # to run on the py3.6 test runner, as its the only one
          # without additional responsibilities.
@@ -56,15 +56,31 @@ class DocExampleTest(BaseTest):
     @skipif(skip_condition, reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
         policies = []
+        policy_map = {}
         idx = 1
         for ptext, resource_name, el_name in get_doc_examples():
             data = yaml.safe_load(ptext)
             for p in data.get('policies', []):
-                # Give each policy a unique name with enough context
-                # that we can identify the origin on failures, note
-                # max size here is 54 if its a lambda policy.
-                p['name'] = "%s-%s-%s-%d" % (
-                    resource_name.split('.')[-1], el_name, p.get('name', 'unknown'), idx)
+                # We unique based on name and content to avoid duplicates
+                # from inherited docs.
+                if p['name'] in policy_map:
+                    if p != policy_map[p['name']]:
+                        # Give each policy a unique name with enough
+                        # context that we can identify the origin on
+                        # failures.
+                        p['name'] = "%s-%s-%s-%d" % (
+                            resource_name.split('.')[-1],
+                            el_name,
+                            p.get('name', 'unknown'), idx)
+                    continue
+                policy_map[p['name']] = p
+                # Note max name size here is 54 if its a lambda policy
+                # given our default prefix custodian- to stay under 64
+                # char limit on lambda function names.
+                if len(p['name']) >= 54 and 'mode' in p:
+                    raise ValueError(
+                        "doc policy exceeds name limit resource:%s element:%s policy:%s" % (
+                            resource_name, el_name, p['name']))
                 policies.append(p)
                 idx += 1
         self.load_policy_set({'policies': policies})
