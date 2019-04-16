@@ -252,7 +252,7 @@ def generate(resource_types=()):
                 ))
 
     schema = {
-        '$schema': 'http://json-schema.org/schema#',
+        "$schema": "http://json-schema.org/draft-07/schema#",
         'id': 'http://schema.cloudcustodian.io/v0/custodian.json',
         'definitions': definitions,
         'type': 'object',
