@@ -54,7 +54,6 @@ def validate(data, schema=None):
             "Only one policy with a given name allowed, duplicates: {}".format(counter)),
             list(counter.keys())[0]]
 
-
     validator = Validator(schema)
     errors = list(validator.iter_errors(data))
     try:
