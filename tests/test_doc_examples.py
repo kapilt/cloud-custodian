@@ -15,7 +15,6 @@ import yaml
 import itertools
 
 from c7n.provider import resources
-from c7n.schema import validate, generate
 from .common import BaseTest
 
 
@@ -36,7 +35,6 @@ def get_doc_examples():
 class DocExampleTest(BaseTest):
 
     def test_doc_examples(self):
-        errors = []
         policies = []
         idx = 1
         for ptext, resource_name, el_name in get_doc_examples():
