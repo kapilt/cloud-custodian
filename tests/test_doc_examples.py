@@ -48,7 +48,7 @@ class DocExampleTest(BaseTest):
         (os.environ.get("C7N_TEST_DOC") not in ('yes', 'true') or
          # Or for ci to avoid some tox pain, we'll auto configure here to run the py3.6 test
          # runner.
-         os.environ.get('C7N_TEST_RUN') and sys.version.major == 3 and sys.version.minor == 6),
+         (os.environ.get('C7N_TEST_RUN') and sys.version.major == 3 and sys.version.minor == 6)),
         reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
         policies = []
