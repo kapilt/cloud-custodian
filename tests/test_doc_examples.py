@@ -13,6 +13,7 @@
 # limitations under the License.
 import itertools
 import os
+import sys
 import yaml
 
 from c7n.provider import resources
@@ -44,12 +45,11 @@ class DocExampleTest(BaseTest):
     @skipif(
         # Okay slightly gross, basically if we're explicitly told via env var to run doc tests
         # do it.
-        (os.environ.get("C7N_TEST_DOC") not in ('yes', 'true')
-         or
+        (os.environ.get("C7N_TEST_DOC") not in ('yes', 'true') or
          # Or for ci to avoid some tox pain, we'll auto configure here to run the py3.6 test
          # runner.
-         os.environ.get('C7N_TEST_RUN') and sys.version.major == 3 and sys.version.minor == 6)
-            reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
+         os.environ.get('C7N_TEST_RUN') and sys.version.major == 3 and sys.version.minor == 6),
+        reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
         policies = []
         idx = 1
