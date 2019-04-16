@@ -43,12 +43,15 @@ def get_doc_examples():
 class DocExampleTest(BaseTest):
 
     skip_condition = not (
-        # Okay slightly gross, basically if we're explicitly told via env var to run doc tests
-        # do it.
+        # Okay slightly gross, basically if we're explicitly told via
+        # env var to run doc tests do it.
         (os.environ.get("C7N_TEST_DOC") not in ('yes', 'true') or
-         # Or for ci to avoid some tox pain, we'll auto configure here to run on the py3.6 test
-         # runner, as its the only one without additional responsibilities.
-         (os.environ.get('C7N_TEST_RUN') and sys.version_info.major == 3 and sys.version_info.minor == 6)))
+         # Or for ci to avoid some tox pain, we'll auto configure here
+         # to run on the py3.6 test runner, as its the only one
+         # without additional responsibilities.
+         (os.environ.get('C7N_TEST_RUN') and
+          sys.version_info.major == 3 and
+          sys.version_info.minor == 6)))
 
     @skipif(skip_condition, reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
@@ -57,9 +60,11 @@ class DocExampleTest(BaseTest):
         for ptext, resource_name, el_name in get_doc_examples():
             data = yaml.safe_load(ptext)
             for p in data.get('policies', []):
-                # Give each policy a unique name with enough context that we can identify the origin
-                # on failures, note max size here is 54 if its a lambda policy.
-                p['name'] = "%s-%s-%s-%d" % (resource_name.split('.')[-1], el_name, p.get('name', 'unknown'), idx)
+                # Give each policy a unique name with enough context
+                # that we can identify the origin on failures, note
+                # max size here is 54 if its a lambda policy.
+                p['name'] = "%s-%s-%s-%d" % (
+                    resource_name.split('.')[-1], el_name, p.get('name', 'unknown'), idx)
                 policies.append(p)
                 idx += 1
         self.load_policy_set({'policies': policies})
