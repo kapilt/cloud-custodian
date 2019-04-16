@@ -13,23 +13,23 @@
 # limitations under the License.
 import yaml
 import itertools
-import os
 
 from c7n.provider import resources
+from c7n.schema import validate, generate
 from .common import BaseTest
 
 
 def get_doc_examples():
     policies = []
-    for key, v in resources().items():
+    for resource_name, v in resources().items():
         for k, cls in itertools.chain(v.filter_registry.items(), v.action_registry.items()):
-            if cls.__doc__:
-                split_doc = [x.split('\n\n') for x in
-                             cls.__doc__.split('yaml')]  # split on yaml and new lines
-                for item in itertools.chain.from_iterable(split_doc):
-                    if 'policies:\n' in item:
-                        policies.append((item, key, cls.__name__))
-
+            if not cls.__doc__:
+                continue
+            # split on yaml and new lines
+            split_doc = [x.split('\n\n') for x in cls.__doc__.split('yaml')]
+            for item in itertools.chain.from_iterable(split_doc):
+                if 'policies:\n' in item:
+                    policies.append((item, resource_name, cls.type))
     return policies
 
 
@@ -37,12 +37,13 @@ class DocExampleTest(BaseTest):
 
     def test_doc_examples(self):
         errors = []
-        for policy, module, cls_name in get_doc_examples():
-            try:
-                parsed_policy = yaml.safe_load(policy)
-                list(map(lambda p: self.load_policy(p, validate=True),
-                         parsed_policy["policies"]))
-            except Exception as e:
-                errors.append((module, cls_name, e))
-
-        assert len(errors) == 0, errors
+        policies = []
+        idx = 1
+        for ptext, resource_name, el_name in get_doc_examples():
+            data = yaml.safe_load(ptext)
+            for p in data.get('policies', []):
+                # Give each policy a unique name so that we do
+                p['name'] = "%s-%s-%s-%d" % (resource_name, el_name, p.get('name', 'unknown'), idx)
+                policies.append(p)
+                idx += 1
+        self.load_policy_set({'policies': policies})
