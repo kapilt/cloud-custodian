@@ -11,11 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import yaml
 import itertools
+import os
+import yaml
 
 from c7n.provider import resources
 from .common import BaseTest
+
+try:
+    import pytest
+    skipif = pytest.mark.skipif
+except ImportError:
+    skipif = lambda func, reasion="": func
 
 
 def get_doc_examples():
@@ -34,6 +41,8 @@ def get_doc_examples():
 
 class DocExampleTest(BaseTest):
 
+    @skipif(os.environ.get("C7N_TEST_DOC") not in ('yes', 'true'),
+            reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
         policies = []
         idx = 1
