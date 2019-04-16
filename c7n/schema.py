@@ -45,19 +45,10 @@ def validate(data, schema=None):
         schema = generate()
         Validator.check_schema(schema)
 
-    counter = Counter([p['name'] for p in data.get('policies')])
-    for k, v in list(counter.items()):
-        if v == 1:
-            counter.pop(k)
-    if counter:
-        return [ValueError(
-            "Only one policy with a given name allowed, duplicates: {}".format(counter)),
-            list(counter.keys())[0]]
-
     validator = Validator(schema)
     errors = list(validator.iter_errors(data))
     if not errors:
-        return []
+        return check_unique(data) or []
     try:
         resp = specific_error(errors[0])
         name = isinstance(
@@ -74,6 +65,17 @@ def validate(data, schema=None):
         errors[0],
         best_match(validator.iter_errors(data)),
     ]))
+
+
+def check_unique(data):
+    counter = Counter([p['name'] for p in data.get('policies', [])])
+    for k, v in list(counter.items()):
+        if v == 1:
+            counter.pop(k)
+    if counter:
+        return [ValueError(
+            "Only one policy with a given name allowed, duplicates: {}".format(counter)),
+            list(counter.keys())[0]]
 
 
 def specific_error(error):
