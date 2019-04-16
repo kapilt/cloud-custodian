@@ -56,6 +56,8 @@ def validate(data, schema=None):
 
     validator = Validator(schema)
     errors = list(validator.iter_errors(data))
+    if not errors:
+        return []
     try:
         resp = specific_error(errors[0])
         name = isinstance(
