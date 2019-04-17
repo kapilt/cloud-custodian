@@ -23,7 +23,7 @@ try:
     import pytest
     skipif = pytest.mark.skipif
 except ImportError:
-    skipif = lambda func, reasion="": func  # noqa E731
+    skipif = lambda func, reason="": func  # noqa E731
 
 
 def get_doc_examples():
