@@ -1,28 +1,23 @@
-FROM python:3.6
-
+FROM python:3.7-slim-strech
 LABEL name="mailer" \
       description="Cloud Custodian Notification Delivery" \
       repository="http://github.com/cloud-custodian/cloud-custodian" \
       homepage="https://cloudcustodian.io" \
       maintainer="Custodian Community <https://cloudcustodian.io>"
 
-# Note this must be run from the root directory of the checkout
-# as we install custodian w/ aws, azure, and gcp support from the same
-# repo.
-
-ADD . /src
-
-# Install Custodian Core & AWS
+ADD . /src/
 WORKDIR /src
-RUN pip3 install -r requirements.txt -e .
 
-# Install Custodian Azure
-WORKDIR /src/tools/c7n_azure
-RUN pip3 install -r requirements.txt -e .
+RUN apt-get --yes update && apt-get --yes upgrade \
+ && apt-get --yes install python-dev build-essential \
+ && pip3 install -r requirements.txt  . \
+ && pip3 install -r tools/c7n_azure/requirements.txt tools/c7n_azure \
+ && pip3 install -r tools/c7n_mailer/requirements.txt tools/c7n_mailer \
+ && apt-get --yes remove build-essential python-dev \
+ && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+ && rm -Rf /var/cache/apt/ \
+ && rm -Rf /var/lib/apt/lists/* \
+ && rm -Rf /src/
 
-# Install Custodian Mailer
-WORKDIR /src/tools/c7n_mailer
-RUN pip3 install -r requirements.txt -e .
 ENV LC_ALL="C.UTF-8" LANG="C.UTF-8"
-
 ENTRYPOINT ["c7n-mailer"]
