@@ -1078,7 +1078,6 @@ class SetPolicyStatement(BucketActionBase):
         **{
             'statements': {
                 'type': 'array',
-                'required': True,
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -2613,7 +2612,6 @@ class Lifecycle(BucketActionBase):
         **{
             'rules': {
                 'type': 'array',
-                'required': True,
                 'items': {
                     'type': 'object',
                     'required': ['ID', 'Status'],

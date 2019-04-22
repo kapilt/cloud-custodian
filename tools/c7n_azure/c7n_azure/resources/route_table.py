@@ -1,4 +1,4 @@
-# Copyright 2015-2018 Capital One Services, LLC
+# Copyright 2019 Capital One Services, LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,4 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version = u"0.8.43.1"
+from c7n_azure.provider import resources
+from c7n_azure.resources.arm import ArmResourceManager
+
+
+@resources.register('routetable')
+class RouteTable(ArmResourceManager):
+
+    class resource_type(ArmResourceManager.resource_type):
+        service = 'azure.mgmt.network'
+        client = 'NetworkManagementClient'
+        enum_spec = ('route_tables', 'list_all', None)
+        default_report_fields = (
+            'name',
+            'location',
+            'resourceGroup'
+        )
