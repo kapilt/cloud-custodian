@@ -281,7 +281,8 @@ def process_select_set(s3, trail_bucket, object_set):
     return {'stats': dict(stats), 'records': resource_records}
 
 
-def process_athena_query(athena, workgroup, athena_db, table, poll_period=30, year=None, month=None, day=None):
+def process_athena_query(athena, workgroup, athena_db, table,
+                         poll_period=30, year=None, month=None, day=None):
     q = TRAIL_ATHENA_QUERY.format(
         athena_db=athena_db,
         table=table,
@@ -295,7 +296,8 @@ def process_athena_query(athena, workgroup, athena_db, table, poll_period=30, ye
     if day:
         date_format, date_value = "%Y/%m/%d", month.strftime("%Y/%m/%d")
     if date_format:
-        q = q + " AND date_format(from_iso8601_timestamp(events.eventtime), '{date_format}') = '{date_value}'".format(
+        q = q + (" AND date_format(from_iso8601_timestamp(events.eventtime), "
+                 "'{date_format}') = '{date_value}'").format(
             date_format=date_format,
             date_value=date_value)
 
@@ -412,7 +414,7 @@ def process_bucket(session_factory, bucket_name, prefix, db_path):
             log.info('Last Page Key: %s', objects[-1]['Key'])
 
         stats.update(page_stats)
-    log.info("Finished %0.2f seconds stats:%s", time.time()-t, stats)
+    log.info("Finished %0.2f seconds stats:%s", time.time() - t, stats)
 
 
 class ResourceTagger(object):
