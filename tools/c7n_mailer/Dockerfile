@@ -5,7 +5,11 @@ LABEL name="mailer" \
       homepage="https://cloudcustodian.io" \
       maintainer="Custodian Community <https://cloudcustodian.io>"
 
-ADD . /src/
+# Assemble custodian bits by parent dir.
+ADD setup.py README.rst requirements.txt /src/
+ADD c7n /src/c7n/
+ADD tools /src/tools/
+
 WORKDIR /src
 
 RUN apt-get --yes update && apt-get --yes upgrade \
