@@ -20,7 +20,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import abc
 import base64
-import contextlib
 import hashlib
 import importlib
 import io
