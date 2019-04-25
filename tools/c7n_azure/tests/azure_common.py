@@ -135,7 +135,7 @@ class AzureVCRBaseTest(VCRTestCase):
         content_type = response['headers'].get('Content-Type', (None,))[0]
         if 'application/json' not in content_type or encoding not in ('gzip', 'deflate'):
             return response
-        
+
         body = response['body'].pop('string')
         if encoding == 'gzip':
             body = zlib.decompress(body, zlib.MAX_WBITS | 16)
