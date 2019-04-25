@@ -183,6 +183,45 @@ class PolicyLambdaProvision(BaseTest):
         resources = mode.run(event, None)
         self.assertEqual(len(resources), 1)
 
+    def test_phd_account_mode(self):
+        factory = self.replay_flight_data('test_phd_event_mode')
+        p = self.load_policy(
+            {'name': 'ec2-retire',
+             'resource': 'account',
+             'mode': {
+                 'categories': ['scheduledChange'],
+                 'events': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED'],
+                 'type': 'phd'}}, session_factory=factory)
+        mode = p.get_execution_mode()
+        event = event_data('event-phd-ec2-retire.json')
+        resources = mode.run(event, None)
+        self.assertEqual(len(resources), 1)
+        self.assertTrue('c7n:HealthEvent' in resources[0])
+
+    def test_phd_mode(self):
+        factory = self.replay_flight_data('test_phd_event_mode')
+        p = self.load_policy(
+            {'name': 'ec2-retire',
+             'resource': 'ec2',
+             'mode': {
+                 'categories': ['scheduledChange'],
+                 'events': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED'],
+                 'type': 'phd'}}, session_factory=factory)
+        mode = p.get_execution_mode()
+        event = event_data('event-phd-ec2-retire.json')
+        resources = mode.run(event, None)
+        self.assertEqual(len(resources), 1)
+
+        p_lambda = PolicyLambda(p)
+        events = p_lambda.get_events(factory)
+        self.assertEqual(
+            json.loads(events[0].render_event_pattern()),
+            {'detail': {
+                'eventTypeCategory': ['scheduledChange'],
+                'eventTypeCode': ['AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT_SCHEDULED']},
+             'source': ['aws.health']}
+        )
+
     def test_cwl_subscriber(self):
         self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
         session_factory = self.replay_flight_data("test_cwl_subscriber")
@@ -251,7 +290,7 @@ class PolicyLambdaProvision(BaseTest):
         if self.recording:
             time.sleep(60)
 
-        log_events = list(manager.logs(func, "1970-1-1 UTC", "9170-1-1"))
+        log_events = list(manager.logs(func, "1970-1-1 UTC", "2037-1-1"))
         messages = [
             e["message"] for e in log_events if e["message"].startswith('{"Records')
         ]
@@ -291,7 +330,7 @@ class PolicyLambdaProvision(BaseTest):
         client.publish(TopicArn=topic_arn, Message="Greetings, program!")
         if self.recording:
             time.sleep(30)
-        log_events = manager.logs(func, "1970-1-1 UTC", "9170-1-1")
+        log_events = manager.logs(func, "1970-1-1 UTC", "2037-1-1")
         messages = [
             e["message"] for e in log_events if e["message"].startswith('{"Records')
         ]

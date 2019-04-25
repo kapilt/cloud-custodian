@@ -30,6 +30,7 @@ class FSx(QueryResourceManager):
         service = 'fsx'
         enum_spec = ('describe_file_systems', 'FileSystems', None)
         name = id = 'FileSystemId'
+        arn = "ResourceARN"
         date = 'CreationTime'
         dimension = None
         filter_name = None
@@ -44,6 +45,7 @@ class FSxBackup(QueryResourceManager):
         service = 'fsx'
         enum_spec = ('describe_backups', 'Backups', None)
         name = id = 'BackupId'
+        arn = "ResourceARN"
         date = 'CreationTime'
         dimension = None
         filter_name = None
@@ -59,7 +61,7 @@ class DeleteBackup(BaseAction):
     .. code-block: yaml
 
         policies:
-            - type: delete-backups
+            - name: delete-backups
               resource: fsx-backup
               filters:
                 - type: value
@@ -92,14 +94,8 @@ FSx.filter_registry.register('marked-for-op', TagActionFilter)
 @FSxBackup.action_registry.register('mark-for-op')
 @FSx.action_registry.register('mark-for-op')
 class MarkForOpFileSystem(TagDelayedAction):
-    concurrency = 2
-    batch_size = 5
-    permissions = ('fsx:TagResource',)
 
-    def process_resource_set(self, resources, tags):
-        client = local_session(self.manager.session_factory).client('fsx')
-        for r in resources:
-            client.tag_resource(ResourceARN=r['ResourceARN'], Tags=tags)
+    permissions = ('fsx:TagResource',)
 
 
 @FSxBackup.action_registry.register('tag')
@@ -109,8 +105,7 @@ class TagFileSystem(Tag):
     batch_size = 5
     permissions = ('fsx:TagResource',)
 
-    def process_resource_set(self, resources, tags):
-        client = local_session(self.manager.session_factory).client('fsx')
+    def process_resource_set(self, client, resources, tags):
         for r in resources:
             client.tag_resource(ResourceARN=r['ResourceARN'], Tags=tags)
 
@@ -122,8 +117,7 @@ class UnTagFileSystem(RemoveTag):
     batch_size = 5
     permissions = ('fsx:UntagResource',)
 
-    def process_resource_set(self, resources, tag_keys):
-        client = local_session(self.manager.session_factory).client('fsx')
+    def process_resource_set(self, client, resources, tag_keys):
         for r in resources:
             client.untag_resource(ResourceARN=r['ResourceARN'], TagKeys=tag_keys)
 

@@ -34,6 +34,8 @@ load_resources()
 
 C7N_SCHEMA = generate()
 DEFAULT_SUBSCRIPTION_ID = 'ea42f556-5106-4743-99b0-c129bfa71a47'
+CUSTOM_SUBSCRIPTION_ID = '00000000-5106-4743-99b0-c129bfa71a47'
+DEFAULT_TENANT_ID = 'ea42f556-5106-4743-99b0-c129bfa71a47'
 # latest VCR recording date that tag tests
 # If tests need to be re-recorded, update to current date
 TEST_DATE = datetime.datetime(2018, 9, 10, 23, 59, 59)
@@ -145,7 +147,7 @@ class BaseTest(TestUtils, AzureVCRBaseTest):
         self._response = initial_response.response if \
             isinstance(initial_response, ClientRawResponse) else \
             initial_response
-        self._callbacks = []  # type: List[Callable]
+        self._callbacks = []  # type List[Callable]
         self._polling_method = msrest.polling.NoPolling()
 
         if isinstance(deserialization_callback, type) and \
