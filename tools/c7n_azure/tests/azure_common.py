@@ -47,6 +47,8 @@ TEST_DATE = datetime.datetime(2018, 9, 10, 23, 59, 59)
 
 class AzureVCRBaseTest(VCRTestCase):
 
+    recording = True
+
     def _get_vcr_kwargs(self):
         return super(VCRTestCase, self)._get_vcr_kwargs(
             filter_headers=['Authorization',
@@ -72,6 +74,7 @@ class AzureVCRBaseTest(VCRTestCase):
         # Block recording when using fake token (tox runs)
         if os.environ.get(constants.ENV_ACCESS_TOKEN) == "fake_token":
             myvcr.record_mode = 'none'
+            self.recording = False
 
         return myvcr
 
@@ -112,10 +115,16 @@ class AzureVCRBaseTest(VCRTestCase):
 
     def response_callback(self, response):
         """Modify requests on load and save"""
+
+        # Read path on new style serialization
         if 'data' in response['body']:
             response['body']['string'] = body = json.dumps(
                 response['body'].pop('data'))
             response['headers']['content-length'] = [str(len(body))]
+            return response
+
+        # Write and Load path, vcr doesn't distinguish :-((
+        if not self.recording:
             return response
 
         for k in list(response['headers'].keys()):
@@ -133,6 +142,8 @@ class AzureVCRBaseTest(VCRTestCase):
         elif encoding == 'deflate':
             body = zlib.decompress(body)
         response['body']['data'] = json.loads(body)
+        response['headers'].pop('Content-Encoding')
+
         return response
 
 
