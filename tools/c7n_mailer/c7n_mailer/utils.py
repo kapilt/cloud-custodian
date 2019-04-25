@@ -53,6 +53,15 @@ def get_rendered_jinja(
     except Exception as error_msg:
         logger.error("Invalid template reference %s\n%s" % (mail_template, error_msg))
         return
+
+    # recast seconds since epoch as utc iso datestring, template
+    # authors can use date_time_format helper func to convert local
+    # tz. if no execution start time was passed use current time.
+    if 'execution_start' in sqs_message:
+        execution_start = datetime.utcfromtimestamp(sqs_message['execution_start']).isoformat()
+    else:
+        execution_start = datetime.utcnow().isoformat()
+
     rendered_jinja = template.render(
         recipient=target,
         resources=resources,
@@ -61,6 +70,7 @@ def get_rendered_jinja(
         event=sqs_message.get('event', None),
         action=sqs_message['action'],
         policy=sqs_message['policy'],
+        execution_start=execution_start,
         region=sqs_message.get('region', ''))
     return rendered_jinja
 
