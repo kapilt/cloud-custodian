@@ -113,19 +113,20 @@ class AzureVCRBaseTest(VCRTestCase):
     def response_callback(self, response):
         """Modify requests on load and save"""
         if 'data' in response['body']:
-            for k in list(response['headers'].keys()):
-                if k.lower().startswith('x'):
-                    response['headers'].pop(k)
             response['body']['string'] = body = json.dumps(
                 response['body'].pop('data'))
             response['headers']['content-length'] = [str(len(body))]
             return response
 
+        for k in list(response['headers'].keys()):
+            if k.lower().startswith('x'):
+                response['headers'].pop(k)
+
         encoding = response['headers'].get('Content-Encoding', (None,))[0]
         content_type = response['headers'].get('Content-Type', (None,))[0]
         if 'application/json' not in content_type or encoding not in ('gzip', 'deflate'):
             return response
-
+        
         body = response['body'].pop('string')
         if encoding == 'gzip':
             body = zlib.decompress(body, zlib.MAX_WBITS | 16)
