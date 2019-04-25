@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
+import json
 import os
 import re
+import zlib
 
 from c7n_azure import constants
 from c7n_azure.session import Session
 from c7n_azure.utils import ThreadHelper
-from mock import patch
-from vcr_unittest import VCRTestCase
 
 from c7n.resources import load_resources
 from c7n.schema import generate
@@ -29,6 +29,11 @@ import msrest.polling
 from msrest.serialization import Model
 from msrest.service_client import ServiceClient
 from msrest.pipeline import ClientRawResponse
+
+
+from mock import patch
+from vcr_unittest import VCRTestCase
+from azure_flight import CustodianFSPersister
 
 load_resources()
 
@@ -56,6 +61,7 @@ class AzureVCRBaseTest(VCRTestCase):
                             'x-ms-gateway-service-instanceid',
                             'x-ms-ratelimit-remaining-tenant-reads',
                             'x-ms-served-by', ],
+            before_record_response=self.response_callback,
             before_record_request=self.request_callback
         )
 
@@ -63,6 +69,7 @@ class AzureVCRBaseTest(VCRTestCase):
         myvcr = super(VCRTestCase, self)._get_vcr(**kwargs)
         myvcr.register_matcher('azurematcher', self.azure_matcher)
         myvcr.match_on = ['azurematcher', 'method']
+        myvcr.persister = CustodianFSPersister
 
         # Block recording when using fake token (tox runs)
         if os.environ.get(constants.ENV_ACCESS_TOKEN) == "fake_token":
@@ -105,6 +112,26 @@ class AzureVCRBaseTest(VCRTestCase):
             return None
         return request
 
+    def response_callback(self, response):
+        """Modify requests on load and save"""
+        if 'data' in response['body']:
+            response['body']['string'] = body = json.dumps(
+                response['body'].pop('data'))
+            response['headers']['content-length'] = [str(len(body))]
+            return
+
+        encoding = response['headers'].get('Content-Encoding', (None,))[0]
+        content_type = response['headers'].get('Content-Type', (None,))[0]
+        if 'application/json' not in content_type or encoding not in ('gzip', 'deflate'):
+            return
+
+        body = response['body'].pop('string')
+        if encoding == 'gzip':
+            body = zlib.decompress(body, zlib.MAX_WBITS | 16)
+        elif encoding == 'deflate':
+            body = zlib.decompress(body)
+        response['body']['data'] = json.loads(body)
+
 
 class BaseTest(TestUtils, AzureVCRBaseTest):
     """ Azure base testing class.
@@ -115,7 +142,7 @@ class BaseTest(TestUtils, AzureVCRBaseTest):
         ThreadHelper.disable_multi_threading = True
 
         # Patch Poller with constructor that always disables polling
-        self.lro_patch = patch.object(msrest.polling.LROPoller, '__init__', BaseTest.lro_test_init)
+        self.lro_patch = patch.object(msrest.polling.LROPoller, '__init__', BaseTest.lro_init)
         self.lro_patch.start()
 
     def tearDown(self):
@@ -142,7 +169,7 @@ class BaseTest(TestUtils, AzureVCRBaseTest):
                           }, clear=True)
 
     @staticmethod
-    def lro_test_init(self, client, initial_response, deserialization_callback, polling_method):
+    def lro_init(self, client, initial_response, deserialization_callback, polling_method):
         self._client = client if isinstance(client, ServiceClient) else client._client
         self._response = initial_response.response if \
             isinstance(initial_response, ClientRawResponse) else \
