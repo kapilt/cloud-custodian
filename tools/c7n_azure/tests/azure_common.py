@@ -33,7 +33,6 @@ from msrest.pipeline import ClientRawResponse
 
 from mock import patch
 from vcr_unittest import VCRTestCase
-from azure_flight import CustodianFSPersister
 
 load_resources()
 
@@ -69,7 +68,6 @@ class AzureVCRBaseTest(VCRTestCase):
         myvcr = super(VCRTestCase, self)._get_vcr(**kwargs)
         myvcr.register_matcher('azurematcher', self.azure_matcher)
         myvcr.match_on = ['azurematcher', 'method']
-        myvcr.persister = CustodianFSPersister
 
         # Block recording when using fake token (tox runs)
         if os.environ.get(constants.ENV_ACCESS_TOKEN) == "fake_token":
@@ -115,6 +113,9 @@ class AzureVCRBaseTest(VCRTestCase):
     def response_callback(self, response):
         """Modify requests on load and save"""
         if 'data' in response['body']:
+            for k in list(response['headers'].keys()):
+                if k.lower().startswith('x'):
+                    response['headers'].pop(k)
             response['body']['string'] = body = json.dumps(
                 response['body'].pop('data'))
             response['headers']['content-length'] = [str(len(body))]
