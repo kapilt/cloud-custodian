@@ -30,6 +30,7 @@ class ConfigRecorder(QueryResourceManager):
         filter_name = 'ConfigurationRecorderNames'
         filter_type = 'list'
         dimension = None
+        arn = False
 
     def augment(self, resources):
         # in general we don't to default augmentation beyond tags, to
