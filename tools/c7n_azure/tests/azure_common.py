@@ -118,12 +118,12 @@ class AzureVCRBaseTest(VCRTestCase):
             response['body']['string'] = body = json.dumps(
                 response['body'].pop('data'))
             response['headers']['content-length'] = [str(len(body))]
-            return
+            return response
 
         encoding = response['headers'].get('Content-Encoding', (None,))[0]
         content_type = response['headers'].get('Content-Type', (None,))[0]
         if 'application/json' not in content_type or encoding not in ('gzip', 'deflate'):
-            return
+            return response
 
         body = response['body'].pop('string')
         if encoding == 'gzip':
@@ -131,6 +131,7 @@ class AzureVCRBaseTest(VCRTestCase):
         elif encoding == 'deflate':
             body = zlib.decompress(body)
         response['body']['data'] = json.loads(body)
+        return response
 
 
 class BaseTest(TestUtils, AzureVCRBaseTest):
