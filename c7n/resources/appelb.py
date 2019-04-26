@@ -309,9 +309,10 @@ class SetS3Logging(BaseAction):
                     key: Attributes."access_logs.s3.enabled"
                     value: False
                 actions:
-                  - type: enable-s3-logging
+                  - type: set-s3-logging
                     bucket: elbv2logtest
                     prefix: dahlogs
+                    state: enabled
     """
     schema = type_schema(
         'set-s3-logging',
@@ -497,8 +498,11 @@ class AppELBListenerFilterBase(object):
         client = local_session(self.manager.session_factory).client('elbv2')
         self.listener_map = defaultdict(list)
         for alb in albs:
-            results = client.describe_listeners(
-                LoadBalancerArn=alb['LoadBalancerArn'])
+            try:
+                results = client.describe_listeners(
+                    LoadBalancerArn=alb['LoadBalancerArn'])
+            except client.exceptions.LoadBalancerNotFoundException:
+                continue
             self.listener_map[alb['LoadBalancerArn']] = results['Listeners']
 
 
