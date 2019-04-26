@@ -167,6 +167,8 @@ class PostFinding(BaseAction):
 
                 finding = self.get_finding(
                     resource_set, finding_id, created_at, updated_at)
+                fsize = len(dumps(finding))
+                self.log.info("Finding Size:%d", fsize)
                 import_response = client.batch_import_findings(
                     Findings=[finding])
                 if import_response['FailedCount'] > 0:
