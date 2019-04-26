@@ -649,6 +649,8 @@ class Delete(BaseAction):
 class CopySnapshotTags(BaseAction):
     """Enables copying tags from rds instance to snapshot
 
+    DEPRECATED - use modify-db instead with `CopyTagsToSnapshot`
+
         .. code-block: yaml
 
             policies:
@@ -670,23 +672,29 @@ class CopySnapshotTags(BaseAction):
     permissions = ('rds:ModifyDBInstances',)
 
     def process(self, resources):
+        error = None
         with self.executor_factory(max_workers=2) as w:
-            futures = []
+            futures = {}
+            client = local_session(self.manager.session_factory).client('rds')
+            resources = [r for r in resources
+                         if r['CopyTagsToSnapshot'] != self.data.get('enable', True)]
             for r in resources:
-                futures.append(w.submit(
-                    self.set_snapshot_tags, r))
+                futures[w.submit(self.set_snapshot_tags, client, r)] = r
             for f in as_completed(futures):
                 if f.exception():
+                    error = f.exception()
                     self.log.error(
-                        'Exception updating rds CopyTagsToSnapshot  \n %s',
-                        f.exception())
+                        'error updating rds:%s CopyTagsToSnapshot \n %s',
+                        futures[f]['DBInstanceIdentifier'], error)
+        if error:
+            raise error
         return resources
 
-    def set_snapshot_tags(self, r):
-        c = local_session(self.manager.session_factory).client('rds')
-        self.manager.retry(c.modify_db_instance(
+    def set_snapshot_tags(self, client, r):
+        self.manager.retry(
+            client.modify_db_instance,
             DBInstanceIdentifier=r['DBInstanceIdentifier'],
-            CopyTagsToSnapshot=self.data.get('enable', True)))
+            CopyTagsToSnapshot=self.data.get('enable', True))
 
 
 @RDS.action_registry.register("post-finding")
