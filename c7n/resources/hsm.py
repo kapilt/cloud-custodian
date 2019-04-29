@@ -41,12 +41,12 @@ class CloudHSMCluster(QueryResourceManager):
     @property
     def generate_arn(self):
         return functools.partial(
-                generate_arn,
-                'cloudhsm',
-                region=self.config.region,
-                account_id=self.account_id,
-                resource_type='cluster',
-                separator='/')
+            generate_arn,
+            'cloudhsm',
+            region=self.config.region,
+            account_id=self.account_id,
+            resource_type='cluster',
+            separator='/')
 
 
 @CloudHSMCluster.action_registry.register('tag')
