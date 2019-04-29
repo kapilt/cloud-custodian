@@ -58,3 +58,8 @@ to get the resource ids.
 It supports this across all the resources that custodian supports.
 
 
+## Multi Account / Multi Region
+
+c7n-trailcreator supports executing across multiple accounts and regions when tagging
+using the same file format that c7n-org uses to denote accounts.
+

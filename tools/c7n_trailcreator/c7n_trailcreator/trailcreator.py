@@ -13,56 +13,7 @@
 # limitations under the License.
 """AWS AutoTag Resource Creators
 
-
-This script will process cloudtrail records to create a sqlite db of
-resources and their creators, and then use that sqlitedb to tag
-the resources with their creator's name.
-
-In processing cloudtrail it can use either Athena or S3 Select. A
-config file of the events and resources of interest is required.
-
-
-## Config File
-
-The config file format here is similiar to what custodian requires
-for lambda policies on cloudtrail api events as an event selector.
-
-First for each resource, the custodian resource-type is required
-to be specified, and then for each event, we need to know the
-name of the service, the event name, and a jmespath expression
-to get the resource ids.
-
-```json
-{
-  "resources": [
-    {
-      "resource": "iam-role",
-      "events": [
-        {
-          "event": "CreateRole",
-          "ids": "requestParameters.roleName",
-          "service": "iam.amazonaws.com"
-        }
-      ]
-    },
-    {
-      "resource": "iam-user",
-      "shape": "User",
-      "events": [
-        {
-          "event": "CreateUser",
-          "ids": "requestParameters.userName",
-          "service": "iam.amazonaws.com"
-        }
-      ]
-    }]
-}
-```
-
-## Tagging
-
-It supports this across all the resources that custodian supports.
-
+See readme for details
 """
 
 __author__ = "Kapil Thangavelu <https://twitter.com/kapilvt>"
@@ -77,8 +28,10 @@ import jmespath
 import json
 import jsonschema
 import logging
+import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 import time
 
@@ -88,7 +41,7 @@ from c7n.credentials import SessionFactory
 from c7n.policy import PolicyCollection
 from c7n.resources import load_resources, aws
 from c7n.tags import UniversalTag
-from c7n.utils import local_session, chunks
+from c7n.utils import local_session, chunks, reset_session_cache
 
 from c7n_org.cli import WORKER_COUNT, resolve_regions, get_session, _get_env_creds, init as org_init
 from c7n_org.utils import environ
@@ -460,8 +413,11 @@ class ResourceTagger(object):
                 continue
             resource_map = self.get_creator_resource_map(rtype)
             resources, rmgr = self.get_untagged_resources(rtype)
-            rtype_id = rmgr.resource_type.id
 
+            if not len(resources):
+                continue
+
+            rtype_id = rmgr.resource_type.id
             # regroup by user/tag value to minimize api calls
             user_resources = {}
             found = 0
@@ -469,14 +425,17 @@ class ResourceTagger(object):
                 if r[rtype_id] not in resource_map:
                     self.stats[rtype + '-not-found'] += 1
                     log.debug(
-                        "could not find trail record resource:%s id:%s", rtype, r[rtype_id])
+                        "account:%s region:%s no trail record resource:%s id:%s",
+                        self.config['account_id'], self.config['region'],
+                        rtype, r[rtype_id])
                     continue
                 uid = resource_map[r[rtype_id]]
                 user_resources.setdefault(uid, []).append(r)
                 found += 1
 
-            log.debug(
-                "account:%s region:%s tag %d %s resources users:%d population:%d not-found:%d records:%d",
+            log.info((
+                "account:%s region:%s tag %d %s resources users:%d "
+                "population:%d not-found:%d records:%d"),
                 self.config['account_id'], self.config['region'],
                 found, rtype, len(user_resources), len(resources),
                 self.stats[rtype + "-not-found"], rcount)
@@ -487,21 +446,16 @@ class ResourceTagger(object):
                     self.tag_resources(rmgr, u, resources)
                 except ClientError as e:
                     log.exception(
-                        "error tagging account:%s region:%s resource:%s error:%s",
-                        self.config['account'], self.config['region'], rtype,
+                        "Error tagging account:%s region:%s resource:%s error:%s",
+                        self.config['account_id'], self.config['region'], rtype,
                         e)
+                    raise
         return self.stats
 
     def tag_resources(self, resource_mgr, user_id, resources):
         """Tag set of resources with user as creator.
         """
         tagger_factory = resource_mgr.action_registry['tag']
-
-        if tagger_factory is None:
-            # log.warning(
-            #    "resource:%s has no tag action" % resource_mgr.type)
-            return
-
         tagger = tagger_factory({}, resource_mgr)
         client = tagger.get_client()
 
@@ -509,7 +463,8 @@ class ResourceTagger(object):
         if isinstance(tagger, UniversalTag):
             tags = {self.creator_tag: user_id}
         if not self.dryrun:
-            tagger.process_resource_set(client, resources, tags)
+            for resource_set in chunks(resources, tagger.batch_size):
+                tagger.process_resource_set(client, resource_set, tags)
 
     def get_creator_resource_map(self, rtype):
         """Return a map of resource id to creator for the given resource type.
@@ -550,6 +505,8 @@ class ResourceTagger(object):
         policy = list(
             PolicyCollection.from_data(
                 {'policies': [policy_data]}, self.config)).pop()
+        if 'tag' not in policy.resource_manager.action_registry:
+            return [], None
         resources = policy.run()
         return resources, policy.resource_manager
 
@@ -669,7 +626,8 @@ def load_athena(table, workgroup, athena_db, resource_map, db,
 @click.option('--debug', default=False, is_flag=True)
 @click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
 @click.option('--type', multiple=True, help="Only process resources of type")
-def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags, debug, verbose, type):
+def tag_org(config, db, region, creator_tag, user_suffix, dryrun,
+            accounts, tags, debug, verbose, type):
     """Tag an orgs resources
     """
     accounts_config, custodian_config, executor = org_init(
@@ -679,6 +637,8 @@ def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags
 
     load_resources()
     stats = {}
+    total = 0
+    start_exec = time.time()
 
     with executor(max_workers=WORKER_COUNT) as w:
         futures = {}
@@ -690,25 +650,24 @@ def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags
         for f in as_completed(futures):
             a, region = futures[f]
             if f.exception():
-                log.warning("error account:%s region:%s error:%s" % (
-                    a['name'], region, f.exception()))
+                log.warning("error account:%s id:%s region:%s error:%s" % (
+                    a['name'], a['account_id'], region, f.exception()))
                 continue
             result = f.result()
             if result:
                 stats[(a['name'], region)] = (a, result)
+            print(
+                ("auto tag complete account:%s id:%s region:%s \n  %s" % (
+                    a['name'], a['account_id'], region,
+                    "\n  ".join([
+                        " {}: {}".format(k, v)
+                        for k, v in result.items()
+                        if v and not k.endswith('not-found')]))).strip())
 
-    total = 0
-    for (name, region), (account, results) in stats.items():
-        print(
-            "auto tag summary account:%s region:%s \n  %s" % (
-            name, region,
-            "\n  ".join([" {}: {}".format(k, v)
-                         for k, v in results.items() if v
-                         and not k.endswith('not-found')])))
-        total += sum([
-            v for k, v in results.items() if not k.endswith('not-found')])
+            total += sum([
+                v for k, v in result.items() if not k.endswith('not-found')])
 
-    print("Total resources tagged: %d" % total)
+    print("Total resources tagged: %d in %0.2f" % total, time.time() - start_exec)
     return stats
 
 
@@ -718,8 +677,11 @@ def tag_org_account(account, region, db, creator_tag, user_suffix, dryrun, type)
     session = get_session(account, "c7n-trailcreator", region)
     env_vars = _get_env_creds(session, region)
     with environ(**env_vars):
-        return tag.callback(
-            None, region, db, creator_tag, user_suffix, dryrun, summary=False, type=type)
+        try:
+            return tag.callback(
+                None, region, db, creator_tag, user_suffix, dryrun, summary=False, type=type)
+        finally:
+            reset_session_cache()
 
 
 @cli.command()
@@ -738,14 +700,18 @@ def tag(assume, region, db, creator_tag, user_suffix, dryrun, summary=True, type
 
     with temp_dir() as output_dir:
         config = ExecConfig.empty(output_dir=output_dir, assume=assume, region=region)
-        provider = aws.AWS()
-        provider.initialize(config)
-
-        factory = provider.get_session_factory(config)
+        factory = aws.AWS().get_session_factory(config)
         account_id = local_session(factory).client('sts').get_caller_identity().get('Account')
         config['account_id'] = account_id
         tagger = ResourceTagger(trail_db, config, creator_tag, user_suffix, dryrun, type)
-        stats = tagger.process()
+
+        try:
+            stats = tagger.process()
+        except Exception:
+            log.exception(
+                "error processing account:%s region:%s config:%s env:%s",
+                account_id, region, config, dict(os.environ))
+            raise
 
     if not summary:
         return stats
@@ -757,13 +723,3 @@ def tag(assume, region, db, creator_tag, user_suffix, dryrun, summary=True, type
         "\n".join([" {}: {}".format(k, v) for k, v in stats.items() if v]))
     total = sum([v for k, v in stats.items() if not k.endswith('not-found')])
     log.info("Total resources tagged: %d" % total)
-
-
-
-if __name__ == '__main__':
-    try:
-        cli()
-    except Exception:
-        import pdb, traceback, sys
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
