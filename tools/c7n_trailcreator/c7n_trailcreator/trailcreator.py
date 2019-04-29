@@ -67,6 +67,7 @@ It supports this across all the resources that custodian supports.
 
 __author__ = "Kapil Thangavelu <https://twitter.com/kapilvt>"
 
+from botocore.exceptions import ClientError
 import click
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -443,17 +444,20 @@ def process_bucket(session_factory, bucket_name, prefix, db_path):
 
 class ResourceTagger(object):
 
-    def __init__(self, trail_db, exec_config, creator_tag, user_suffix, dryrun):
+    def __init__(self, trail_db, exec_config, creator_tag, user_suffix, dryrun, types):
         self.trail_db = trail_db
         self.config = exec_config
         self.creator_tag = creator_tag
         self.user_suffix = user_suffix
         self.dryrun = dryrun
         self.stats = Counter()
+        self.types = types
 
     def process(self):
         for rtype, rcount in self.trail_db.get_type_record_stats(
                 self.config['account_id'], self.config['region']):
+            if self.types and rtype not in self.types:
+                continue
             resource_map = self.get_creator_resource_map(rtype)
             resources, rmgr = self.get_untagged_resources(rtype)
             rtype_id = rmgr.resource_type.id
@@ -465,20 +469,27 @@ class ResourceTagger(object):
                 if r[rtype_id] not in resource_map:
                     self.stats[rtype + '-not-found'] += 1
                     log.debug(
-                        "could not find resource:%s id:%s", rtype, r[rtype_id])
+                        "could not find trail record resource:%s id:%s", rtype, r[rtype_id])
                     continue
                 uid = resource_map[r[rtype_id]]
                 user_resources.setdefault(uid, []).append(r)
                 found += 1
 
-            log.info("account:%s region:%s tag %d %s resources users:%d population:%d not-found:%d records:%d",
-                     self.config['account_id'], self.config['region'],
-                     found, rtype, len(user_resources), len(resources),
-                     self.stats[rtype + "-not-found"], rcount)
+            log.debug(
+                "account:%s region:%s tag %d %s resources users:%d population:%d not-found:%d records:%d",
+                self.config['account_id'], self.config['region'],
+                found, rtype, len(user_resources), len(resources),
+                self.stats[rtype + "-not-found"], rcount)
             self.stats[rtype] += found
 
             for u, resources in user_resources.items():
-                self.tag_resources(rmgr, u, resources)
+                try:
+                    self.tag_resources(rmgr, u, resources)
+                except ClientError as e:
+                    log.exception(
+                        "error tagging account:%s region:%s resource:%s error:%s",
+                        self.config['account'], self.config['region'], rtype,
+                        e)
         return self.stats
 
     def tag_resources(self, resource_mgr, user_id, resources):
@@ -527,6 +538,15 @@ class ResourceTagger(object):
             'filters': [{
                 'tag:{}'.format(
                     self.creator_tag): 'absent'}]}
+        # Cloud Formation stacks can only be tagged in successful
+        # steady state.
+        if rtype == 'cfn':
+            policy_data['filters'].insert(0, {
+                'type': 'value',
+                'key': 'StackStatus',
+                'op': 'in',
+                'value': ['UPDATE_COMPLETE', 'CREATE_COMPLETE']})
+
         policy = list(
             PolicyCollection.from_data(
                 {'policies': [policy_data]}, self.config)).pop()
@@ -647,11 +667,13 @@ def load_athena(table, workgroup, athena_db, resource_map, db,
 @click.option('-t', '--tags', multiple=True, default=None, help="Account tag filter")
 @click.option('-r', '--region', default=None, multiple=True, required=True)
 @click.option('--debug', default=False, is_flag=True)
-def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags, debug):
+@click.option('-v', '--verbose', default=False, help="Verbose", is_flag=True)
+@click.option('--type', multiple=True, help="Only process resources of type")
+def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags, debug, verbose, type):
     """Tag an orgs resources
     """
     accounts_config, custodian_config, executor = org_init(
-        config, use=None, debug=debug, verbose=True,
+        config, use=None, debug=debug, verbose=verbose,
         accounts=accounts or None, tags=tags, policies=None,
         resource=None, policy_tags=None)
 
@@ -664,18 +686,16 @@ def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags
             for r in resolve_regions(region or a.get('regions', ())):
                 futures[w.submit(
                     tag_org_account, a, r, db,
-                    creator_tag, user_suffix, dryrun)] = (a, r)
+                    creator_tag, user_suffix, dryrun, type)] = (a, r)
         for f in as_completed(futures):
             a, region = futures[f]
             if f.exception():
                 log.warning("error account:%s region:%s error:%s" % (
                     a['name'], region, f.exception()))
+                continue
             result = f.result()
             if result:
                 stats[(a['name'], region)] = (a, result)
-            else:
-                log.warning("no result found region:%s account:%s id:" % (
-                    region, a['name'], a['account_id']))
 
     total = 0
     for (name, region), (account, results) in stats.items():
@@ -692,12 +712,14 @@ def tag_org(config, db, region, creator_tag, user_suffix, dryrun, accounts, tags
     return stats
 
 
-def tag_org_account(account, region, db, creator_tag, user_suffix, dryrun):
+def tag_org_account(account, region, db, creator_tag, user_suffix, dryrun, type):
+    log.info("processing account:%s id:%s region:%s",
+             account['name'], account['account_id'], region)
     session = get_session(account, "c7n-trailcreator", region)
     env_vars = _get_env_creds(session, region)
     with environ(**env_vars):
         return tag.callback(
-            None, region, db, creator_tag, user_suffix, dryrun, summary=False)
+            None, region, db, creator_tag, user_suffix, dryrun, summary=False, type=type)
 
 
 @cli.command()
@@ -707,7 +729,8 @@ def tag_org_account(account, region, db, creator_tag, user_suffix, dryrun):
 @click.option('--assume', help="Assume role for resource tagging")
 @click.option('--user-suffix', help="Ignore users without the given suffix")
 @click.option('--dryrun', is_flag=True)
-def tag(assume, region, db, creator_tag, user_suffix, dryrun, summary=True):
+@click.option('--type', multiple=True, help="Only process resources of type")
+def tag(assume, region, db, creator_tag, user_suffix, dryrun, summary=True, type=()):
     """Tag resources with their creator.
     """
     trail_db = TrailDB(db)
@@ -721,7 +744,7 @@ def tag(assume, region, db, creator_tag, user_suffix, dryrun, summary=True):
         factory = provider.get_session_factory(config)
         account_id = local_session(factory).client('sts').get_caller_identity().get('Account')
         config['account_id'] = account_id
-        tagger = ResourceTagger(trail_db, config, creator_tag, user_suffix, dryrun)
+        tagger = ResourceTagger(trail_db, config, creator_tag, user_suffix, dryrun, type)
         stats = tagger.process()
 
     if not summary:

@@ -340,8 +340,6 @@ class QueryResourceManager(ResourceManager):
 
     resource_type = ""
 
-    retry = None
-
     # TODO Check if we can move to describe source
     max_workers = 3
     chunk_size = 20
