@@ -163,9 +163,10 @@ class Tag(tags.Tag):
     permissions = ('elasticloadbalancing:AddTags',)
 
     def process_resource_set(self, client, resource_set, tags):
-        client.add_tags(
-            LoadBalancerNames=[r['LoadBalancerName'] for r in resource_set],
-            Tags=tags)
+        for r in resource_set:
+            client.add_tags(
+                LoadBalancerNames=[r['LoadBalancerName'] for r in resource_set],
+                Tags=tags)
 
 
 @actions.register('remove-tag')
@@ -346,7 +347,7 @@ class EnableS3Logging(BaseAction):
 
             policies:
               - name: elb-test
-                resource: app-elb
+                resource: elb
                 filters:
                   - type: is-not-logging
                 actions:
@@ -396,7 +397,7 @@ class DisableS3Logging(BaseAction):
                   - type: is-logging
                     bucket: prodbucket
                 actions:
-                  - type: disable-elb-logging
+                  - type: disable-s3-logging
     """
     schema = type_schema('disable-s3-logging')
     permissions = ("elasticloadbalancing:ModifyLoadBalancerAttributes",)
