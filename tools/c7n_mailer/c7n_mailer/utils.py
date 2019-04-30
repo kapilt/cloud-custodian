@@ -57,10 +57,10 @@ def get_rendered_jinja(
     # recast seconds since epoch as utc iso datestring, template
     # authors can use date_time_format helper func to convert local
     # tz. if no execution start time was passed use current time.
-    if 'execution_start' in sqs_message:
-        execution_start = datetime.utcfromtimestamp(sqs_message['execution_start']).isoformat()
-    else:
-        execution_start = datetime.utcnow().isoformat()
+    execution_start = datetime.utcfromtimestamp(
+        sqs_message.get(
+            'execution_start',
+            datetime.timestamp(datetime.utcnow()))).isoformat()
 
     rendered_jinja = template.render(
         recipient=target,
