@@ -14,9 +14,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import base64
+from datetime import datetime, timedelta
 import json
 import os
-from datetime import datetime, timedelta
+import time
 
 import jinja2
 import jmespath
@@ -60,7 +61,9 @@ def get_rendered_jinja(
     execution_start = datetime.utcfromtimestamp(
         sqs_message.get(
             'execution_start',
-            datetime.timestamp(datetime.utcnow()))).isoformat()
+            time.mktime(
+                datetime.utcnow().timetuple())
+        )).isoformat()
 
     rendered_jinja = template.render(
         recipient=target,
