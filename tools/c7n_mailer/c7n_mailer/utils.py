@@ -15,6 +15,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import base64
 from datetime import datetime, timedelta
+import functools
 import json
 import os
 import time
@@ -29,7 +30,7 @@ from ruamel import yaml
 
 def get_jinja_env(template_folders):
     env = jinja2.Environment(trim_blocks=True, autoescape=False)
-    env.filters['yaml_safe'] = yaml.safe_dump
+    env.filters['yaml_safe'] = functools.partial(yaml.safe_dump, default_flow_style=False)
     env.filters['date_time_format'] = date_time_format
     env.filters['get_date_time_delta'] = get_date_time_delta
     env.filters['get_date_age'] = get_date_age
