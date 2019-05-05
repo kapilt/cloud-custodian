@@ -406,7 +406,6 @@ class LambdaMode(ServerlessExecutionMode):
         return False
 
     def resolve_resources(self, event):
-        self.assume_member(event)
         mode = self.policy.data.get('mode', {})
         resource_ids = CloudWatchEvents.get_ids(event, mode)
         if resource_ids is None:
@@ -441,6 +440,7 @@ class LambdaMode(ServerlessExecutionMode):
             map(root.removeHandler, root.handlers[:])
             root.handlers = [logging.NullHandler()]
 
+        self.assume_member(event)
         resources = self.resolve_resources(event)
         if not resources:
             return resources
@@ -517,6 +517,7 @@ class PeriodicMode(LambdaMode, PullMode):
         'periodic', schedule={'type': 'string'}, rinherit=LambdaMode.schema)
 
     def run(self, event, lambda_context):
+        self.assume_member(event)
         return PullMode.run(self)
 
 
@@ -650,7 +651,6 @@ class GuardDutyMode(LambdaMode):
         return event['detail']['accountId']
 
     def resolve_resources(self, event):
-        self.assume_member(event)
         rid = self.id_exprs[self.policy.resource_type].search(event)
         resources = self.policy.resource_manager.get_resources([rid])
         # For iam users annotate with the access key specified in the finding event
@@ -690,6 +690,7 @@ class ConfigRuleMode(LambdaMode):
         return [source.load_resource(self.cfg_event['configurationItem'])]
 
     def run(self, event, lambda_context):
+        self.assume_member(event)
         self.cfg_event = json.loads(event['invokingEvent'])
         cfg_item = self.cfg_event['configurationItem']
         evaluation = None
