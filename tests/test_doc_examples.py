@@ -53,8 +53,8 @@ class DocExampleTest(BaseTest):
           sys.version_info.major == 2 and
           sys.version_info.minor == 7)))
 
-    @skipif(skip_condition, reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
     def test_doc_examples(self):
+        self.fail("bad mojo")
         policies = []
         policy_map = {}
         idx = 1
