@@ -210,8 +210,8 @@ c7n-mailer: error: argument -c/--config is required
 Fundamentally what `c7n-mailer` does is deploy a Lambda (using
 [Mu](http://cloudcustodian.io/docs/policy/mu.html)) based on
 configuration you specify in a YAML file.  Here is [the
-schema](./c7n_mailer/cli.py#L11-L41) to which the file must conform, here is
-[an example config](./example.yml), and here is a description of the options:
+schema](./c7n_mailer/cli.py#L11-L41) to which the file must conform,
+and here is a description of the options:
 
 | Required? | Key                  | Type             | Notes                               |
 |:---------:|:---------------------|:-----------------|:------------------------------------|
@@ -400,7 +400,7 @@ mailer is running under.
 The notify action in your policy will reflect transport type `asq` with the URL
 to an Azure Storage Queue.  For example:
 
-```json
+```yaml
 policies:
   - name: azure-notify
     resource: azure.resourcegroup
@@ -420,7 +420,7 @@ policies:
 In your mailer configuration, you'll need to provide your SendGrid API key as well as
 prefix your queue URL with `asq://` to let mailer know what type of queue it is:
 
-```yml
+```yaml
 queue_url: asq://storageaccount.queue.core.windows.net/queuename
 from_address: you@youremail.com
 sendgrid_api_key: SENDGRID_API_KEY
@@ -439,7 +439,7 @@ mailer configuration.
 
 where `mailer.yml` may look like:
 
-```yml
+```yaml
 queue_url: asq://storage.queue.core.windows.net/custodian
 from_address: foo@mail.com
 sendgrid_api_key: <key>
@@ -455,8 +455,7 @@ function_properties:
 ## Writing an email template
 
 Templates are authored in [jinja2](http://jinja.pocoo.org/docs/dev/templates/).
-Drop a file with the `.j2` extension into the
-[`c7n_mailer/msg-templates`](./c7n_mailer/msg-templates) directory, and send a pull request to this
+Drop a file with the `.j2` extension into the a templates directory, and send a pull request to this
 repo. You can then reference it in the `notify` action as the `template`
 variable by file name minus extension. Templates ending with `.html.j2` are
 sent as HTML-formatted emails, all others are sent as plain text.

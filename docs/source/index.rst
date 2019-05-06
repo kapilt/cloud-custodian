@@ -24,12 +24,6 @@ Navigate below and get started with Cloud Custodian!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Mailer
-
-   mailer
-
-.. toctree::
-   :maxdepth: 2
    :caption: AWS
 
    aws/gettingstarted
@@ -49,6 +43,14 @@ Navigate below and get started with Cloud Custodian!
    azure/policy/index
    azure/advanced/index
    azure/contribute
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tools
+
+   tools/c7n-org
+   tools/c7n-mailer
+
 
 .. toctree::
    :maxdepth: 2
