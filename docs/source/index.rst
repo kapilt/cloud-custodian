@@ -23,10 +23,15 @@ Navigate below and get started with Cloud Custodian!
    quickstart/policyStructure
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Examples
+   :maxdepth: 2
+   :caption: AWS
 
-   usecases/index
+   aws/gettingstarted
+   aws/examples/index
+   aws/policy/index
+   filters
+   aws/policy/lambda
+   aws/policy/mu
 
 .. toctree::
    :maxdepth: 1
@@ -38,20 +43,6 @@ Navigate below and get started with Cloud Custodian!
    azure/policy/index
    azure/advanced/index
    azure/contribute
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Working with AWS Lambda
-
-   policy/lambda
-   policy/mu
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Policies reference
-
-   policy/index.rst
-   filters
 
 .. toctree::
    :maxdepth: 2
