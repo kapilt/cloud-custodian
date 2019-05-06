@@ -24,6 +24,12 @@ Navigate below and get started with Cloud Custodian!
 
 .. toctree::
    :maxdepth: 2
+   :caption: Mailer
+
+   mailer
+
+.. toctree::
+   :maxdepth: 2
    :caption: AWS
 
    aws/gettingstarted

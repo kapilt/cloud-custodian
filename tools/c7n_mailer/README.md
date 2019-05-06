@@ -21,17 +21,17 @@ and run a policy that triggers an email to your inbox.
 
 1. [Install](#developer-install-os-x-el-capitan) the mailer on your laptop (if you are not running as a [Docker container](https://hub.docker.com/r/cloudcustodian/mailer)
    - or use `pip install c7n-mailer`
-1. In your text editor, create a `mailer.yml` file to hold your mailer config.
-1. In the AWS console, create a new standard SQS queue (quick create is fine).
+2. In your text editor, create a `mailer.yml` file to hold your mailer config.
+3. In the AWS console, create a new standard SQS queue (quick create is fine).
    Copy the queue URL to `queue_url` in `mailer.yml`.
-1. In AWS, locate or create a role that has read access to the queue. Grab the
+4. In AWS, locate or create a role that has read access to the queue. Grab the
    role ARN and set it as `role` in `mailer.yml`.
 
 there is different notification endpoints options, you can combine both.
 
 ### Email:
 Make sure your email address is verified in SES, and set it as
-   `from_address` in `mailer.yml`. By default SES is in sandbox mode where you
+`from_address` in `mailer.yml`. By default SES is in sandbox mode where you
 must
 [verify](http://docs.aws.amazon.com/ses/latest/DeveloperGuide/verify-email-addresses.html)
 every individual recipient of emails. If need be, make an AWS support ticket to
@@ -49,14 +49,14 @@ from_address: you@example.com
 
 Now let's make a Custodian policy to populate your mailer queue. Create a
 `test-policy.yml` file with this content (update `to` and `queue` to match your
-environment):
+environment)
 
 ```yaml
-policies:
+  policies:
   - name: c7n-mailer-test
     resource: sqs
     filters:
-     - "tag:MailerTest": absent
+      - "tag:MailerTest": absent
     actions:
       - type: notify
         template: default
