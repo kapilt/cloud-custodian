@@ -23,7 +23,8 @@ RUN apt-get --yes update && apt-get --yes upgrade \
  && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  && rm -Rf /var/cache/apt/ \
  && rm -Rf /var/lib/apt/lists/* \
- && rm -Rf /src/
+ && rm -Rf /src/ \
+ && rm -Rf /root/.cache/
 
 ENV LC_ALL="C.UTF-8" LANG="C.UTF-8"
 VOLUME ["/var/log/cloud-custodian", "/etc/cloud-custodian"]

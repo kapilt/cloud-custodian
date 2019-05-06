@@ -20,13 +20,13 @@ RUN apt-get --yes update && apt-get --yes upgrade \
  && pip3 install -r requirements.txt  . \
  && pip3 install -r tools/c7n_gcp/requirements.txt tools/c7n_gcp \
  && pip3 install -r tools/c7n_azure/requirements.txt tools/c7n_azure \
- && pip3 install -r tools/c7n_org \
+ && pip3 install tools/c7n_org \
  && apt-get --yes remove build-essential \
  && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  && rm -Rf /var/cache/apt/ \
  && rm -Rf /var/lib/apt/lists/* \
- && rm -Rf /src/
+ && rm -Rf /src/ \
+ && rm -Rf /root/.cache/
 
 ENV LC_ALL="C.UTF-8" LANG="C.UTF-8"
 ENTRYPOINT ["/usr/local/bin/c7n-org"]
-
