@@ -16,11 +16,12 @@ Navigate below and get started with Cloud Custodian!
    :maxdepth: 2
    :caption: Introduction
 
-   overview/index
+   overview
    quickstart/index
    quickstart/usage
    quickstart/advanced
    quickstart/policyStructure
+   overview/glossary
 
 .. toctree::
    :maxdepth: 2
@@ -49,6 +50,7 @@ Navigate below and get started with Cloud Custodian!
    :caption: Tools
 
    tools/c7n-org
+   tools/c7n-policystream
    tools/c7n-mailer
 
 
