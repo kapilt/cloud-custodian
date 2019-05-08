@@ -36,6 +36,7 @@ Cloud Custodian
      :alt: Requirements Status
 
 ===============
+
 Cloud Custodian is a rules engine for managing public cloud accounts
 and resources. It allows users to define policies to enable a well
 managed cloud infrastructure, that's both secure and cost
@@ -100,7 +101,7 @@ Usage
 
 First a role must be created with the appropriate permissions for custodian to act on the resources
 described in the policies yaml given as an example below.
-For convenience, an _`example policy <_static/custodian-quickstart-policy.json>`_
+For convenience, an `example policy <_static/custodian-quickstart-policy.json>`_
 is provided for this quick start guide. Customized AWS IAM policies
 will be necessary for your own custodian policies
 
