@@ -35,6 +35,7 @@ Cloud Custodian
      :target: https://requires.io/github/cloud-custodian/cloud-custodian/requirements/?branch=master
      :alt: Requirements Status
 
+===============
 Cloud Custodian is a rules engine for managing public cloud accounts
 and resources. It allows users to define policies to enable a well
 managed cloud infrastructure, that's both secure and cost
@@ -97,7 +98,24 @@ Quick Install
 Usage
 -----
 
-First a policy file needs to be created in YAML format, as an example
+First a role must be created with the appropriate permissions for custodian to act on the resources
+described in the policies yaml given as an example below.
+For convenience, an _`example policy <_static/custodian-quickstart-policy.json>`_
+is provided for this quick start guide. Customized AWS IAM policies
+will be necessary for your own custodian policies
+
+To implement the policy:
+
+1. Open the AWS console
+2. Navigate to IAM -> Policies
+3. Use the `json` option to copy the example policy as a new AWS IAM Policy
+4. Name the IAM policy as something recognizable and save it.
+5. Navigate to IAM -> Roles and create a role called `CloudCustodian-QuickStart`
+6. Assign the role the IAM policy created above.
+
+Now with the pre-requisite completed; you are ready continue and run custodian.
+
+A custodian policy file needs to be created in YAML format, as an example
 
 .. code-block:: yaml
 
@@ -118,6 +136,7 @@ First a policy file needs to be created in YAML format, as an example
       unencrypted volumes.
     mode:
       type: cloudtrail
+      role: CloudCustodian-QuickStart
       events:
         - RunInstances
     filters:
@@ -162,7 +181,7 @@ Given that, you can run Cloud Custodian with
 You can run it with Docker as well
 
 .. code-block:: bash
-   
+
   # Download the image
   $ docker pull cloudcustodian/c7n
 
