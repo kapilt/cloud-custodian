@@ -1,3 +1,20 @@
+..
+    !!! Important !!!
+    This file is moved during document generation.
+    Only edit the original document at ./tools/c7n_sentry/README.md
+
+===============
+Cloud Custodian
+===============
+
+.. image:: https://cloudcustodian.io/img/logo_capone_devex_cloud_custodian.svg
+    :alt: Cloud Custodian Logo
+    :height: 200 px
+    :width: 200 px
+    :align: center
+
+----------------
+
 .. image:: https://badges.gitter.im/cloud-custodian/cloud-custodian.svg
      :target: https://gitter.im/cloud-custodian/cloud-custodian?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
      :alt: Join the chat at https://gitter.im/cloud-custodian/cloud-custodian
@@ -18,10 +35,7 @@
      :target: https://requires.io/github/cloud-custodian/cloud-custodian/requirements/?branch=master
      :alt: Requirements Status
 
-
-Cloud Custodian
 ===============
-
 Cloud Custodian is a rules engine for managing public cloud accounts
 and resources. It allows users to define policies to enable a well
 managed cloud infrastructure, that's both secure and cost
