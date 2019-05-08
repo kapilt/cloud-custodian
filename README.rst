@@ -1,7 +1,7 @@
 ..
     !!! Important !!!
     This file is moved during document generation.
-    Only edit the original document at ./tools/c7n_sentry/README.md
+    Only edit the original document at ./README.rst
 
 ===============
 Cloud Custodian
