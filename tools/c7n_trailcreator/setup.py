@@ -16,7 +16,7 @@ import os
 from setuptools import setup
 
 long_description = ""
-is os.path.exists('readme.md'):
+if os.path.exists('readme.md'):
     long_description = open("readme.md", "r").read()
 
 setup(
