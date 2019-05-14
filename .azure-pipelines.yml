@@ -83,8 +83,8 @@ jobs:
       testRunTitle: 'Python $(python.version)'
     condition: succeededOrFailed()
 
-- job: 'Test PyPy36'
-  displayName: 'Test PyPy 3_6'
+- job: 'TestPyPy36'
+  displayName: 'Test PyPy 3.6'
   pool:
     vmImage: 'ubuntu-16.04'
   steps:
