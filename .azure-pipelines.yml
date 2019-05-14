@@ -90,15 +90,13 @@ jobs:
   steps:
   - checkout: self
     fetchDepth: 2
-  - task: Docker@1
-    inputs:
-      command: build
-      DockerFile: tools/dev/docker-pypy-test
+  - script: docker build -t custodian-pypy:test -f tools/dev/docker-pypy-test
 
 - job: 'TestWindows'
   displayName: 'Test Win2019'
   pool:
     vmImage: 'windows-2019'
+  strategy:
     matrix:
       Python36:
         python.version: '3.6'
