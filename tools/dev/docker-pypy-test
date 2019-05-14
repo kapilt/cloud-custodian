@@ -10,10 +10,4 @@ ADD . /src
 WORKDIR /src
 
 RUN tox -e pypy3 --notest
-# && apt-get --yes remove build-essential git \
-# && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
-# && rm -Rf /var/cache/apt/ \
-# && rm -Rf /var/lib/apt/lists/* \
-# && rm -Rf /root/.cache/
-
 RUN tox -e pypy3
