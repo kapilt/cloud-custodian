@@ -91,7 +91,9 @@ jobs:
   - checkout: self
     fetchDepth: 2
   - task: Docker@1
-    dockerFile: tools/dev/docker-pypy-test
+    inputs:
+      command: build
+      DockerFile: tools/dev/docker-pypy-test
 
 - job: 'TestWindows'
   displayName: 'Test Win2019'
