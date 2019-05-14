@@ -1,0 +1,19 @@
+from pypy:3.6-slim
+
+RUN apt-get --yes update && apt-get --yes upgrade \
+ && apt-get --yes install build-essential libssl-dev git \
+ && pip3 install tox
+
+# Transfer Custodian source into container by directory
+# to minimize size
+ADD . /src
+WORKDIR /src
+
+RUN tox -e pypy3 --notest
+# && apt-get --yes remove build-essential git \
+# && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+# && rm -Rf /var/cache/apt/ \
+# && rm -Rf /var/lib/apt/lists/* \
+# && rm -Rf /root/.cache/
+
+RUN tox -e pypy3
