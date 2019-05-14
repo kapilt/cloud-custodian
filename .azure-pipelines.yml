@@ -83,11 +83,20 @@ jobs:
       testRunTitle: 'Python $(python.version)'
     condition: succeededOrFailed()
 
+- job: 'Test PyPy3.6'
+  displayName: 'Test PyPy3.6'
+  pool:
+    vmImage: 'ubuntu-16.04'
+  steps:
+  - checkout: self
+    fetchDepth: 2
+  - task: Docker@1
+    dockerFile: tools/dev/docker-pypy-test
+
 - job: 'TestWindows'
   displayName: 'Test Win2019'
   pool:
     vmImage: 'windows-2019'
-  strategy:
     matrix:
       Python36:
         python.version: '3.6'
