@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from setuptools import setup
 
-with open("readme.md", "r") as fh:
-    long_description = fh.read()
+long_description = ""
+is os.path.exists('readme.md'):
+    long_description = open("readme.md", "r").read()
 
 setup(
     name="c7n_trailcreator",
-    version='0.1.1',
+    version='0.1.2',
     description="Cloud Custodian - Retroactive Tag Resource Creators from CloudTrail",
     long_description=long_description,
     long_description_content_type="text/markdown",
