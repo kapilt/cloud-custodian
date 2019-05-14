@@ -90,7 +90,7 @@ jobs:
   steps:
   - checkout: self
     fetchDepth: 2
-  - script: docker build -t custodian-pypy:test -f tools/dev/docker-pypy-test
+  - script: docker build -t custodian-pypy:test -f tools/dev/docker-pypy-test .
 
 - job: 'TestWindows'
   displayName: 'Test Win2019'
