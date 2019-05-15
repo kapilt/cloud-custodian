@@ -9,5 +9,5 @@ RUN apt-get --yes update && apt-get --yes upgrade \
 ADD . /src
 WORKDIR /src
 
-RUN tox -e pypy3 --notest
-RUN tox -e pypy3
+RUN time tox -e pypy3 --notest
+RUN time tox -e pypy3
