@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 long_description = ""
 if os.path.exists('readme.md'):
@@ -21,7 +21,7 @@ if os.path.exists('readme.md'):
 
 setup(
     name="c7n_trailcreator",
-    version='0.1.2',
+    version='0.1.3',
     description="Cloud Custodian - Retroactive Tag Resource Creators from CloudTrail",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -31,10 +31,10 @@ setup(
     ],
     url="https://github.com/capitalone/cloud-custodian",
     license="Apache-2.0",
-    py_modules=['c7n_trailcreator'],
+    packages=find_packages(),
     entry_points={
         'console_scripts': [
             'c7n-trailcreator = c7n_trailcreator.trailcreator:cli',
         ]},
-    install_requires=["c7n", "click"],
+    install_requires=["c7n", "click", "c7n-org"],
 )
