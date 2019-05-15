@@ -1,7 +1,7 @@
 from pypy:3.6-slim
 
 RUN apt-get --yes update && apt-get --yes upgrade \
- && apt-get --yes install build-essential libssl-dev git \
+ && apt-get --yes install build-essential libssl-dev git time \
  && pip3 install tox
 
 # Transfer Custodian source into container by directory
