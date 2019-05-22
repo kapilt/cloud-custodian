@@ -110,7 +110,7 @@ OPERATORS = {
 VALUE_TYPES = [
     'age', 'integer', 'expiration', 'normalize', 'size',
     'cidr', 'cidr_size', 'swap', 'resource_count', 'expr',
-    'unique_size']
+    'unique_size', 'date']
 
 
 class FilterRegistry(PluginRegistry):
@@ -418,7 +418,11 @@ class ValueFilter(Filter):
         # the value filters because it operates on the full resource list
         if self.data.get('value_type') == 'resource_count':
             return self._validate_resource_count()
-
+        elif self.data.get('value_type') == 'date':
+            if not parse_date(self.data.get('value')):
+                raise PolicyValidationError(
+                    "value_type: date with invalid date value:%s",
+                    self.data.get('value', ''))
         if 'key' not in self.data and 'key' in self.required_keys:
             raise PolicyValidationError(
                 "Missing 'key' in value filter %s" % self.data)
@@ -558,21 +562,15 @@ class ValueFilter(Filter):
                 return sentinel, 0
         elif self.vtype == 'swap':
             return value, sentinel
+        elif self.vtype == 'date':
+            return parse_date(sentinel), parse_date(value)
         elif self.vtype == 'age':
             if not isinstance(sentinel, datetime.datetime):
                 sentinel = datetime.datetime.now(tz=tzutc()) - timedelta(sentinel)
-            if isinstance(value, (str, int, float)):
-                try:
-                    value = datetime.datetime.fromtimestamp(float(value)).replace(tzinfo=tzutc())
-                except ValueError:
-                    pass
-            if not isinstance(value, datetime.datetime):
-                # EMR bug when testing ages in EMR. This is due to
-                # EMR not having more functionality.
-                try:
-                    value = parse(value, default=datetime.datetime.now(tz=tzutc()))
-                except (AttributeError, TypeError, ValueError):
-                    value = 0
+            value = parse_date(value)
+            if value is None:
+                # compatiblity
+                value = 0
             # Reverse the age comparison, we want to compare the value being
             # greater than the sentinel typically. Else the syntax for age
             # comparisons is intuitively wrong.
@@ -594,13 +592,9 @@ class ValueFilter(Filter):
         elif self.vtype == 'expiration':
             if not isinstance(sentinel, datetime.datetime):
                 sentinel = datetime.datetime.now(tz=tzutc()) + timedelta(sentinel)
-
-            if not isinstance(value, datetime.datetime):
-                try:
-                    value = parse(value, default=datetime.datetime.now(tz=tzutc()))
-                except (AttributeError, TypeError, ValueError):
-                    value = 0
-
+            value = parse_date(value)
+            if value is None:
+                value = 0
             return sentinel, value
         return sentinel, value
 
@@ -668,3 +662,30 @@ class EventFilter(ValueFilter):
         if self(event):
             return resources
         return []
+
+
+def parse_date(v, tz=None):
+    if v is None:
+        return v
+
+    tz = tz or tzutc()
+
+    if isinstance(v, datetime.datetime):
+        if v.tzinfo is None:
+            return v.astimezone(tz)
+        return v
+
+    if isinstance(v, str):
+        try:
+            return parse(v).astimezone(tz)
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    if isinstance(v, (str, int, float)):
+        try:
+            v = datetime.datetime.fromtimestamp(
+                float(v)).astimezone(tzutc())
+        except ValueError:
+            pass
+
+    return isinstance(v, datetime.datetime) and v or None
