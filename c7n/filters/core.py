@@ -23,6 +23,7 @@ import fnmatch
 import logging
 import operator
 import re
+import sys
 
 from dateutil.tz import tzutc
 from dateutil.parser import parse
@@ -664,6 +665,13 @@ class EventFilter(ValueFilter):
         return []
 
 
+
+def cast_tz(d, tz):
+    if sys.version_info.major == 2:
+        return d.replace(tzinfo=tz)
+    return d.astimezone(tz)
+
+
 def parse_date(v, tz=None):
     if v is None:
         return v
@@ -672,7 +680,7 @@ def parse_date(v, tz=None):
 
     if isinstance(v, datetime.datetime):
         if v.tzinfo is None:
-            return v.astimezone(tz)
+            return cast_tz(v, tz)
         return v
 
     if isinstance(v, str):
@@ -683,8 +691,7 @@ def parse_date(v, tz=None):
 
     if isinstance(v, (str, int, float)):
         try:
-            v = datetime.datetime.fromtimestamp(
-                float(v)).astimezone(tzutc())
+            v = cast_tz(datetime.datetime.fromtimestamp(float(v)), tz)
         except ValueError:
             pass
 
