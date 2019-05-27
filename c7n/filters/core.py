@@ -760,4 +760,3 @@ class ValueRegex(object):
         if capture is None:  # regex didn't capture anything
             return None
         return capture.group(1)
-
