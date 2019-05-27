@@ -665,7 +665,6 @@ class EventFilter(ValueFilter):
         return []
 
 
-
 def cast_tz(d, tz):
     if sys.version_info.major == 2:
         return d.replace(tzinfo=tz)
