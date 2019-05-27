@@ -372,6 +372,7 @@ class ValueFilter(Filter):
             'key': {'type': 'string'},
             'value_type': {'$ref': '#/definitions/filters_common/value_types'},
             'default': {'type': 'object'},
+            'value_regex': {'type': 'string'},
             'value_from': {'$ref': '#/definitions/filters_common/value_from'},
             'value': {'$ref': '#/definitions/filters_common/value'},
             'op': {'$ref': '#/definitions/filters_common/comparison_operators'}
@@ -405,7 +406,8 @@ class ValueFilter(Filter):
                 "`value` must be an integer in resource_count filter %s" % self.data)
 
         # I don't see how to support regex for this?
-        if self.data['op'] not in OPERATORS or self.data['op'] in {'regex', 'regex-case'}:
+        if (self.data['op'] not in OPERATORS or self.data['op'] in {'regex', 'regex-case'} or
+                'value_regex' in self.data):
             raise PolicyValidationError(
                 "Invalid operator in value filter %s" % self.data)
 
@@ -443,6 +445,29 @@ class ValueFilter(Filter):
                 except re.error as e:
                     raise PolicyValidationError(
                         "Invalid regex: %s %s" % (e, self.data))
+        if 'value_regex' in self.data:
+            return self._validate_value_regex()
+
+        return self
+
+    def _validate_value_regex(self):
+        """Specific validation for `value_regex` type
+
+        The `value_regex` type works a little differently.  In
+        particular it doesn't support OPERATORS that perform
+        operations on a list of values, specifically 'intersect',
+        'contains', 'difference', 'in' and 'not-in'
+        """
+        # Sanity check that we can compile
+        try:
+            pattern = re.compile(self.data['value_regex'])
+            if pattern.groups != 1:
+                raise PolicyValidationError(
+                    "value_regex must have a single capturing group: %s" %
+                    self.data)
+        except re.error as e:
+            raise PolicyValidationError(
+                "Invalid value_regex: %s %s" % (e, self.data))
         return self
 
     def __call__(self, i):
@@ -488,6 +513,10 @@ class ValueFilter(Filter):
             r = self.expr[k].search(i)
         else:
             r = self.expr[k].search(i)
+
+        if 'value_regex' in self.data:
+            regex = ValueRegex(self.data['value_regex'])
+            r = regex.get_resource_value(r)
         return r
 
     def match(self, i):
@@ -695,3 +724,40 @@ def parse_date(v, tz=None):
             pass
 
     return isinstance(v, datetime.datetime) and v or None
+
+
+class ValueRegex(object):
+    """Allows filtering based on the output of a regex capture.
+    This is useful for parsing data that has a weird format.
+
+    Instead of comparing the contents of the 'resource value' with the 'value',
+    it will instead apply the regex to contents of the 'resource value', and compare
+    the result of the capture group defined in that regex with the 'value'.
+    Therefore you must have a single capture group defined in the regex.
+
+    If the regex doesn't find a match it will return 'None'
+
+    Example of getting a datetime object to make an 'expiration' comparison::
+
+    type: value
+    value_regex: ".*delete_after=([0-9]{4}-[0-9]{2}-[0-9]{2}).*"
+    key: "tag:company_mandated_metadata"
+    value_type: expiration
+    op: lte
+    value: 0
+    """
+
+    def __init__(self, expr):
+        self.expr = expr
+
+    def get_resource_value(self, resource):
+        if resource is None:
+            return resource
+        try:
+            capture = re.match(self.expr, resource)
+        except (ValueError, TypeError):
+            return None
+        if capture is None:  # regex didn't capture anything
+            return None
+        return capture.group(1)
+
