@@ -1316,70 +1316,69 @@ class Snapshot(BaseAction):
 
     schema = type_schema(
         'snapshot',
-        **{'copy-tags': {'type': 'array', 'items': {'type': 'string'}}})
+        **{'copy-tags': {'type': 'array', 'items': {'type': 'string'}},
+           'copy-volume-tags': {'type': 'boolean'},
+           'exclude-boot': {'type': 'boolean', 'default': False}})
     permissions = ('ec2:CreateSnapshot', 'ec2:CreateTags',)
 
+    def validate(self):
+        if self.data.get('copy-tags') and 'copy-instance-tags' in self.data:
+            raise PolicyValidationError(
+                "Can specify copy-tags or copy-instance-tags, not both")
+
     def process(self, resources):
-        client = utils.local_session(
-            self.manager.session_factory).client('ec2')
+        client = utils.local_session(self.manager.session_factory).client('ec2')
+        err = None
         with self.executor_factory(max_workers=2) as w:
-            futures = []
+            futures = {}
             for resource in resources:
-                futures.append(w.submit(
-                    self.process_volume_set, client, resource))
+                futures[w.submit(
+                    self.process_volume_set, client, resource)] = resource
             for f in as_completed(futures):
                 if f.exception():
-                    raise f.exception()
+                    err = f.exception()
+                    resource = futures[f]
                     self.log.error(
-                        "Exception creating snapshot set \n %s" % (
-                            f.exception()))
+                        "Exception creating snapshot set instance:%s \n %s" % (
+                            resource['InstanceId'], err))
+        if err:
+            raise err
 
     def process_volume_set(self, client, resource):
-        for block_device in resource['BlockDeviceMappings']:
-            if 'Ebs' not in block_device:
-                continue
-            volume_id = block_device['Ebs']['VolumeId']
-            description = "Automated,Backup,%s,%s" % (
-                resource['InstanceId'], volume_id)
-            tags = self.get_snapshot_tags(resource, block_device)
-            try:
-                self.manager.retry(
-                    client.create_snapshot,
-                    DryRun=self.manager.config.dryrun,
-                    VolumeId=volume_id,
-                    Description=description,
-                    TagSpecifications=[{
-                        'ResourceType': 'snapshot',
-                        'Tags': tags}])
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'IncorrectState':
-                    self.log.warning(
-                        "action:%s volume:%s is incorrect state" % (
-                            self.__class__.__name__.lower(),
-                            volume_id))
-                    continue
-                raise
+        params = dict(
+            InstanceSpecification={
+                'ExcludeBootVolume': self.data.get('exclude-boot', False),
+                'InstanceId': resource['InstanceId']})
+        if 'copy-tags' in self.data:
+            params['TagSpecifications'] =  [{
+                'ResourceType': 'snapshot',
+                'Tags': self.get_snapshot_tags(resource)}]
+        elif self.data.get('copy-volume-tags', True):
+            params['CopyTagsFromSource'] = 'volume'
 
-    def get_snapshot_tags(self, resource, block_device):
+        try:
+            snap_ids = [s['SnapshotId'] for s in client.create_snapshots(
+                **params)['Snapshots']]
+            resource['c7n:snapshots'] = snap_ids
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'IncorrectState':
+                self.log.warning(
+                    "action:%s instance:%s is incorrect state" % (
+                        self.__class__.__name__.lower(),
+                        resource['InstanceId']))
+            if e.response['Error']['Code'] == 'InvalidInstanceId.NotFound':
+                pass
+            raise
+
+    def get_snapshot_tags(self, resource):
         tags = [
-            {'Key': 'Name', 'Value': block_device['Ebs']['VolumeId']},
-            {'Key': 'InstanceId', 'Value': resource['InstanceId']},
-            {'Key': 'DeviceName', 'Value': block_device['DeviceName']},
             {'Key': 'custodian_snapshot', 'Value': ''}]
-
         copy_keys = self.data.get('copy-tags', [])
         copy_tags = []
         if copy_keys:
             for t in resource.get('Tags', []):
                 if t['Key'] in copy_keys:
                     copy_tags.append(t)
-
-            if len(copy_tags) + len(tags) > 40:
-                self.log.warning(
-                    "action:%s volume:%s too many tags to copy" % (
-                        self.__class__.__name__.lower(),
-                        block_device['Ebs']['VolumeId']))
-                copy_tags = []
             tags.extend(copy_tags)
         return tags
 
