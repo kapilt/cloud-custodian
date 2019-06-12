@@ -1325,7 +1325,6 @@ class Snapshot(BaseAction):
         if self.data.get('copy-tags') and 'copy-volume-tags' in self.data:
             raise PolicyValidationError(
                 "Can specify copy-tags or copy-volume-tags, not both")
-
     def process(self, resources):
         client = utils.local_session(self.manager.session_factory).client('ec2')
         err = None
