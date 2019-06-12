@@ -143,6 +143,7 @@ def init():
     INITIALIZED = True
     return env
 
+
 def setup(app):
     init()
 
@@ -168,7 +169,6 @@ def main(provider, output_dir, group_by):
 
     # group by will be provider specific, supports nested attributes
     group_by = operator.attrgetter(group_by or "type")
-    groups = []
 
     for key, group in itertools.groupby(
             sorted(provider_class.resources.values(), key=group_by), key=group_by):
