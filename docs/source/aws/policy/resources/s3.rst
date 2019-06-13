@@ -14,10 +14,10 @@ Filters
   .. c7n-schema:: aws.s3.filters.global-grants
 
 
-``missing-policy-statement``
+``missing-statement``
   Find buckets missing a set of named policy statements
 
-  .. c7n-schema:: aws.s3.filters.missing-policy-statements
+  .. c7n-schema:: aws.s3.filters.missing-statement
 
 
 Actions

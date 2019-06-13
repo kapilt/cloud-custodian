@@ -20,5 +20,5 @@ Actions
 ``delete``
   Delete DB Snapshot
 
-  .. c7n-schema:: aws.rds.filters.delete
+  .. c7n-schema:: aws.rds.actions.delete
 

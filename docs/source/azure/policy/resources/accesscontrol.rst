@@ -25,7 +25,7 @@ Filters
 - ``resource-access``
   Filter Role Assignments based on access to an azure resource
 
-  .. c7n-schema:: azure.roleassignment.filters.role-assignment
+  .. c7n-schema:: azure.roleassignment.filters.resource-access
 
 - ``scope``
   Filter Role Assignments by scope access

@@ -75,6 +75,17 @@ Filters
   .. c7n-schema:: aws.asg.filters.user-data
 
 
+``offhour`` or ``OffHour``
+  Turn resources off based on a schedule.
+
+  .. c7n-schema:: aws.asg.filters.offhour
+
+``onhour`` or ``onhour``
+  Turn resources on based on a schedule.
+
+  .. c7n-schema:: aws.asg.filters.onhour
+
+
 Actions
 -------
 
@@ -131,18 +142,6 @@ Actions
   Delete ASG.
 
   .. c7n-schema:: aws.asg.actions.delete
-
-``offhour`` or ``OffHour``
-  Turn resources off based on a schedule.
-  :py:class:`.c7n.offhours`
-
-  .. c7n-schema:: aws.asg.actions.offhour
-
-``onhour`` or ``onhour``
-  Turn resources on based on a schedule.
-  :py:class:`.c7n.offhours`
-
-  .. c7n-schema:: aws.asg.actions.onhour
 
 
 Launch Configs

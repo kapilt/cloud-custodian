@@ -14,5 +14,5 @@ Actions
 ``delete``
   Delete AppELB
 
-  .. c7n-schema:: aws.appelb.actions.delete
+  .. c7n-schema:: aws.app-elb.actions.delete
 

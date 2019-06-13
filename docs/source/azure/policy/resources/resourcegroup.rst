@@ -22,7 +22,7 @@ Actions
 - ``delete``
   Delete a resource group
 
-  .. c7n-schema:: azure.resourcegroup.filters.delete
+  .. c7n-schema:: azure.resourcegroup.actions.delete
 
 
 

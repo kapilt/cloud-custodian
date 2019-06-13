@@ -12,7 +12,7 @@ Metric Filter
 ``MetricFilter``
 Filters Azure resources based on live metrics from the Azure monitor.
 
-.. c7n-schema:: azure.vm.filters.metrics
+.. c7n-schema:: azure.vm.filters.metric
 
 
 Metrics for Custodian-supported Azure resources:
@@ -197,7 +197,7 @@ Diagnostic Settings Filter
 The diagnostic settings filter is implicitly just the ValueFilter (see :ref:`filters`) on the diagnostic settings for
 an azure resource.
 
-.. c7n-schema:: azure.vm.filters.diagnostic-settings
+.. c7n-schema:: azure.loadbalancer.filters.diagnostic-settings
 
 
 Example Policies

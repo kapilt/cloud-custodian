@@ -38,5 +38,5 @@ Actions
 ``set-ssl-listener-policy``
   Set SSL listener policy
 
-  .. c7n-schema:: aws.elb.set-ssl-listener-policy
+  .. c7n-schema:: aws.elb.actions.set-ssl-listener-policy
 
