@@ -1350,7 +1350,7 @@ class Snapshot(BaseAction):
                 'ExcludeBootVolume': self.data.get('exclude-boot', False),
                 'InstanceId': resource['InstanceId']})
         if 'copy-tags' in self.data:
-            params['TagSpecifications'] =  [{
+            params['TagSpecifications'] = [{
                 'ResourceType': 'snapshot',
                 'Tags': self.get_snapshot_tags(resource)}]
         elif self.data.get('copy-volume-tags', True):
