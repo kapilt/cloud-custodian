@@ -54,3 +54,4 @@ This policy will get Network Interfaces that have VirtualNetworkGateway and VNet
               - None
               - VirtualAppliance
 
+:ref:`This policy <azure_orphanresources-nic>` will get Network Interfaces that are not attached to any Virtual Machine. 
