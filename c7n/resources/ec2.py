@@ -1325,6 +1325,7 @@ class Snapshot(BaseAction):
         if self.data.get('copy-tags') and 'copy-volume-tags' in self.data:
             raise PolicyValidationError(
                 "Can specify copy-tags or copy-volume-tags, not both")
+
     def process(self, resources):
         client = utils.local_session(self.manager.session_factory).client('ec2')
         err = None
@@ -1356,18 +1357,19 @@ class Snapshot(BaseAction):
             params['CopyTagsFromSource'] = 'volume'
 
         try:
-            snap_ids = [s['SnapshotId'] for s in client.create_snapshots(
-                **params)['Snapshots']]
+            result = self.manager.retry(client.create_snapshots(**params))
+            snap_ids = [s['SnapshotId'] for s in result['Snapshots']]
             resource['c7n:snapshots'] = snap_ids
         except ClientError as e:
-            if e.response['Error']['Code'] == 'IncorrectState':
-                self.log.warning(
-                    "action:%s instance:%s is incorrect state" % (
-                        self.__class__.__name__.lower(),
-                        resource['InstanceId']))
-            if e.response['Error']['Code'] == 'InvalidInstanceId.NotFound':
-                pass
-            raise
+            err_code = e.response['Error']['Code']
+            if err_code not in (
+                    'InvalidInstanceId.NotFound',
+                    'ConcurrentSnapshotLimitExceeded',
+                    'IncorrectState'):
+                raise
+            self.log.warning(
+                "action:snapshot instance:%s error:%s",
+                resource['InstanceId'], err_code)
 
     def get_snapshot_tags(self, resource):
         tags = [

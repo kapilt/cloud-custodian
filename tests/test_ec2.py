@@ -994,6 +994,42 @@ class TestOr(BaseTest):
 
 class TestSnapshot(BaseTest):
 
+    def test_ec2_snapshot_error_process_set(self):
+        p = self.load_policy({
+            'name': 'ec2-test-snapshot', "resource": "ec2",
+            "actions": [{"type": "snapshot"}]})
+        snapshotter = p.resource_manager.actions[0]
+
+        def process_volume_set(client, resource):
+            raise ValueError('something bad happened')
+
+        snapshotter.process_volume_set = process_volume_set
+        log = self.capture_logging('custodian.actions')
+        self.assertRaises(
+            ValueError, snapshotter.process, [{'InstanceId': 'xyz'}])
+        self.assertTrue('something' in log.getvalue())
+
+    def test_ec2_snapshot_error_process_once(self):
+        p = self.load_policy({
+            'name': 'ec2-test-snapshot', "resource": "ec2",
+            "actions": [{"type": "snapshot"}]})
+
+        log = self.capture_logging('custodian.actions')
+        snapshotter = p.resource_manager.actions[0]
+        client = mock.Mock(['create_snapshots'])
+        err_response = {'Error': {'Code': 'InvalidInstanceId.NotFound'}}
+        err = ClientError(err_response, 'create_snapshots')
+        client.create_snapshots.side_effect = err
+        snapshotter.process_volume_set(client, {'InstanceId': 'i-foo'})
+        client.create_snapshots.assert_called_once()
+
+        self.assertTrue('i-foo' in log.getvalue())
+        err_response['Error']['Code'] = 'InvalidRequest'
+        self.assertRaises(
+            ClientError,
+            snapshotter.process_volume_set,
+            client, {'InstanceId': 'i-foo'})
+
     def test_ec2_snapshot_validate(self):
         templ = {
             "name": "ec2-test-snapshot",
