@@ -1021,7 +1021,8 @@ class TestSnapshot(BaseTest):
         resources = policy.run()
         self.assertEqual(len(resources), 1)
         client = session_factory().client('ec2')
-        snaps = client.describe_snapshots(SnapshotIds=resources[0]['c7n:snapshots']).get('Snapshots')
+        snaps = client.describe_snapshots(
+            SnapshotIds=resources[0]['c7n:snapshots']).get('Snapshots')
         rtags = {t['Key']: t['Value'] for t in resources[0]['Tags']}
         for s in snaps:
             self.assertEqual(rtags, {t['Key']: t['Value'] for t in s['Tags']})
@@ -1041,7 +1042,8 @@ class TestSnapshot(BaseTest):
         self.assertEqual(len(resources), 1)
 
         client = session_factory().client('ec2')
-        snaps = client.describe_snapshots(SnapshotIds=resources[0]['c7n:snapshots']).get('Snapshots')
+        snaps = client.describe_snapshots(
+            SnapshotIds=resources[0]['c7n:snapshots']).get('Snapshots')
         rtags = {t['Key']: t['Value'] for t in resources[0]['Tags']}
         rtags.pop('App')
         rtags['custodian_snapshot'] = ''
