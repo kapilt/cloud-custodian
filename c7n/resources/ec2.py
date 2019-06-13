@@ -1357,9 +1357,9 @@ class Snapshot(BaseAction):
             params['CopyTagsFromSource'] = 'volume'
 
         try:
-            result = self.manager.retry(client.create_snapshots(**params))
-            snap_ids = [s['SnapshotId'] for s in result['Snapshots']]
-            resource['c7n:snapshots'] = snap_ids
+            result = self.manager.retry(client.create_snapshots, **params)
+            resource['c7n:snapshots'] = [
+                s['SnapshotId'] for s in result['Snapshots']]
         except ClientError as e:
             err_code = e.response['Error']['Code']
             if err_code not in (
