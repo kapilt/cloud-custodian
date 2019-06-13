@@ -14,8 +14,7 @@ Filters
     - Filter based on Effective Routes associated with network interfaces such as route names, next hops.
     - Network Interfaces must be attached to a virtual machine and the virtual machine must be powered on.
 
-    .. c7n-schema:: EffectiveRouteTableFilter
-       :module: c7n_azure.resources.network_interface
+    .. c7n-schema:: azure.networkinterface.filters.effective-route-table
 
 Actions
 -------
