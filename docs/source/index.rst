@@ -36,7 +36,7 @@ Navigate below and get started with Cloud Custodian!
    aws/usage
    aws/lambda
    aws/mu
-   aws/resources/index
+   aws/policy/index
 
 .. toctree::
    :maxdepth: 1
@@ -56,7 +56,10 @@ Navigate below and get started with Cloud Custodian!
 
    gcp/gettingstarted
    gcp/gcp-modes
-   gcp/resources/index
+   gcp/examples/index
+   gcp/policy/index
+   gcp/contribute
+
 
 .. toctree::
    :maxdepth: 2
