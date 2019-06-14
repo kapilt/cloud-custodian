@@ -69,6 +69,7 @@ class ConfigRule(QueryResourceManager):
 class RuleStatus(ValueFilter):
 
     schema = type_schema('status', rinherit=ValueFilter.schema)
+    schema_alias = False
     permissions = ('config:DescribeConfigRuleEvaluationStatus',)
     annotate = False
 

@@ -494,7 +494,7 @@ class StartNotebookInstance(BaseAction, StateTransitionFilter):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: start-sagemaker-notebook
@@ -527,7 +527,7 @@ class StopNotebookInstance(BaseAction, StateTransitionFilter):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: stop-sagemaker-notebook
@@ -562,7 +562,7 @@ class DeleteNotebookInstance(BaseAction, StateTransitionFilter):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: delete-sagemaker-notebook
@@ -609,7 +609,7 @@ class DeleteModel(BaseAction, StateTransitionFilter):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: delete-sagemaker-model
@@ -667,7 +667,7 @@ class SagemakerEndpointDelete(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: delete-sagemaker-endpoint
@@ -697,7 +697,7 @@ class SagemakerEndpointConfigDelete(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: delete-sagemaker-endpoint-config

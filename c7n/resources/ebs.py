@@ -538,7 +538,6 @@ class EBS(QueryResourceManager):
 
 @EBS.action_registry.register('detach')
 class VolumeDetach(BaseAction):
-
     """
     Detach an EBS volume from an Instance.
 
@@ -589,6 +588,7 @@ class AttachedInstanceFilter(ValueFilter):
     """
 
     schema = type_schema('instance', rinherit=ValueFilter.schema)
+    schema_alias = False
 
     def get_permissions(self):
         return self.manager.get_resource_manager('ec2').get_permissions()
@@ -632,11 +632,14 @@ class FaultTolerantSnapshots(Filter):
     means that, in the event of a failure, the volume can be restored
     from a snapshot with (reasonable) data loss
 
-    - name: ebs-volume-tolerance
-    - resource: ebs
-    - filters: [{
-        'type': 'fault-tolerant',
-        'tolerant': True}]
+    .. code-block:: yaml
+
+      policies:
+       - name: ebs-volume-tolerance
+         resource: ebs
+         filters:
+           - type: fault-tolerant
+             tolerant: True
     """
     schema = type_schema('fault-tolerant', tolerant={'type': 'boolean'})
     check_id = 'H7IgTzjTYb'
@@ -663,6 +666,7 @@ class FaultTolerantSnapshots(Filter):
 @EBS.filter_registry.register('health-event')
 class HealthFilter(HealthEventFilter):
 
+    schema_alias = False
     schema = type_schema(
         'health-event',
         types={'type': 'array', 'items': {
@@ -1237,7 +1241,7 @@ class ModifyableVolume(Filter):
       - must wait at least 6hrs between modifications to the same volume.
       - volumes must have been attached after nov 1st, 2016.
 
-    See `custodian schema ebs.actions.modify` for examples.
+    See :ref:`modify action <aws.ebs.actions.modify>` for examples.
     """
 
     schema = type_schema('modifyable')

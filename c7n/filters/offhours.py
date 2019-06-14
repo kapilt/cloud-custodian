@@ -259,7 +259,10 @@ def parens_removed(u):
 
 
 class Time(Filter):
-
+    """
+    Schedule offhours for resources see :ref:`offhours <offhours>`
+    for features and configuration.
+    """
     schema = {
         'type': 'object',
         'properties': {

@@ -58,7 +58,7 @@ class DeleteBackup(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
             - name: delete-backups
@@ -129,7 +129,7 @@ class UpdateFileSystem(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
             - name: update-fsx-resource
@@ -172,7 +172,7 @@ class BackupFileSystem(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
             - name: backup-fsx-resource
@@ -253,7 +253,7 @@ class DeleteFileSystem(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
             - name: delete-fsx-instance-with-snapshot

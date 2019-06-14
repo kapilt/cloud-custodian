@@ -83,6 +83,7 @@ class MetricFilter(Filter):
         'type': 'object',
         'required': ['type', 'metric', 'op', 'threshold'],
         'properties': {
+            'type': {'enum': ['metric']},
             'metric': {'type': 'string'},
             'op': {'enum': list(scalar_ops.keys())},
             'threshold': {'type': 'number'},

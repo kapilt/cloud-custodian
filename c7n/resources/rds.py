@@ -258,15 +258,8 @@ def _get_available_engine_upgrades(client, major=False):
     return results
 
 
-@filters.register('offhour')
-class RDSOffHour(OffHour):
-    """Scheduled action on rds instance.
-    """
-
-
-@filters.register('onhour')
-class RDSOnHour(OnHour):
-    """Scheduled action on rds instance."""
+filters.register('offhour', OffHour)
+filters.register('onhour', OnHour)
 
 
 @filters.register('default-vpc')
@@ -651,7 +644,9 @@ class CopySnapshotTags(BaseAction):
 
     DEPRECATED - use modify-db instead with `CopyTagsToSnapshot`
 
-        .. code-block: yaml
+    :example:
+
+        .. code-block:: yaml
 
             policies:
               - name: enable-rds-snapshot-tags
@@ -1523,6 +1518,7 @@ class ParameterFilter(ValueFilter):
     """
 
     schema = type_schema('db-parameter', rinherit=ValueFilter.schema)
+    schema_alias = False
     permissions = ('rds:DescribeDBInstances', 'rds:DescribeDBParameters', )
 
     @staticmethod

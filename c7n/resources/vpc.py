@@ -362,7 +362,7 @@ class DhcpOptionsFilter(Filter):
 
      :example:
 
-     .. code-block: yaml
+     .. code-block:: yaml
 
           policies:
              - name: vpcs-in-domain
@@ -1373,7 +1373,7 @@ class DeleteNetworkInterface(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: mark-orphaned-enis
@@ -1476,6 +1476,7 @@ class Route(ValueFilter):
     """Filter a route table by its routes' attributes."""
 
     schema = type_schema('route', rinherit=ValueFilter.schema)
+    schema_alias = False
 
     def process(self, resources, event=None):
         results = []
@@ -1949,7 +1950,7 @@ class CreateFlowLogs(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: vpc-enable-flow-logs

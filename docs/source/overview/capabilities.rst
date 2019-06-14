@@ -35,17 +35,6 @@ section :ref:`explore-cc` on how to view the full list of available resources.
 AWS
 ---
 
-- :ref:`ami`
-- :ref:`asg`
-- :ref:`cfn`
-- :ref:`ebs`
-- :ref:`ec2`
-- :ref:`elb`
-- :ref:`kms`
-- :ref:`rds`
-- :ref:`redshift`
-- :ref:`s3`
-
 Azure
 -----
 - :ref:`azure_vm`
@@ -58,6 +47,6 @@ Azure
 
 GCP
 ---
-- tbd
+
 
 For multi-account/subscription/project execution, see c7n-org.

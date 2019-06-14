@@ -1,6 +1,7 @@
-.. {{provider_name|upper}}:
+.. _{{provider_name|upper}}:
 
-{{provider_name|upper}} Resources
+{{provider_name|upper}} Reference
+------------------------------------
 
 Reference information about provider resources and their actions and filters.
 See the :ref:`Generic Filters reference <filters>` for filters that can

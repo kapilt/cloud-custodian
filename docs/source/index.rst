@@ -27,7 +27,7 @@ Navigate below and get started with Cloud Custodian!
    overview/deployment
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: AWS
 
    aws/gettingstarted
@@ -35,8 +35,7 @@ Navigate below and get started with Cloud Custodian!
    aws/aws-modes
    aws/usage
    aws/lambda
-   aws/mu
-   aws/policy/index
+   aws/resources/index
 
 .. toctree::
    :maxdepth: 1

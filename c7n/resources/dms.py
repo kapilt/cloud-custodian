@@ -141,7 +141,7 @@ class ModifyReplicationInstance(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: enable-minor-version-upgrade
@@ -284,7 +284,7 @@ class ModifyDmsEndpoint(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
           policies:
             - name: dms-endpoint-modify
@@ -389,7 +389,7 @@ class DeleteDmsEndpoint(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
           policies:
             - name: dms-endpoint-no-ssl-delete

@@ -148,6 +148,7 @@ class Parameter(ValueFilter):
     """
 
     schema = type_schema('param', rinherit=ValueFilter.schema)
+    schema_alias = False
     group_params = ()
 
     permissions = ("redshift:DescribeClusterParameters",)
@@ -835,7 +836,7 @@ class RedshiftSnapshotRevokeAccess(BaseAction):
 
     :example:
 
-        .. code-block: yaml
+        .. code-block:: yaml
 
             policies:
               - name: redshift-snapshot-revoke-access

@@ -265,7 +265,7 @@ class DeleteStage(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: delete-rest-stage
@@ -357,6 +357,7 @@ class FilterRestIntegration(ValueFilter):
             'all', 'ANY', 'PUT', 'GET', "POST",
             "DELETE", "OPTIONS", "HEAD", "PATCH"]},
         rinherit=ValueFilter.schema)
+    schema_alias = False
     permissions = ('apigateway:GET',)
 
     def process(self, resources, event=None):
@@ -427,7 +428,7 @@ class UpdateRestIntegration(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: enforce-timeout-on-api-integration
@@ -481,7 +482,7 @@ class DeleteRestIntegration(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: enforce-no-resource-integration-with-type-aws
@@ -533,6 +534,7 @@ class FilterRestMethod(ValueFilter):
             'all', 'ANY', 'PUT', 'GET', "POST",
             "DELETE", "OPTIONS", "HEAD", "PATCH"]},
         rinherit=ValueFilter.schema)
+    schema_alias = False
     permissions = ('apigateway:GET',)
 
     def process(self, resources, event=None):
@@ -594,7 +596,7 @@ class UpdateRestMethod(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: enforce-iam-permissions-on-api

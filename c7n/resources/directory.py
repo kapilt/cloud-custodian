@@ -70,7 +70,7 @@ class DirectoryTag(Tag):
 
     :example:
 
-        .. code-block: yaml
+        .. code-block:: yaml
 
             policies:
               - name: tag-directory
@@ -99,7 +99,7 @@ class DirectoryRemoveTag(RemoveTag):
 
     :example:
 
-        .. code-block: yaml
+        .. code-block:: yaml
 
             policies:
               - name: remove-directory-tag

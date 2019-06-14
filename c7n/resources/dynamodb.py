@@ -541,7 +541,7 @@ class DaxDeleteCluster(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: dax-delete-cluster
@@ -571,7 +571,7 @@ class DaxUpdateCluster(BaseAction):
 
     :example:
 
-    .. code-block: yaml
+    .. code-block:: yaml
 
         policies:
           - name: dax-update-cluster

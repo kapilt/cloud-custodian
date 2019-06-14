@@ -414,12 +414,36 @@ def resource_vocabulary(cloud_name=None, qualify_name=True):
     for type_name, resource_type in resources.items():
         classes = {'actions': {}, 'filters': {}, 'resource': resource_type}
         actions = []
+        seen_actions = set() # Aliases get processed once
         for action_name, cls in resource_type.action_registry.items():
+
+            if cls in seen_actions:
+                continue
+            else:
+                seen_actions.add(cls)
+
+            if 'type' in cls.schema['properties']:
+                action_name = cls.schema['properties']['type']['enum'][0]
+            else:
+                import pdb; pdb.set_trace()
+                print("{}.{} {}".format(type_name, action_name, cls))
             actions.append(action_name)
             classes['actions'][action_name] = cls
 
         filters = []
+        seen_filters = set()
         for filter_name, cls in resource_type.filter_registry.items():
+            if cls in seen_filters:
+                continue
+            else:
+                seen_filters.add(cls)
+            if filter_name in ('and', 'or', 'not'):
+                continue
+            if 'properties' in cls.schema and 'type' in cls.schema['properties']:
+                filter_name = cls.schema['properties']['type']['enum'][0]
+            else:
+                import pdb; pdb.set_trace()
+                print("{}.{} {}".format(type_name, filter_name, cls))
             filters.append(filter_name)
             classes['filters'][filter_name] = cls
 
