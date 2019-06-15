@@ -13,12 +13,10 @@
 # limitations under the License.
 from __future__ import absolute_import
 
-import inspect
 import itertools
 import logging
 import operator
 import os
-
 
 import click
 import yaml
@@ -33,8 +31,8 @@ from sphinx.errors import SphinxError
 from sphinx.directives import SphinxDirective as Directive
 from sphinx.util.nodes import nested_parse_with_titles
 
-from c7n.filters import ValueFilter
-from c7n.schema import resource_vocabulary, generate as generate_schema
+from c7n.schema import (
+    ElementSchema, resource_vocabulary, generate as generate_schema)
 from c7n.resources import load_resources
 from c7n.provider import clouds
 
@@ -45,49 +43,11 @@ def template_underline(value, under="="):
     return len(value) * under
 
 
-def element_name(cls):
-    return cls.schema['properties']['type']['enum'][0]
-
-
-def element_doc(cls):
-    if cls.__doc__ is not None:
-        return inspect.cleandoc(cls.__doc__)
-    for b in cls.__bases__:
-        if b in (ValueFilter, object):
-            continue
-        doc = b.__doc__ or element_doc(b)
-        if doc is not None:
-            print("{} -> {} for docs".format(cls, b))
-            return inspect.cleandoc(doc)
-    return ""
-
-
-def element_permissions(cls):
-    if cls.permissions:
-        return cls.permissions
-    return ()
-
-
-def elements(cls, registry_attr):
-    registry = getattr(cls, registry_attr)
-    seen = {}
-    for k, v in registry.items():
-        if k in ('and', 'or', 'not'):
-            continue
-        if v in seen:
-            continue
-        else:
-            seen[element_name(v)] = v
-
-    return [seen[k] for k in sorted(seen)]
-
-
 def get_environment():
     env = Environment(loader=PackageLoader('c7n_sphinxext', '_templates'))
     env.globals['underline'] = template_underline
-    env.globals['ename'] = element_name
-    env.globals['edoc'] = element_doc
-    env.globals['eperm'] = element_permissions
+    env.globals['ename'] = ElementSchema.name
+    env.globals['edoc'] = ElementSchema.doc
     env.globals['eschema'] = CustodianSchema.render_schema
     env.globals['render_resource'] = CustodianResource.render_resource
     return env
@@ -121,27 +81,7 @@ class CustodianDirective(Directive):
 
     @classmethod
     def resolve(cls, schema_path):
-        current = cls.vocabulary
-        frag = None
-        if schema_path.startswith('.'):
-            # The preprended '.' is an odd artifact
-            schema_path = schema_path[1:]
-        parts = schema_path.split('.')
-        while parts:
-            k = parts.pop(0)
-            if frag:
-                k = "%s.%s" % (frag, k)
-                frag = None
-                parts.insert(0, 'classes')
-            elif k in clouds:
-                frag = k
-                if len(parts) == 1:
-                    parts.append('resource')
-                continue
-            if k not in current:
-                raise ValueError("Invalid schema path %s" % schema_path)
-            current = current[k]
-        return current
+        return ElementSchema.resolve(cls.vocabulary, schema_path)
 
 
 class CustodianResource(CustodianDirective):
@@ -154,8 +94,8 @@ class CustodianResource(CustodianDirective):
             variables=dict(
                 provider_name=provider_name,
                 resource_name="%s.%s" % (provider_name, resource_class.type),
-                filters=elements(resource_class, 'filter_registry'),
-                actions=elements(resource_class, 'action_registry'),
+                filters=ElementSchema.elements(resource_class.filter_registry),
+                actions=ElementSchema.elements(resource_class.action_registry),
                 resource=resource_class))
 
 
@@ -163,30 +103,19 @@ class CustodianSchema(CustodianDirective):
 
     option_spec = {'module': unchanged}
 
-    @staticmethod
-    def schema_present(schema):
-        s = dict(schema)
-        s.pop('type', None)
-        s.pop('additionalProperties', None)
-        return s
-
     @classmethod
     def render_schema(cls, el):
         return cls._render(
             'schema.rst',
             {'schema_yaml': yaml.safe_dump(
-                cls.schema_present(el.schema),
+                ElementSchema.schema(cls.definitions, el),
                 default_flow_style=False)})
 
     def run(self):
         schema_path = self.arguments[0]
-        schema = self.resolve(schema_path).schema
-        if schema is None:
-            raise SphinxError(
-                "Unable to generate reference docs for %s, no schema found" % (
-                    schema_path))
+        el = self.resolve(schema_path)
         schema_yaml = yaml.safe_dump(
-            self.schema_present(schema), default_flow_style=False)
+            ElementSchema.schema(self.definitions, el), default_flow_style=False)
         return self._nodify(
             'schema.rst', '<c7n-schema>',
             dict(name=schema_path, schema_yaml=schema_yaml))
@@ -262,10 +191,10 @@ def _main(provider, output_dir, group_by):
     common_actions = {}
     common_filters = {}
     for r in provider_class.resources.values():
-        for f in elements(r, 'filter_registry'):
+        for f in ElementSchema.elements(r.filter_registry):
             if not f.schema_alias:
                 continue
-            common_filters[element_name(f)] = (f, r)
+            common_filters[ElementSchema.name(f)] = (f, r)
         fpath = os.path.join(
             output_dir, "%s-common-filters.rst" % provider_class.type.lower())
         with open(fpath, 'w') as fh:
@@ -275,10 +204,10 @@ def _main(provider, output_dir, group_by):
                 element_type='filters',
                 elements=[common_filters[k] for k in sorted(common_filters)]))
 
-        for a in elements(r, 'action_registry'):
+        for a in ElementSchema.elements(r.action_registry):
             if not a.schema_alias:
                 continue
-            common_actions[element_name(a)] = (a, r)
+            common_actions[ElementSchema.name(a)] = (a, r)
         fpath = os.path.join(
             output_dir, "%s-common-actions.rst" % provider_class.type.lower())
         with open(fpath, 'w') as fh:

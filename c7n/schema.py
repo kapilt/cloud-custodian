@@ -29,8 +29,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from collections import Counter
 import json
+import inspect
 import logging
 
+import jmespath
 from jsonschema import Draft4Validator as Validator
 from jsonschema.exceptions import best_match
 
@@ -414,30 +416,14 @@ def resource_vocabulary(cloud_name=None, qualify_name=True):
     for type_name, resource_type in resources.items():
         classes = {'actions': {}, 'filters': {}, 'resource': resource_type}
         actions = []
-        seen_actions = set()  # Aliases get processed once
-        for action_name, cls in resource_type.action_registry.items():
-
-            if cls in seen_actions:
-                continue
-            else:
-                seen_actions.add(cls)
-
-            if 'type' in cls.schema['properties']:
-                action_name = cls.schema['properties']['type']['enum'][0]
+        for cls in ElementSchema.elements(resource_type.action_registry):
+            action_name = ElementSchema.name(cls)
             actions.append(action_name)
             classes['actions'][action_name] = cls
 
         filters = []
-        seen_filters = set()
-        for filter_name, cls in resource_type.filter_registry.items():
-            if cls in seen_filters:
-                continue
-            else:
-                seen_filters.add(cls)
-            if filter_name in ('and', 'or', 'not'):
-                continue
-            if 'properties' in cls.schema and 'type' in cls.schema['properties']:
-                filter_name = cls.schema['properties']['type']['enum'][0]
+        for cls in ElementSchema.elements(resource_type.filter_registry):
+            filter_name = ElementSchema.name(cls)
             filters.append(filter_name)
             classes['filters'][filter_name] = cls
 
@@ -454,7 +440,96 @@ def resource_vocabulary(cloud_name=None, qualify_name=True):
     return vocabulary
 
 
-def summary(vocabulary):
+class ElementSchema(object):
+    """Utility functions for working with resource's filters and actions.
+    """
+
+    @staticmethod
+    def elements(registry):
+        """Given a resource registry return sorted de-aliased values.
+        """
+        seen = {}
+        for k, v in registry.items():
+            if k in ('and', 'or', 'not'):
+                continue
+            if v in seen:
+                continue
+            else:
+                seen[ElementSchema.name(v)] = v
+        return [seen[k] for k in sorted(seen)]
+
+    @staticmethod
+    def resolve(vocabulary, schema_path):
+        """Given a resource vocabulary and a dotted path, resolve an element.
+        """
+        current = vocabulary
+        frag = None
+        if schema_path.startswith('.'):
+            # The preprended '.' is an odd artifact
+            schema_path = schema_path[1:]
+        parts = schema_path.split('.')
+        while parts:
+            k = parts.pop(0)
+            if frag:
+                k = "%s.%s" % (frag, k)
+                frag = None
+                parts.insert(0, 'classes')
+            elif k in clouds:
+                frag = k
+                if len(parts) == 1:
+                    parts.append('resource')
+                continue
+            if k not in current:
+                raise ValueError("Invalid schema path %s" % schema_path)
+            current = current[k]
+        return current
+
+    @staticmethod
+    def name(cls):
+        """For a filter or action return its name."""
+        return cls.schema['properties']['type']['enum'][0]
+
+    @staticmethod
+    def doc(cls):
+        """Return 'best' formatted doc string for a given class.
+
+        Walks up class hierarchy, skipping known bad. Returns
+        empty string if no suitable doc string found.
+        """
+        # walk up class hierarchy for nearest
+        # good doc string, skip known
+        if cls.__doc__ is not None:
+            return inspect.cleandoc(cls.__doc__)
+        for b in cls.__bases__:
+            if b in (ValueFilter, object):
+                continue
+        doc = b.__doc__ or ElementSchema.element_doc(b)
+        if doc is not None:
+            return inspect.cleandoc(doc)
+        return ""
+
+    @staticmethod
+    def schema(definitions, cls):
+        """Return a pretty'ified version of an element schema."""
+        schema = dict(cls.schema)
+        schema.pop('type', None)
+        schema.pop('additionalProperties', None)
+        return ElementSchema._expand_schema(definitions, cls)
+
+    @staticmethod
+    def _expand_schema(schema, definitions):
+        """Expand references in schema to their full schema"""
+        for k, v in list(schema.items()):
+            if k == '$ref':
+                # the value here is in the form of: '#/definitions/path/to/key'
+                path = '.'.join(v.split('/')[2:])
+            return jmespath.search(path, definitions)
+        if isinstance(v, dict):
+            schema[k] = ElementSchema._expand_schema(v, definitions)
+        return schema
+
+
+def pprint_schema_summary(vocabulary):
     providers = {}
     non_providers = {}
 
