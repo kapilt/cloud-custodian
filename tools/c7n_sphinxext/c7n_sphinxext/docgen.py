@@ -40,8 +40,6 @@ from c7n.provider import clouds
 
 log = logging.getLogger('c7nsphinx')
 
-from c7n.filters.offhours import OffHour
-
 
 def template_underline(value, under="="):
     return len(value) * under
@@ -52,7 +50,7 @@ def element_name(cls):
 
 
 def element_doc(cls):
-    if cls.__doc__ != None:
+    if cls.__doc__ is not None:
         return inspect.cleandoc(cls.__doc__)
     for b in cls.__bases__:
         if b in (ValueFilter, object):
