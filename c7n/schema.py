@@ -511,10 +511,10 @@ class ElementSchema(object):
     @staticmethod
     def schema(definitions, cls):
         """Return a pretty'ified version of an element schema."""
-        schema = dict(cls.schema)
+        schema = isinstance(cls, type) and dict(cls.schema) or dict(cls)
         schema.pop('type', None)
         schema.pop('additionalProperties', None)
-        return ElementSchema._expand_schema(definitions, cls)
+        return ElementSchema._expand_schema(schema, definitions)
 
     @staticmethod
     def _expand_schema(schema, definitions):
@@ -523,9 +523,9 @@ class ElementSchema(object):
             if k == '$ref':
                 # the value here is in the form of: '#/definitions/path/to/key'
                 path = '.'.join(v.split('/')[2:])
-            return jmespath.search(path, definitions)
-        if isinstance(v, dict):
-            schema[k] = ElementSchema._expand_schema(v, definitions)
+                return jmespath.search(path, definitions)
+            elif isinstance(v, dict):
+                schema[k] = ElementSchema._expand_schema(v, definitions)
         return schema
 
 

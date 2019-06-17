@@ -383,7 +383,7 @@ def schema_cmd(options):
 
     resource_mapping = schema.resource_vocabulary()
     if options.summary:
-        schema.summary(resource_mapping)
+        schema.pprint_schema_summary(resource_mapping)
         return
 
     # Here are the formats for what we accept:
