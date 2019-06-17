@@ -27,7 +27,6 @@ from docutils.parsers.rst.directives import unchanged
 
 from jinja2 import Environment, PackageLoader
 
-from sphinx.errors import SphinxError
 from sphinx.directives import SphinxDirective as Directive
 from sphinx.util.nodes import nested_parse_with_titles
 
