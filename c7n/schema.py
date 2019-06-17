@@ -500,10 +500,11 @@ class ElementSchema(object):
         # good doc string, skip known
         if cls.__doc__ is not None:
             return inspect.cleandoc(cls.__doc__)
+        doc = None
         for b in cls.__bases__:
             if b in (ValueFilter, object):
                 continue
-        doc = b.__doc__ or ElementSchema.element_doc(b)
+            doc = b.__doc__ or ElementSchema.doc(b)
         if doc is not None:
             return inspect.cleandoc(doc)
         return ""
