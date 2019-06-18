@@ -166,7 +166,7 @@ class LogGroup(QueryResourceManager):
     def augment(self, resources):
         resources = universal_augment(self, resources)
         for r in resources:
-            r['creationTime'] = r['creationTime']/1000.0
+            r['creationTime'] = r['creationTime'] / 1000.0
         return resources
 
     def get_arns(self, resources):
