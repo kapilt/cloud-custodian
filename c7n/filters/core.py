@@ -23,6 +23,7 @@ import fnmatch
 import logging
 import operator
 import re
+import sys
 
 from dateutil.tz import tzutc
 from dateutil.parser import parse
@@ -110,7 +111,7 @@ OPERATORS = {
 VALUE_TYPES = [
     'age', 'integer', 'expiration', 'normalize', 'size',
     'cidr', 'cidr_size', 'swap', 'resource_count', 'expr',
-    'unique_size']
+    'unique_size', 'date']
 
 
 class FilterRegistry(PluginRegistry):
@@ -420,7 +421,11 @@ class ValueFilter(Filter):
         # the value filters because it operates on the full resource list
         if self.data.get('value_type') == 'resource_count':
             return self._validate_resource_count()
-
+        elif self.data.get('value_type') == 'date':
+            if not parse_date(self.data.get('value')):
+                raise PolicyValidationError(
+                    "value_type: date with invalid date value:%s",
+                    self.data.get('value', ''))
         if 'key' not in self.data and 'key' in self.required_keys:
             raise PolicyValidationError(
                 "Missing 'key' in value filter %s" % self.data)
@@ -587,21 +592,15 @@ class ValueFilter(Filter):
                 return sentinel, 0
         elif self.vtype == 'swap':
             return value, sentinel
+        elif self.vtype == 'date':
+            return parse_date(sentinel), parse_date(value)
         elif self.vtype == 'age':
             if not isinstance(sentinel, datetime.datetime):
                 sentinel = datetime.datetime.now(tz=tzutc()) - timedelta(sentinel)
-            if isinstance(value, (str, int, float)):
-                try:
-                    value = datetime.datetime.fromtimestamp(float(value)).replace(tzinfo=tzutc())
-                except ValueError:
-                    pass
-            if not isinstance(value, datetime.datetime):
-                # EMR bug when testing ages in EMR. This is due to
-                # EMR not having more functionality.
-                try:
-                    value = parse(value, default=datetime.datetime.now(tz=tzutc()))
-                except (AttributeError, TypeError, ValueError):
-                    value = 0
+            value = parse_date(value)
+            if value is None:
+                # compatiblity
+                value = 0
             # Reverse the age comparison, we want to compare the value being
             # greater than the sentinel typically. Else the syntax for age
             # comparisons is intuitively wrong.
@@ -623,13 +622,9 @@ class ValueFilter(Filter):
         elif self.vtype == 'expiration':
             if not isinstance(sentinel, datetime.datetime):
                 sentinel = datetime.datetime.now(tz=tzutc()) + timedelta(sentinel)
-
-            if not isinstance(value, datetime.datetime):
-                try:
-                    value = parse(value, default=datetime.datetime.now(tz=tzutc()))
-                except (AttributeError, TypeError, ValueError):
-                    value = 0
-
+            value = parse_date(value)
+            if value is None:
+                value = 0
             return sentinel, value
         return sentinel, value
 
@@ -699,6 +694,38 @@ class EventFilter(ValueFilter):
         return []
 
 
+def cast_tz(d, tz):
+    if sys.version_info.major == 2:
+        return d.replace(tzinfo=tz)
+    return d.astimezone(tz)
+
+
+def parse_date(v, tz=None):
+    if v is None:
+        return v
+
+    tz = tz or tzutc()
+
+    if isinstance(v, datetime.datetime):
+        if v.tzinfo is None:
+            return cast_tz(v, tz)
+        return v
+
+    if isinstance(v, six.string_types):
+        try:
+            return cast_tz(parse(v), tz)
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    if isinstance(v, (int, float) + six.string_types):
+        try:
+            v = cast_tz(datetime.datetime.fromtimestamp(float(v)), tz)
+        except ValueError:
+            pass
+
+    return isinstance(v, datetime.datetime) and v or None
+
+
 class ValueRegex(object):
     """Allows filtering based on the output of a regex capture.
     This is useful for parsing data that has a weird format.
@@ -733,3 +760,17 @@ class ValueRegex(object):
         if capture is None:  # regex didn't capture anything
             return None
         return capture.group(1)
+
+
+class StateTransitionFilter(Filter):
+    valid_origin_states = ()
+
+    def filter_resource_state(self, resources, event=None):
+        state_key = self.manager.get_model().state_key
+        states = self.valid_origin_states
+        orig_length = len(resources)
+        results = [r for r in resources if r[state_key] in states]
+        self.log.info("filtered %d of %d %s resources with  %s states" % (
+            len(results), orig_length, self.__class__.__name__, states))
+
+        return results

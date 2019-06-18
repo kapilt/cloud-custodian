@@ -16,11 +16,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 
+import functools
+
 from c7n.manager import resources
 from c7n.query import QueryResourceManager
-from c7n.utils import local_session, chunks, type_schema
+from c7n.utils import local_session, chunks, type_schema, generate_arn
 from c7n.actions import BaseAction
 from c7n.filters.vpc import SubnetFilter, SecurityGroupFilter
+from c7n.tags import universal_augment, register_universal_tags
+from c7n.filters import StateTransitionFilter
 
 
 @resources.register('glue-connection')
@@ -96,8 +100,28 @@ class GlueDevEndpoint(QueryResourceManager):
         dimension = None
         filter_name = None
         arn = False
+        type = 'devEndpoint'
 
     permissions = ('glue:GetDevEndpoints',)
+
+    augment = universal_augment
+
+    @property
+    def generate_arn(self):
+        self._generate_arn = functools.partial(
+            generate_arn,
+            'glue',
+            region=self.config.region,
+            account_id=self.config.account_id,
+            resource_type='devEndpoint',
+            separator='/')
+        return self._generate_arn
+
+    def get_arns(self, resources):
+        return [self.generate_arn(r['EndpointName']) for r in resources]
+
+
+register_universal_tags(GlueDevEndpoint.filter_registry, GlueDevEndpoint.action_registry)
 
 
 @GlueDevEndpoint.action_registry.register('delete')
@@ -137,3 +161,109 @@ class DeleteDevEndpoint(BaseAction):
                     self.log.error(
                         "Exception deleting glue dev endpoint \n %s",
                         f.exception())
+
+
+@resources.register('glue-job')
+class GlueJob(QueryResourceManager):
+
+    class resource_type(object):
+        service = 'glue'
+        enum_spec = ('get_jobs', 'Jobs', None)
+        detail_spec = None
+        id = name = 'Name'
+        date = 'CreatedOn'
+        dimension = None
+        filter_name = None
+        type = 'job'
+        arn = False
+
+    permissions = ('glue:GetJobs',)
+
+    augment = universal_augment
+
+    @property
+    def generate_arn(self):
+        self._generate_arn = functools.partial(
+            generate_arn,
+            'glue',
+            region=self.config.region,
+            account_id=self.config.account_id,
+            resource_type='job',
+            separator='/')
+        return self._generate_arn
+
+    def get_arns(self, resources):
+        return [self.generate_arn(r['Name']) for r in resources]
+
+
+register_universal_tags(GlueJob.filter_registry, GlueJob.action_registry)
+
+
+@GlueJob.action_registry.register('delete')
+class DeleteJob(BaseAction):
+
+    schema = type_schema('delete')
+    permissions = ('glue:DeleteJob',)
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('glue')
+        for r in resources:
+            try:
+                client.delete_job(JobName=r['Name'])
+            except client.exceptions.EntityNotFoundException:
+                continue
+
+
+@resources.register('glue-crawler')
+class GlueCrawler(QueryResourceManager):
+
+    class resource_type(object):
+        service = 'glue'
+        enum_spec = ('get_crawlers', 'Crawlers', None)
+        detail_spec = None
+        id = name = 'Name'
+        date = 'CreatedOn'
+        dimension = None
+        filter_name = None,
+        type = 'crawler'
+        arn = False
+        state_key = 'State'
+
+    permissions = ('glue:GetCrawlers',)
+
+    augment = universal_augment
+
+    @property
+    def generate_arn(self):
+        self._generate_arn = functools.partial(
+            generate_arn,
+            'glue',
+            region=self.config.region,
+            account_id=self.config.account_id,
+            resource_type='crawler',
+            separator='/')
+        return self._generate_arn
+
+    def get_arns(self, resources):
+        return [self.generate_arn(r['Name']) for r in resources]
+
+
+register_universal_tags(GlueCrawler.filter_registry, GlueCrawler.action_registry)
+
+
+@GlueCrawler.action_registry.register('delete')
+class DeleteCrawler(BaseAction, StateTransitionFilter):
+
+    schema = type_schema('delete')
+    permissions = ('glue:DeleteCrawler',)
+    valid_origin_states = ('READY', 'FAILED')
+
+    def process(self, resources):
+        resources = self.filter_resource_state(resources)
+
+        client = local_session(self.manager.session_factory).client('glue')
+        for r in resources:
+            try:
+                client.delete_crawler(Name=r['Name'])
+            except client.exceptions.EntityNotFoundException:
+                continue
