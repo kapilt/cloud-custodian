@@ -82,6 +82,7 @@ class MetricFilter(Filter):
     schema = {
         'type': 'object',
         'required': ['type', 'metric', 'op', 'threshold'],
+        'additionalProperties': False,
         'properties': {
             'type': {'enum': ['metric']},
             'metric': {'type': 'string'},
