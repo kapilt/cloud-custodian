@@ -416,6 +416,7 @@ class FirewallRulesFilter(Filter):
             'include': {'type': 'array', 'items': {'type': 'string'}},
             'equal': {'type': 'array', 'items': {'type': 'string'}}
         })
+    schema_alias = True
 
     def __init__(self, data, manager=None):
         super(FirewallRulesFilter, self).__init__(data, manager)
