@@ -525,7 +525,7 @@ class ElementSchema(object):
                 parts = v.split('/')
                 if ['#', 'definitions'] != parts[0:2]:
                     raise ValueError("Invalid Ref %s" % v)
-                current =  definitions
+                current = definitions
                 for p in parts[2:]:
                     if p not in current:
                         return None

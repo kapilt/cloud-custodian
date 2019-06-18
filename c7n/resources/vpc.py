@@ -1133,7 +1133,7 @@ SGPermissionSchema = {
     'IpProtocol': {'enum': [-1, 'tcp', 'udp', 'icmp', 'icmpv6']},
     'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
     'FromPort': {'type': 'integer'},
-    'ToPort':  {'type': 'integer'},
+    'ToPort': {'type': 'integer'},
     'UserIdGroupPairs': {},
     'IpRanges': {},
     'PrefixListIds': {},
@@ -1141,6 +1141,7 @@ SGPermissionSchema = {
     'Cidr': {},
     'CidrV6': {},
 }
+
 
 @SecurityGroup.filter_registry.register('ingress')
 class IPPermission(SGPermission):
@@ -1173,6 +1174,7 @@ class IPPermissionEgress(SGPermission):
         },
         'required': ['type']}
     schema['properties'].update(SGPermissionSchema)
+
 
 @SecurityGroup.action_registry.register('delete')
 class Delete(BaseAction):
