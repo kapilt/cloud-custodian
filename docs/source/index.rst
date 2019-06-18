@@ -16,15 +16,12 @@ Navigate below and get started with Cloud Custodian!
    :maxdepth: 2
    :caption: Introduction
 
-   overview
-   overview/index
    quickstart/index
    filters
    actions
    quickstart/advanced
    quickstart/policyStructure
-   overview/glossary
-   overview/deployment
+   deployment
 
 .. toctree::
    :maxdepth: 1

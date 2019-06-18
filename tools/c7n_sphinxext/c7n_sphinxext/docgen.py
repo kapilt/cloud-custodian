@@ -217,7 +217,7 @@ def _main(provider, output_dir, group_by):
     with open(fpath, 'w') as fh:
         t = env.get_template('provider-common-elements.rst')
         fh.write(t.render(
-            provider_name=provider,
+            provider_name=provider_class.display_name,
             element_type='actions',
             elements=[common_actions[k] for k in sorted(common_actions)]))
         files.insert(0, os.path.basename(fpath))
