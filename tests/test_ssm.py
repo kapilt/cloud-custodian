@@ -19,7 +19,28 @@ from .common import BaseTest, functional
 import time
 
 
-class TestSsm(BaseTest):
+class TestOpsCenter(BaseTest):
+
+    def test_post_ops_item(self):
+        factory = self.replay_flight_data('test_post_ops_item')
+        p = self.load_policy({
+            'name': 'checking-lambdas',
+            'description': 'something good',
+            'resource': 'aws.lambda',
+            'filters': [{'FunctionName': 'CloudCustodian'}],
+            'actions': [{
+                'type': 'post-item'}]},
+            session_factory=factory, config={'region': 'us-west-2'})
+        resources = p.run()
+        client = factory().client('ssm', region_name='us-west-2')
+        item = client.get_ops_item(
+            OpsItemId=resources[0]['c7n:opsitem']).get('OpsItem')
+        arn = p.resource_manager.get_arns(resources)[0]
+        self.assertTrue(
+            arn in item['OperationalData']['/aws/resources']['Value'])
+        self.assertTrue(item['OperationalData']['/aws/dedup'])
+        self.assertEqual(item['Title'], p.name)
+        self.assertEqual(item['Description'], p.data['description'])
 
     def test_ec2_ssm_send_command_validate(self):
         self.assertRaises(
