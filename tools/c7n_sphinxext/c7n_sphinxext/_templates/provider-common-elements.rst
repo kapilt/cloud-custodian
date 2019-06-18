@@ -15,8 +15,7 @@
 {{underline(ename(e), '+')}}
 
 {{edoc(e)}}
-
-.. c7n-schema:: {{provider_name}}.{{resource.type}}.{{element_type}}.{{ename(e)}}
+{{eschema(e)}}
 
 {% endfor %}
 

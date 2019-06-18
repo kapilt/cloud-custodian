@@ -523,8 +523,15 @@ class ElementSchema(object):
         for k, v in list(schema.items()):
             if k == '$ref':
                 # the value here is in the form of: '#/definitions/path/to/key'
-                path = '.'.join(v.split('/')[2:])
-                return jmespath.search(path, definitions)
+                parts = v.split('/')
+                if ['#', 'definitions'] != parts[0:2]:
+                    raise ValueError("Invalid Ref %s" % v)
+                current =  definitions
+                for p in parts[2:]:
+                    if p not in current:
+                        return None
+                    current = current[p]
+                return ElementSchema._expand_schema(current, definitions)
             elif isinstance(v, dict):
                 schema[k] = ElementSchema._expand_schema(v, definitions)
         return schema

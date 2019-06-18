@@ -1135,9 +1135,21 @@ class IPPermission(SGPermission):
     ip_permissions_key = "IpPermissions"
     schema = {
         'type': 'object',
-        # 'additionalProperties': True,
+        'additionalProperties': False,
         'properties': {
             'type': {'enum': ['ingress']},
+
+            'IpProtocol': {'type': 'object'},
+            'FromPort': {'type': 'integer'},
+            'ToPort':  {'type': 'integer'},
+            'UserIdGroupPairs': {'type': 'object'},
+            'IpRanges': {'type': 'object'},
+            'PrefixListIds': {'type': 'object'},
+            'Description': {'type': 'object'},
+            'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
+            'Cidr': {'type': 'object'},
+            'CidrV6': {'type': 'object'},
+
             'match-operator': {'type': 'string', 'enum': ['or', 'and']},
             'Ports': {'type': 'array', 'items': {'type': 'integer'}},
             'SelfReference': {'type': 'boolean'}
@@ -1151,9 +1163,21 @@ class IPPermissionEgress(SGPermission):
     ip_permissions_key = "IpPermissionsEgress"
     schema = {
         'type': 'object',
-        # 'additionalProperties': True,
+        'additionalProperties': False,
         'properties': {
             'type': {'enum': ['egress']},
+
+            'IpProtocol': {'type': 'object'},
+            'FromPort': {'type': 'integer'},
+            'ToPort':  {'type': 'integer'},
+            'UserIdGroupPairs': {'type': 'object'},
+            'IpRanges': {'type': 'object'},
+            'PrefixListIds': {'type': 'object'},
+            'Description': {'type': 'object'},
+            'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
+            'Cidr': {'type': 'object'},
+            'CidrV6': {'type': 'object'},
+
             'match-operator': {'type': 'string', 'enum': ['or', 'and']},
             'SelfReference': {'type': 'boolean'}
         },

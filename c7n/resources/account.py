@@ -600,7 +600,7 @@ class RequestLimitIncrease(BaseAction):
 
     schema = {
         'type': 'object',
-        'notify': {'type': 'array'},
+        'additionalProperties': False,
         'properties': {
             'type': {'enum': ['request-limit-increase']},
             'percent-increase': {'type': 'number', 'minimum': 1},
@@ -608,6 +608,7 @@ class RequestLimitIncrease(BaseAction):
             'minimum-increase': {'type': 'number', 'minimum': 1},
             'subject': {'type': 'string'},
             'message': {'type': 'string'},
+            'notify': {'type': 'array', 'items': {'type': 'string'}},
             'severity': {'type': 'string', 'enum': ['urgent', 'high', 'normal', 'low']}
         },
         'oneOf': [
