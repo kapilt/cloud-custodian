@@ -163,7 +163,11 @@ class LogGroup(QueryResourceManager):
         dimension = 'LogGroupName'
         date = 'creationTime'
 
-    augment = universal_augment
+    def augment(self, resources):
+        resources = universal_augment(self, resources)
+        for r in resources:
+            r['creationTime'] = r['creationTime']/1000.0
+        return resources
 
     def get_arns(self, resources):
         # log group arn in resource describe has ':*' suffix, not all
