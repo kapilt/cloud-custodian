@@ -1,4 +1,4 @@
-{{provider_name|title}} Common {{element_type.title()}}
+{{provider_name}} Common {{element_type.title()}}
 {{underline(provider_name.title() + ' Common ' + element_type.title())}}
 
 {{element_type|title}}

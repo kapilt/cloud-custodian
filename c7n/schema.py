@@ -272,7 +272,8 @@ def generate(resource_types=()):
                     resource_type,
                     resource_defs,
                     alias_name,
-                    definitions
+                    definitions,
+                    cloud_name
                 ))
 
     schema = {
@@ -295,7 +296,10 @@ def generate(resource_types=()):
     return schema
 
 
-def process_resource(type_name, resource_type, resource_defs, alias_name=None, definitions=None):
+def process_resource(
+        type_name, resource_type, resource_defs, alias_name=None,
+        definitions=None, provider_name=None):
+
     r = resource_defs.setdefault(type_name, {'actions': {}, 'filters': {}})
 
     seen_actions = set()  # Aliases get processed once
@@ -306,14 +310,15 @@ def process_resource(type_name, resource_type, resource_defs, alias_name=None, d
         else:
             seen_actions.add(a)
         if a.schema_alias:
-            if action_name in definitions['actions']:
+            action_alias = "%s.%s" % (provider_name, action_name)
+            if action_alias in definitions['actions']:
 
-                if definitions['actions'][action_name] != a.schema: # NOQA
+                if definitions['actions'][action_alias] != a.schema: # NOQA
                     msg = "Schema mismatch on type:{} action:{} w/ schema alias ".format(
                         type_name, action_name)
                     raise SyntaxError(msg)
-            definitions['actions'][action_name] = a.schema
-            action_refs.append({'$ref': '#/definitions/actions/%s' % action_name})
+            definitions['actions'][action_alias] = a.schema
+            action_refs.append({'$ref': '#/definitions/actions/%s' % action_alias})
         else:
             r['actions'][action_name] = a.schema
             action_refs.append(

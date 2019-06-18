@@ -48,6 +48,7 @@ Navigate below and get started with Cloud Custodian!
    azure/azure-modes
    azure/advanced/index
    azure/contribute
+   azure/resources/index
 
 .. toctree::
    :maxdepth: 1
@@ -58,6 +59,7 @@ Navigate below and get started with Cloud Custodian!
    gcp/examples/index
    gcp/policy/index
    gcp/contribute
+   gcp/resources/index
 
 
 .. toctree::

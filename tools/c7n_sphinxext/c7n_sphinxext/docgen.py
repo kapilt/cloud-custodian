@@ -174,17 +174,19 @@ def _main(provider, output_dir, group_by):
     # group by will be provider specific, supports nested attributes
     group_by = operator.attrgetter(group_by or "type")
 
+    files = []
+
     # Write out resources by grouped page
     for key, group in itertools.groupby(
             sorted(provider_class.resources.values(), key=group_by), key=group_by):
         rpath = os.path.join(output_dir, "%s.rst" % key)
         with open(rpath, 'w') as fh:
-            log.info("Writing ResourceGroup:%s.%s to %s", provider, key, rpath)
             t = env.get_template('provider-resource.rst')
             fh.write(t.render(
                 provider_name=provider,
                 key=key,
                 resources=sorted(group, key=operator.attrgetter('type'))))
+        files.append(os.path.basename(rpath))
 
     # Write out common provider filters & actions
     common_actions = {}
@@ -194,31 +196,37 @@ def _main(provider, output_dir, group_by):
             if not f.schema_alias:
                 continue
             common_filters[ElementSchema.name(f)] = (f, r)
-        fpath = os.path.join(
-            output_dir, "%s-common-filters.rst" % provider_class.type.lower())
-        with open(fpath, 'w') as fh:
-            t = env.get_template('provider-common-elements.rst')
-            fh.write(t.render(
-                provider_name=provider,
-                element_type='filters',
-                elements=[common_filters[k] for k in sorted(common_filters)]))
 
         for a in ElementSchema.elements(r.action_registry):
             if not a.schema_alias:
                 continue
             common_actions[ElementSchema.name(a)] = (a, r)
-        fpath = os.path.join(
-            output_dir, "%s-common-actions.rst" % provider_class.type.lower())
-        with open(fpath, 'w') as fh:
-            t = env.get_template('provider-common-elements.rst')
-            fh.write(t.render(
-                provider_name=provider,
-                element_type='actions',
-                elements=[common_actions[k] for k in sorted(common_actions)]))
+
+    fpath = os.path.join(
+        output_dir, "%s-common-filters.rst" % provider_class.type.lower())
+    with open(fpath, 'w') as fh:
+        t = env.get_template('provider-common-elements.rst')
+        fh.write(t.render(
+            provider_name=provider_class.display_name,
+            element_type='filters',
+            elements=[common_filters[k] for k in sorted(common_filters)]))
+        files.insert(0, os.path.basename(fpath))
+
+    fpath = os.path.join(
+        output_dir, "%s-common-actions.rst" % provider_class.type.lower())
+    with open(fpath, 'w') as fh:
+        t = env.get_template('provider-common-elements.rst')
+        fh.write(t.render(
+            provider_name=provider,
+            element_type='actions',
+            elements=[common_actions[k] for k in sorted(common_actions)]))
+        files.insert(0, os.path.basename(fpath))
+
+    log.info("%s Wrote %d resources groups", provider.title(), len(files))
 
     # Write out the provider index
     provider_path = os.path.join(output_dir, 'index.rst')
     with open(provider_path, 'w') as fh:
         log.info("Writing Provider Index to %s", provider_path)
         t = env.get_template('provider-index.rst')
-        fh.write(t.render(provider_name=provider))
+        fh.write(t.render(provider_name=provider_class.display_name, files=files))

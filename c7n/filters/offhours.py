@@ -276,7 +276,7 @@ class Time(Filter):
             'skip-days-from': ValuesFrom.schema,
         }
     }
-
+    schema_alias = True
     time_type = None
 
     # Defaults and constants

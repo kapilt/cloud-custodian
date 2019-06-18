@@ -25,7 +25,7 @@ Azure Storage Accounts, Google Cloud Storage Bucket) or logging service (CloudWa
 Logs, Azure Application Insights Logs, Stackdriver logs) in the account Custodian was
 run from.
 
-Custodian currently provides policy definition around AWS, Azure, and Google Cloud
+Custodian currently supports policy definition around AWS, Azure, and Google Cloud
 Platform resources:
 
 **Note**: this is a small sample of all of the available resources, see the
@@ -33,20 +33,17 @@ section :ref:`explore-cc` on how to view the full list of available resources.
 
 
 AWS
----
+===
+
+See AWS Reference section :ref:`AWS`
 
 Azure
------
-- :ref:`azure_vm`
-- :ref:`azure_disk`
-- :ref:`azure_storage`
-- :ref:`azure_vnet`
-- :ref:`azure_resourcegroup`
-- :ref:`azure_keyvault`
-- :ref:`azure_sqlserver`
+=====
+
+See AWS Reference section :ref:`Azure`
 
 GCP
 ---
 
+See GCP Reference section :ref:`GCP`
 
-For multi-account/subscription/project execution, see c7n-org.

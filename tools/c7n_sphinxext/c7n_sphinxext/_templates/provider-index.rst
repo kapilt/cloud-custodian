@@ -1,6 +1,6 @@
 .. _{{provider_name|upper}}:
 
-{{provider_name|upper}} Reference
+{{provider_name}} Reference
 ------------------------------------
 
 Reference information about provider resources and their actions and filters.
@@ -10,6 +10,7 @@ be applies for all resources.
 .. toctree::
    :maxdepth: 1
    :titlesonly:
-   :glob:
 
-   *
+{% for f in files %}
+   {{f}}
+{% endfor %}
