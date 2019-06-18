@@ -1,0 +1,17 @@
+{
+    "status_code": 200,
+    "data": {
+        "OpsItemId": "oi-e84beb1b6714",
+        "ResponseMetadata": {
+            "RequestId": "269b7175-7ca8-478f-a4a4-3f608038da0b",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {
+                "x-amzn-requestid": "269b7175-7ca8-478f-a4a4-3f608038da0b",
+                "content-type": "application/x-amz-json-1.1",
+                "content-length": "31",
+                "date": "Tue, 18 Jun 2019 22:48:56 GMT"
+            },
+            "RetryAttempts": 0
+        }
+    }
+}

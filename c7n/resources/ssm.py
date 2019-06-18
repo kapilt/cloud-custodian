@@ -13,12 +13,15 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
+import hashlib
 
+from c7n.actions import Action
 from c7n.exceptions import PolicyValidationError
 from c7n.query import QueryResourceManager, TypeInfo
 from c7n.manager import resources
-from c7n.utils import chunks, get_retry, local_session, type_schema
-from c7n.actions import Action
+from c7n.utils import chunks, get_retry, local_session, type_schema, filter_empty
+from c7n.version import version
 
 from .aws import shape_validate
 from .ec2 import EC2
@@ -151,3 +154,133 @@ class DeleteSSMActivation(Action):
         client = local_session(self.manager.session_factory).client('ssm')
         for a in resources:
             client.delete_activation(ActivationId=a["ActivationId"])
+
+
+@resources.register('ops-item')
+class OpsItem(QueryResourceManager):
+
+    class resource_type(TypeInfo):
+
+        enum_spec = ('describe_ops_items', 'OpsItemSummaries', None)
+        service = 'ssm'
+        arn = False
+        id = 'OpsItemId'
+
+        default_report_fields = (
+            'Status', 'Title', 'LastModifiedTime',
+            'CreatedBy', 'CreatedTime')
+
+
+class PostItem(Action):
+    """Post an OpsItem to AWS Systems Manager OpsCenter.
+
+    https://docs.aws.amazon.com/systems-manager/latest/userguide/OpsCenter.html
+
+    : Example :
+x
+    Create an ops item for sqs queues with cross account access as ops
+    items.
+
+    .. code-block:: yaml
+
+        policies:
+          - name: sqs-cross-account-access
+            resource: aws.sqs
+            filters:
+              - type: cross-account
+            actions:
+              - type: post-item
+
+    : Example :
+
+    Create an ops item for ec2 instances with Create User permissions
+
+    .. code-block:: yaml
+
+        policies:
+          - name: over-privileged-ec2
+            resource: aws.ec2
+            filters:
+              - type: check-permissions
+                match: allowed
+                actions:
+                  - iam:CreateUser
+            actions:
+              - type: post-item
+    """
+
+    schema = type_schema(
+        'post-item',
+        description={'type': 'string'},
+        tags={'type': 'object'},
+        priority={'enum': list(range(1, 6))},
+        title={'type': 'string'},
+    )
+    schema_alias = True
+
+    def process(self, resources, event=None):
+        client = local_session(
+            self.manager.session_factory).client('ssm')
+
+        for resource_set in chunks(resources, 225):
+            resource_arns = json.dumps(
+                [{'arn': arn} for arn in sorted(self.manager.get_arns(resource_set))])
+            item = self.get_item_template()
+            item['OperationalData']['/aws/resources'] = {
+                'Type': 'SearchableString',
+                'Value': resource_arns}
+            try:
+                oid = client.create_ops_item(
+                    **filter_empty(item)).get('OpsItemId')
+                for r in resource_set:
+                    r['c7n:opsitem'] = oid
+            except client.exceptions.OpsItemAlreadyExistsException:
+                continue
+
+    def get_item_template(self):
+        dedup = ("%s %s %s" % (
+            self.manager.data['name'],
+            self.manager.config.region,
+            self.manager.config.account_id)).encode('utf8')
+        dedup = hashlib.md5(dedup).hexdigest()
+
+        return dict(
+            Title=self.data.get('title', self.manager.data.get('name')),
+            Description=self.data.get(
+                'description',
+                self.manager.data.get(
+                    'description',
+                    self.manager.data.get('name'))),
+            Priority=self.data.get('priority'),
+            Source="Cloud Custodian",
+            Tags=self.data.get('tags', self.manager.data.get('tags')),
+            OperationalData={
+                '/aws/dedup': {
+                    'Type': 'SearchableString',
+                    'Value': json.dumps({'dedupString': dedup})},
+                '/custodian/execution-id': {
+                    'Type': 'String',
+                    'Value': self.manager.ctx.execution_id},
+                '/custodian/policy': {
+                    'Type': 'String',
+                    'Value': json.dumps(self.manager.data)},
+                '/custodian/version': {
+                    'Type': 'String',
+                    'Value': version},
+                '/custodian/policy-name': {
+                    'Type': 'SearchableString',
+                    'Value': self.manager.data['name']},
+                '/custodian/resource': {
+                    'Type': 'SearchableString',
+                    'Value': self.manager.type},
+            }
+        )
+
+    @classmethod
+    def register(cls, registry, _):
+        for resource in registry.keys():
+            klass = registry.get(resource)
+            klass.action_registry.register('post-item', cls)
+
+
+resources.subscribe(resources.EVENT_FINAL, PostItem.register)
