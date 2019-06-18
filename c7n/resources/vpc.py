@@ -1129,6 +1129,19 @@ class SGPermission(Filter):
             return True
 
 
+SGPermissionSchema = {
+    'IpProtocol': {'enum': [-1, 'tcp', 'udp', 'icmp', 'icmpv6']},
+    'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
+    'FromPort': {'type': 'integer'},
+    'ToPort':  {'type': 'integer'},
+    'UserIdGroupPairs': {},
+    'IpRanges': {},
+    'PrefixListIds': {},
+    'Description': {},
+    'Cidr': {},
+    'CidrV6': {},
+}
+
 @SecurityGroup.filter_registry.register('ingress')
 class IPPermission(SGPermission):
 
@@ -1138,23 +1151,12 @@ class IPPermission(SGPermission):
         'additionalProperties': False,
         'properties': {
             'type': {'enum': ['ingress']},
-
-            'IpProtocol': {'type': 'object'},
-            'FromPort': {'type': 'integer'},
-            'ToPort':  {'type': 'integer'},
-            'UserIdGroupPairs': {'type': 'object'},
-            'IpRanges': {'type': 'object'},
-            'PrefixListIds': {'type': 'object'},
-            'Description': {'type': 'object'},
-            'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
-            'Cidr': {'type': 'object'},
-            'CidrV6': {'type': 'object'},
-
             'match-operator': {'type': 'string', 'enum': ['or', 'and']},
             'Ports': {'type': 'array', 'items': {'type': 'integer'}},
             'SelfReference': {'type': 'boolean'}
         },
         'required': ['type']}
+    schema['properties'].update(SGPermissionSchema)
 
 
 @SecurityGroup.filter_registry.register('egress')
@@ -1166,23 +1168,11 @@ class IPPermissionEgress(SGPermission):
         'additionalProperties': False,
         'properties': {
             'type': {'enum': ['egress']},
-
-            'IpProtocol': {'type': 'object'},
-            'FromPort': {'type': 'integer'},
-            'ToPort':  {'type': 'integer'},
-            'UserIdGroupPairs': {'type': 'object'},
-            'IpRanges': {'type': 'object'},
-            'PrefixListIds': {'type': 'object'},
-            'Description': {'type': 'object'},
-            'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
-            'Cidr': {'type': 'object'},
-            'CidrV6': {'type': 'object'},
-
             'match-operator': {'type': 'string', 'enum': ['or', 'and']},
             'SelfReference': {'type': 'boolean'}
         },
         'required': ['type']}
-
+    schema['properties'].update(SGPermissionSchema)
 
 @SecurityGroup.action_registry.register('delete')
 class Delete(BaseAction):

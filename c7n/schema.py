@@ -32,7 +32,6 @@ import json
 import inspect
 import logging
 
-import jmespath
 from jsonschema import Draft4Validator as Validator
 from jsonschema.exceptions import best_match
 
