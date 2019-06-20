@@ -65,7 +65,7 @@ def main(role, ou, assume, profile, output, regions, active):
             'tags': tags,
             'role': role.format(**a)}
         if regions:
-            ainfo['regions'] = regions
+            ainfo['regions'] = list(regions)
         results.append(ainfo)
 
     print(
