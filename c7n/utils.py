@@ -33,7 +33,7 @@ from six.moves.urllib import parse as urlparse
 from c7n.exceptions import ClientError, PolicyValidationError
 from c7n import ipaddress, config
 
-# Try to place nice in a serverless environment, where we don't require yaml
+# Try to play nice in a serverless environment, where we don't require yaml
 
 try:
     import yaml
