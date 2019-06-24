@@ -982,7 +982,7 @@ class CloudWatchEventSource(object):
     def resolve_cloudtrail_payload(self, payload):
         sources = self.data.get('sources', [])
         events = []
-        for e in self.data.get('events'):
+        for e in self.data.get('events', ()):
             if not isinstance(e, dict):
                 events.append(e)
                 event_info = CloudWatchEvents.get(e)
@@ -1000,7 +1000,9 @@ class CloudWatchEventSource(object):
     def render_event_pattern(self):
         event_type = self.data.get('type')
         payload = {}
-        if event_type == 'cloudtrail':
+        if event_type == 'cwe':
+            payload = dict(self.data['pattern'])
+        elif event_type == 'cloudtrail':
             payload['detail-type'] = ['AWS API Call via CloudTrail']
             self.resolve_cloudtrail_payload(payload)
         if event_type == 'cloudtrail':

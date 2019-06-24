@@ -571,6 +571,22 @@ class PHDMode(LambdaMode):
         return resources
 
 
+@execution.register('cwe')
+class CloudWatchEventMode(LambdaMode):
+    """A generic lambda execution mode allowing user specificied event patterns."""
+
+    schema = utils.type_schema(
+        'cwe',
+        type={'enum': ['cwe']},
+        pattern={'type': 'object'},
+        ids={'type': 'string'},
+        required=('pattern', 'ids'),
+    )
+
+    def resolve_resources(self, event):
+        pass
+
+
 @execution.register('cloudtrail')
 class CloudTrailMode(LambdaMode):
     """A lambda policy using cloudwatch events rules on cloudtrail api logs."""
