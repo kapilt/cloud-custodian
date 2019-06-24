@@ -1,9 +1,11 @@
 
 .. container:: toggle
 
-  .. container:: header
+  {# `raw:: html` is used because `.. container` doesn't support empty content #}
 
-    Schema:
+  .. raw:: html
+     
+    <div class="header docutils container" style=""></div>
 
   .. code-block:: yaml
 
