@@ -15,9 +15,9 @@
 from __future__ import print_function
 
 import click
-import yaml
 import os
 from c7n.credentials import assumed_session, SessionFactory
+from c7n.utils import yaml_dump
 
 ROLE_TEMPLATE = "arn:aws:iam::{Id}:role/OrganizationAccountAccessRole"
 
@@ -68,11 +68,7 @@ def main(role, ou, assume, profile, output, regions, active):
             ainfo['regions'] = list(regions)
         results.append(ainfo)
 
-    print(
-        yaml.safe_dump(
-            {'accounts': results},
-            default_flow_style=False),
-        file=output)
+    print(yaml_dump({'accounts': results}), file=output)
 
 
 def get_session(role, session_name, profile):
