@@ -31,7 +31,7 @@ from c7n.exceptions import PolicyValidationError, ClientError, ResourceLimitExce
 from c7n.output import DEFAULT_NAMESPACE
 from c7n.resources import load_resources
 from c7n.registry import PluginRegistry
-from c7n.provider import get_resource_class
+from c7n.provider import clouds, get_resource_class
 from c7n import utils
 from c7n.version import version
 
