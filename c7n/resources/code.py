@@ -37,7 +37,7 @@ class CodeRepository(QueryResourceManager):
         date = 'creationDate'
 
     def get_resources(self, ids, cache=True):
-        return self.augment(ids)
+        return self.augment([{'repositoryName': i} for i in ids])
 
 
 @CodeRepository.action_registry.register('delete')
