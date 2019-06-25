@@ -76,7 +76,11 @@ def get_resource_class(resource_type):
 
     provider = clouds.get(provider_name)
     if provider is None:
-        raise ValueError("Invalid cloud provider: %s" % provider_name)
+        raise KeyError(
+            "Invalid cloud provider: %s" % provider_name)
 
     factory = provider.resources.get(resource)
+    if factory is None:
+        raise KeyError("Invalid resource %s for provider %s" % (
+            resource, provider_name))
     return factory
