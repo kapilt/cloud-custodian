@@ -187,7 +187,7 @@ def generate(resource_types=()):
             # Shortcut form of value filter as k=v
             'valuekv': {
                 'type': 'object',
-                'additionalProperties': {'type': 'string'},
+                'additionalProperties': {'oneOf': [{'type': 'string'}, {'type': 'boolean'}]},
                 'minProperties': 1,
                 'maxProperties': 1},
         },

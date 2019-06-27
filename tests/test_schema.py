@@ -254,11 +254,7 @@ class SchemaTest(BaseTest):
                      {'or': [{
                          'type': 'imagex',
                          'key': 'tag:Foo',
-                         'value': 'a'}]
-                      }]
-            }]
-        }
-
+                         'value': 'a'}]}]}]}
         errors = list(self.validator.iter_errors(data))
         self.assertTrue(errors)
 
