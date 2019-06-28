@@ -454,7 +454,7 @@ class TestFSxBackup(BaseTest):
                 'resource': 'fsx-backup',
                 'filters': [
                     {'BackupId': backup_id},
-                    {'Tags': []}
+                    {'Tags': 'empty'}
                 ],
                 'actions': [
                     {'type': 'tag', 'tags': {'tag-test': 'tag-test'}}
@@ -491,7 +491,7 @@ class TestFSxBackup(BaseTest):
                 'resource': 'fsx-backup',
                 'filters': [
                     {'BackupId': backup_id},
-                    {'Tags': []}
+                    {'Tags': 'empty'}
                 ],
                 'actions': [
                     {'type': 'mark-for-op', 'op': 'delete'}
