@@ -188,7 +188,7 @@ def generate(resource_types=()):
             'valuekv': {
                 'type': 'object',
                 'additionalProperties': {'oneOf': [{'type': 'number'}, {'type': 'null'},
-                    {'type': 'string'}, {'type': 'boolean'}]},
+                    {'type': 'array', 'maxItems': 0}, {'type': 'string'}, {'type': 'boolean'}]},
                 'minProperties': 1,
                 'maxProperties': 1},
         },
