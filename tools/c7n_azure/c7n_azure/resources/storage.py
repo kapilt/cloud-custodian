@@ -185,17 +185,17 @@ class StorageDiagnosticSettingsFilter(ValueFilter):
               filters:
                 - or:
                     - type: storage-diagnostic-settings
-                      storage_type: blob
+                      storage-type: blob
                       key: logging.delete
                       op: eq
                       value: False
                     - type: storage-diagnostic-settings
-                      storage_type: queue
+                      storage-type: queue
                       key: logging.delete
                       op: eq
                       value: False
                     - type: storage-diagnostic-settings
-                      storage_type: table
+                      storage-type: table
                       key: logging.delete
                       op: eq
                       value: False
