@@ -246,15 +246,9 @@ class SchemaTest(BaseTest):
         self.assertEqual(errors, [])
 
     def test_bool_operator_child_validation(self):
-        data = {
-            'policies': [
-                {'name': 'test',
-                 'resource': 'ec2',
-                 'filters': [
-                     {'or': [{
-                         'type': 'imagex',
-                         'key': 'tag:Foo',
-                         'value': 'a'}]}]}]}
+        data = {'policies': [
+            {'name': 'test', 'resource': 'ec2', 'filters': [
+                {'or': [{'type': 'imagex', 'key': 'tag:Foo', 'value': 'a'}]}]}]}
         errors = list(self.validator.iter_errors(data))
         self.assertTrue(errors)
 
