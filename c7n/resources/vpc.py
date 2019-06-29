@@ -1128,7 +1128,7 @@ class SGPermission(Filter):
 
 
 SGPermissionSchema = {
-    'IpProtocol': {'enum': [-1, 'tcp', 'udp', 'icmp', 'icmpv6']},
+    'IpProtocol': {'enum': ["-1", -1, 'tcp', 'udp', 'icmp', 'icmpv6']},
     'OnlyPorts': {'type': 'array', 'items': {'type': 'integer'}},
     'FromPort': {'type': 'integer'},
     'ToPort': {'type': 'integer'},
