@@ -560,9 +560,9 @@ class S3Metrics(MetricsFilter):
     def get_dimensions(self, resource):
         dims = [{'Name': 'BucketName', 'Value': resource['Name']}]
         if (self.data['name'] == 'NumberOfObjects' and
-            'dimensions' not in self.data):
-            dims.append({
-                'Name': 'StorageType', 'Value': 'AllStorageTypes'})
+                'dimensions' not in self.data):
+            dims.append(
+                {'Name': 'StorageType', 'Value': 'AllStorageTypes'})
         return dims
 
 
