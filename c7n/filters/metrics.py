@@ -62,7 +62,11 @@ class MetricsFilter(Filter):
         'metrics',
         **{'namespace': {'type': 'string'},
            'name': {'type': 'string'},
-           'dimensions': {'type': 'array', 'items': {'type': 'string'}},
+           'dimensions': {'type': 'array', 'items': {
+               'type': 'object',
+               'properties': {
+                   'Name': {'type': 'string'},
+                   'Value': {'type': 'string'}}}},
            # Type choices
            'statistics': {'type': 'string', 'enum': [
                'Average', 'Sum', 'Maximum', 'Minimum', 'SampleCount']},
@@ -159,6 +163,11 @@ class MetricsFilter(Filter):
             # if we overload dimensions with multiple resources we get
             # the statistics/average over those resources.
             dimensions = self.get_dimensions(r)
+            # Merge in any filter specified metrics, get_dimensions is
+            # commonly overridden so we can't do it there.
+            if 'dimensions' in self.data:
+                dimensions.extend(self.data['dimensions'])
+
             collected_metrics = r.setdefault('c7n.metrics', {})
             # Note this annotation cache is policy scoped, not across
             # policies, still the lack of full qualification on the key

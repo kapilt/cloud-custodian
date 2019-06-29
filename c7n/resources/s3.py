@@ -558,11 +558,12 @@ class S3Metrics(MetricsFilter):
     """
 
     def get_dimensions(self, resource):
-        return [
-            {'Name': 'BucketName',
-             'Value': resource['Name']},
-            {'Name': 'StorageType',
-             'Value': 'AllStorageTypes'}]
+        dims = [{'Name': 'BucketName', 'Value': resource['Name']}]
+        if (self.data['name'] == 'NumberOfObjects' and
+            'dimensions' not in self.data):
+            dims.append({
+                'Name': 'StorageType', 'Value': 'AllStorageTypes'})
+        return dims
 
 
 @filters.register('cross-account')
