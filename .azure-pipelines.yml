@@ -60,12 +60,15 @@ jobs:
     displayName: 'Tox'
 
   - script: |
-      bash <(curl -s https://codecov.io/bash) -Z -X gcov \
-       -X search -X xcode -X gcovout -X fix
+      coverage xml && \
+      bash <(curl -s https://codecov.io/bash) -Z \
+       -X gcov -X coveragepy -X search -X xcode -X gcovout -X fix \
+       -f coverage.xml
     displayName: 'Publish Code Coverage'
     condition: "eq(variables['python.version'], '3.6')"
     env:
       CODECOV_TOKEN: $(CODECOV_TOKEN)
+
   - script: TOXENV=docs tox
     displayName: "Docs Build"
     condition: "eq(variables['python.version'], '3.7')"
