@@ -1173,6 +1173,59 @@ class SetXrayEncryption(BaseAction):
         client.put_encryption_config(**req)
 
 
+@filters.register('default-ebs-encryption')
+class EbsEncryption(Filter):
+
+    permissions = ('ec2:GetEbsEncryptionByDefault',)
+    schema = type_schema(
+        'default-ebs-encryption',
+        state={'type': 'boolean'},
+        key={'oneOf': [
+            {'$ref': '#/definitions/filters/valuekv'},
+            {'type': 'string'}]})
+
+    def process(self, resources, event=None):
+        state = self.data.get('state', False)
+        client = local_session(self.manager.session_factory).client('ec2')
+        account_state = client.get_ebs_encryption_by_default().get(
+            'EbsEncryptionByDefault')
+        if account_state == state:
+            return resources
+        if state and self.data('key'):
+            vf = ValueFilter(self.data['key'])
+            vf.annotate = False
+            key = client.get_ebs_default_kms_key_id()
+            if vf.match(key['KmsKeyId']):
+                return resources
+        return []
+
+
+@actions.register('set-ebs-encryption')
+class SetEbsEncryption(BaseAction):
+
+    permissions = ('ec2:EnableEbsEncryptionByDefault',
+                   'ec2:DisableEbsEncryptionByDefault')
+
+    schema = type_schema(
+        'set-ebs-encryption',
+        state={'type': 'boolean'},
+        key={'type': 'string'})
+
+    def process(self, resources):
+        client = local_session(
+            self.manager.session_factory).client('ec2')
+        state = self.data.get('state')
+        key = self.data.get('key')
+        if state:
+            client.enable_ebs_encryption_by_default()
+        else:
+            client.disable_ebs_encryption_by_default()
+
+        if state and key:
+            client.modify_ebs_default_kms_key_id(
+                KmsKeyId=self.data['key'])
+
+
 @filters.register('s3-public-block')
 class S3PublicBlock(ValueFilter):
     """Check for s3 public blocks on an account.
