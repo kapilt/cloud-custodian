@@ -1304,7 +1304,7 @@ class ModifyableVolume(Filter):
         client = local_session(self.manager.session_factory).client('ec2')
         modifying = set()
         for vol_set in chunks(list(results), 197):
-            # we have to use chunk size 197, not 200, because we adding 3 more to each chunk (line 1315)
+            #must use chunk size 197 over 200, because we adding 3 more to each chunk (line 1315)
             vol_ids = [v['VolumeId'] for v in vol_set]
             mutating = client.describe_volumes_modifications(
                 Filters=[
