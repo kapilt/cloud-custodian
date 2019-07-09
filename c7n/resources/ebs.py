@@ -1303,7 +1303,7 @@ class ModifyableVolume(Filter):
         # Filter volumes that are currently under modification
         client = local_session(self.manager.session_factory).client('ec2')
         modifying = set()
-        for vol_set in chunks(list(results), 200):
+        for vol_set in chunks(list(results), 197):
             vol_ids = [v['VolumeId'] for v in vol_set]
             mutating = client.describe_volumes_modifications(
                 Filters=[
