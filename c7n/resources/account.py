@@ -1247,7 +1247,7 @@ class SetEbsEncryption(BaseAction):
     .. code-block:: yaml
 
        policies:
-         - name:
+         - name: set-default-ebs-encryption
            resource: aws.account
            filters:
             - type: default-ebs-encryption
