@@ -1216,7 +1216,7 @@ class EbsEncryption(Filter):
         'default-ebs-encryption',
         state={'type': 'boolean'},
         key={'oneOf': [
-            {'$ref': '#/definitions/filters/valuekv'},
+            {'$ref': '#/definitions/filters/value'},
             {'type': 'string'}]})
 
     def process(self, resources, event=None):
