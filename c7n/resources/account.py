@@ -1187,7 +1187,7 @@ class EbsEncryption(Filter):
     .. code-block:: yaml
 
        policies:
-         - name:
+         - name: check-default-ebs-encryption
            resource: aws.account
            filters:
             - type: default-ebs-encryption
@@ -1201,7 +1201,7 @@ class EbsEncryption(Filter):
     .. code-block:: yaml
 
        policies:
-         - name:
+         - name: check-ebs-encryption-key-origin
            resource: aws.account
            filters:
             - type: default-ebs-encryption
