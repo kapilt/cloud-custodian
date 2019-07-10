@@ -111,6 +111,7 @@ class AccountTests(BaseTest):
             'resource': 'account',
             'filters': [{
                 'type': 'default-ebs-encryption',
+                'key': 'alias/aws/ebs',
                 'state': True}],
             'actions': [{
                 'type': 'set-ebs-encryption',
