@@ -160,13 +160,16 @@ class DeleteSSMActivation(Action):
 
 @resources.register('ops-item')
 class OpsItem(QueryResourceManager):
-
+    """Resource for OpsItems in SSM OpsCenter
+    https://docs.aws.amazon.com/systems-manager/latest/userguide/OpsCenter.html
+    """
     class resource_type(TypeInfo):
 
         enum_spec = ('describe_ops_items', 'OpsItemSummaries', None)
         service = 'ssm'
         arn_type = 'opsitem'
         id = 'OpsItemId'
+        name = 'Title'
 
         default_report_fields = (
             'Status', 'Title', 'LastModifiedTime',
@@ -177,8 +180,7 @@ class OpsItem(QueryResourceManager):
 class UpdateOpsItem(Action):
     """Update an ops item.
 
-
-    : Example :
+    : example :
 
     Close out open ops items older than 30 days for a given issue.
 
@@ -208,6 +210,7 @@ class UpdateOpsItem(Action):
         topics={'type': 'string'},
         status={'enum': ['Open', 'In Progress', 'Resolved']},
     )
+    permissions = ('ssm:UpdateOpsItem',)
 
     def process(self, resources):
         attrs = dict(self.data)
@@ -231,7 +234,22 @@ class UpdateOpsItem(Action):
 
 
 class OpsItemFilter(Filter):
-    """Filter resources associated to extant OpsCenter operational items"""
+    """Filter resources associated to extant OpsCenter operational items.
+
+    :example:
+
+    Find ec2 instances with open ops items.
+
+    .. code-block: yaml
+
+       policies:
+         - name: ec2-instances-ops-items
+           resource: ec2
+           filters:
+             - type: ops-item
+               # we can filter on source, title, priority
+               priority: [1, 2]
+    """
 
     schema = type_schema(
         'ops-item',
@@ -244,6 +262,7 @@ class OpsItemFilter(Filter):
         title={'type': 'string'},
         source={'type': 'string'})
     schema_alias = True
+    permissions = ('ssm:DescribeOpsItems',)
 
     def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('ssm')
@@ -355,6 +374,7 @@ class PostItem(Action):
         topics={'type': 'string'},
     )
     schema_alias = True
+    permissions = ('ssm:CreateOpsItem',)
 
     def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('ssm')

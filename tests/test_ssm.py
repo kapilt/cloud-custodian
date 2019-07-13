@@ -27,12 +27,14 @@ class TestOpsCenter(BaseTest):
             'name': 'checking-lambdas',
             'description': 'something good',
             'resource': 'aws.lambda',
-            'filters': [{'FunctionName': 'CloudCustodian'}],
+            'source': 'config',
+            'query': [
+                {'clause': "resourceId = 'custodian-aws'"}],
             'actions': [{
                 'type': 'post-item'}]},
-            session_factory=factory, config={'region': 'us-west-2'})
+            session_factory=factory, config={'region': 'us-east-1'})
         resources = p.run()
-        client = factory().client('ssm', region_name='us-west-2')
+        client = factory().client('ssm', region_name='us-east-1')
         item = client.get_ops_item(
             OpsItemId=resources[0]['c7n:opsitem']).get('OpsItem')
         arn = p.resource_manager.get_arns(resources)[0]
