@@ -1,7 +1,7 @@
 .. _azure_orphanresources:
 
-Delete or report on orphan resources (NICs, Disks, Public IPs).
-===============================================================
+Resource Groups - Delete or report on orphan resources (NICs, Disks, Public IPs)
+================================================================================
 
 .. _azure_orphanresources-disk:
 

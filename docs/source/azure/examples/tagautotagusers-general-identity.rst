@@ -1,7 +1,7 @@
 .. _azure_examples_autotagusers:
 
-Automatically tag the creator of a resource or resource group.
-==============================================================
+Tags - Automatically tag the creator of a resource or resource group
+====================================================================
 
 - It is strongly recommended to always use ``resource-type`` filter when using ``armresource``.
 - Tag operation is allowed only for ARM resources supported by Cloud Custodian, error message is logged

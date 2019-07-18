@@ -1,5 +1,5 @@
-Filter resources by metrics from Azure Monitor
-==============================================
+Monitor - Filter resources by metrics from Azure Monitor
+========================================================
 
 Find VMs with an average Percentage CPU greater than or equal to 75% over the last 12 hours
 

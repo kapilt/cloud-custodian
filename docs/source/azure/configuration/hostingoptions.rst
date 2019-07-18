@@ -1,7 +1,7 @@
-.. _azure_azurefunctions:
+.. _azure_hostingoptions:
 
-Azure Functions Support
-=======================
+Hosting options
+===============
 
 Overview
 ########
@@ -12,11 +12,33 @@ them to run inexpensively in your subscription.
 Python support in Azure Functions V2 is in preview and this feature is still immature.
 
 - Linux is currently the only supported operating system.
-- Python 3.6 is the only supported version.
+- Python 3.6+ is the only supported version.
 - Only Service Principal authentication is currently supported.
 
 Currently periodic (CRON) and Event Grid functions are supported, however consumption pricing is not
 yet supported.
+
+Azure Modes
+###########
+
+Custodian can run in numerous modes with the default being pull Mode.
+
+- pull:
+    Default mode, which runs locally where custodian is run.
+
+  .. c7n-schema:: mode.pull
+
+- azure-periodic:
+    Runs custodian in Azure Functions at a user defined cron interval.
+
+  .. c7n-schema:: mode.azure-periodic
+
+- azure-event-grid:
+    Runs custodian in Azure Functions triggered by event-grid events. This allows
+    you to apply your policies as soon as events occur. See `Azure Event Grid
+    <https://azure.microsoft.com/en-us/services/event-grid/>`_ for more details.
+
+  .. c7n-schema:: mode.azure-event-grid
 
 Provision Options
 #################
@@ -174,6 +196,7 @@ Common properties are:
 - output_dir
 - cache_period
 - dryrun
+- metrics
 
 Output directory defaults to `/tmp/<random_uuid>` but you can point it to a Azure Blob Storage container instead
 
@@ -189,6 +212,7 @@ Output directory defaults to `/tmp/<random_uuid>` but you can point it to a Azur
                 name: functionshost
             execution-options:
               output_dir: azure://yourstorageaccount.blob.core.windows.net/custodian
+              metrics: azure://<resource_group_name>/<app_insights_name>
          resource: azure.vm
          filters:
           - type: instance-view

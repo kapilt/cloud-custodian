@@ -1,5 +1,5 @@
-Add Tag To Virtual Machines
-===========================
+Tags - Add tag to Virtual Machines
+==================================
 
 .. code-block:: yaml
 

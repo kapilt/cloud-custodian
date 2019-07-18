@@ -1,7 +1,7 @@
 .. _azure_examples_vm_with_public_ips:
 
-Find Virtual Machines with Public IP address
-============================================
+Virtual Machines - Find Virtual Machines with public IP address
+===============================================================
 
 .. code-block:: yaml
 
