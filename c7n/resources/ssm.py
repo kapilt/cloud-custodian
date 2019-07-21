@@ -258,7 +258,7 @@ class OpsItemFilter(Filter):
         status={'type': 'array',
                 'default': ['Open'],
                 'items': {'enum': ['Open', 'In progress', 'Resolved']}},
-        priority={'type': 'array', 'items': {'enum': range(1, 6)}},
+        priority={'type': 'array', 'items': {'enum': list(range(1, 6))}},
         title={'type': 'string'},
         source={'type': 'string'})
     schema_alias = True
