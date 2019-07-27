@@ -19,7 +19,7 @@ import zlib
 import jmespath
 
 from c7n.actions import BaseAction, ModifyVpcSecurityGroupsAction
-from c7n.actions.securityhub import OtherPostFinding
+from c7n.actions.securityhub import PostFinding
 from c7n.exceptions import PolicyValidationError, ClientError
 from c7n.filters import (
     DefaultVpcBase, Filter, ValueFilter)
@@ -30,7 +30,7 @@ from c7n.filters.revisions import Diff
 from c7n import query, resolver
 from c7n.manager import resources
 from c7n.utils import (
-    chunks, local_session, type_schema, get_retry, parse_cidr, get_partition)
+    chunks, local_session, type_schema, get_retry, parse_cidr)
 
 from c7n.resources.shield import IsShieldProtected, SetShieldProtection
 
@@ -430,7 +430,7 @@ class DhcpOptionsFilter(Filter):
 
 
 @Vpc.action_registry.register('post-finding')
-class VpcPostFinding(OtherPostFinding):
+class VpcPostFinding(PostFinding):
 
     def format_resource(self, r):
         fr = super(VpcPostFinding, self).format_resource(r)
@@ -1268,7 +1268,7 @@ class RemovePermissions(BaseAction):
 
 
 @SecurityGroup.action_registry.register('post-finding')
-class SecurityGroupPostFinding(OtherPostFinding):
+class SecurityGroupPostFinding(PostFinding):
 
     def format_resource(self, r):
         fr = super(SecurityGroupPostFinding, self).format_resource(r)
