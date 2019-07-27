@@ -583,7 +583,6 @@ class PolicyLambdaProvision(BaseTest):
             hub_action.get(mu_policy.name),
             {'event': False, 'action': None})
 
-
     def test_cwe_schedule(self):
         session_factory = self.replay_flight_data("test_cwe_schedule", zdata=True)
         p = Policy(
