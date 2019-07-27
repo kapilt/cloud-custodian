@@ -15,6 +15,7 @@
 from io import open
 from os import path
 from setuptools import setup, find_packages
+import sys
 
 # read the contents of your README file
 this_directory = path.abspath(path.dirname(__file__))
@@ -23,6 +24,10 @@ long_description = ''
 if path.exists(readme):
     with open(readme, encoding='utf-8') as f:
         long_description = f.read()
+
+# azure-functions are required if running in Azure Functions
+# mode which is not supported for Python 2.7
+extra_dependencies = ["azure-functions"] if sys.version_info[0] >= 3 else []
 
 setup(
     name="c7n_azure",
@@ -43,10 +48,11 @@ setup(
     },
     install_requires=["azure-mgmt-authorization",
                       "azure-mgmt-apimanagement",
-                      "azure-mgmt-applicationinsights==0.1.1",
+                      "azure-mgmt-applicationinsights",
                       "azure-mgmt-batch",
                       "azure-mgmt-cognitiveservices",
                       "azure-mgmt-cosmosdb",
+                      "azure-mgmt-costmanagement",
                       "azure-mgmt-compute",
                       "azure-mgmt-cdn",
                       "azure-mgmt-containerregistry",
@@ -79,6 +85,8 @@ setup(
                       "azure-storage-queue",
                       "azure-storage-file",
                       "azure-cosmosdb-table",
+                      "applicationinsights",
+                      "apscheduler",
                       "distlib",
                       "jsonpickle",
                       "requests",
@@ -88,7 +96,7 @@ setup(
                       "adal",
                       "backports.functools_lru_cache",
                       "futures>=3.1.1",
-                      "netaddr"],
+                      "netaddr"] + extra_dependencies,
     package_data={str(''): [str('function_binding_resources/bin/*.dll'),
                             str('function_binding_resources/*.csproj'),
                             str('function_binding_resources/bin/*.json')]}
