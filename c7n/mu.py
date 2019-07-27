@@ -1038,7 +1038,7 @@ class CloudWatchEventSource(object):
             payload['detail-type'] = ['Security Hub Findings']
         elif event_type == 'hub-action':
             payload['source'] = ['aws.securityhub']
-            payload['detail-type'] =  [
+            payload['detail-type'] = [
                 'Security Hub Findings - Custom Action',
                 'Security Hub Insight Results']
         elif event_type == 'periodic':
@@ -1087,7 +1087,7 @@ class CloudWatchEventSource(object):
         # Add Targets
         found = False
         response = self.client.list_targets_by_rule(Rule=func.name)
-        # CWE seems to be quite picky about function arns (no aliases/versions)
+        # CloudWatchE seems to be quite picky about function arns (no aliases/versions)
         func_arn = func.arn
 
         if func_arn.count(':') > 6:
@@ -1187,7 +1187,6 @@ class SecurityHubAction(object):
                       self.policy.name),
                   'Id': self.policy.name}
         params['Description'] = params['Description'].strip()[:500]
-        import pdb; pdb.set_trace()
         if not action:
             log.debug('Creating SecurityHub Action %s' % arn)
             return client.create_action_target(
