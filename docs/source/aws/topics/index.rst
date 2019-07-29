@@ -10,3 +10,4 @@ Deeper dives on custodian integration with particular services or common best pr
 
   config.rst
   securityhub.rst
+  ssm.rst
