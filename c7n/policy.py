@@ -490,7 +490,7 @@ class LambdaMode(ServerlessExecutionMode):
         # auto tag lambda policies with mode and version, we use the
         # version in mugc to effect cleanups.
         tags = self.policy.data['mode'].setdefault('tags', {})
-        tags['custodian-info'] = "mode=%s;version=%s" % (
+        tags['custodian-info'] = "mode=%s:version=%s" % (
             self.policy.data['mode']['type'], version)
 
         from c7n import mu

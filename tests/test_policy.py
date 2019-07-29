@@ -964,7 +964,7 @@ class LambdaModeTest(BaseTest):
         p.provision()
         self.assertEqual(
             policy_lambda[0].tags['custodian-info'],
-            'mode=config-rule;version=%s' % version)
+            'mode=config-rule:version=%s' % version)
 
 
 class PullModeTest(BaseTest):
