@@ -362,11 +362,19 @@ class LambdaMode(ServerlessExecutionMode):
 
     def validate(self):
         super(LambdaMode, self).validate()
-        prefix = self.policy.data.get('function-prefix', 'custodian-')
+        prefix = self.policy.data['mode'].get('function-prefix', 'custodian-')
         if len(prefix + self.policy.name) > 64:
             raise PolicyValidationError(
                 "Custodian Lambda policies have a max length with prefix of 64"
                 " policy:%s prefix:%s" % (prefix, self.policy.name))
+        tags = self.policy.data['mode'].get('tags')
+        if not tags:
+            return
+        reserved_overlap = [t for t in tags if t.startswith('custodian-')]
+        if reserved_overlap:
+            log.warning((
+                'Custodian reserves policy lambda '
+                'tags starting with custodian'))
 
     def get_metrics(self, start, end, period):
         from c7n.mu import LambdaManager, PolicyLambda
@@ -478,6 +486,12 @@ class LambdaMode(ServerlessExecutionMode):
         return resources
 
     def provision(self):
+        # auto tag lambda policies with mode and version, we use the
+        # version in mugc to effect cleanups.
+        tags = self.policy.data['mode'].get('tags', {})
+        tags['custodian-info'] = "mode=%s;version=%s" % (
+            self.policy.data['mode'], version)
+
         from c7n import mu
         with self.policy.ctx:
             self.policy.log.info(
@@ -629,7 +643,8 @@ class SecurityHub(LambdaMode):
 
     This policy will provision a lambda and security hub custom action.
     The action can be invoked on a finding or insight result (collection
-    of findings). The action name will ahve the resource type prefixed.
+    of findings). The action name will have the resource type prefixed as
+    custodian actions are resource specific.
 
     .. code-block: yaml
 
@@ -673,9 +688,6 @@ class SecurityHub(LambdaMode):
 
     schema = utils.type_schema(
         'hub-finding', aliases=('hub-action',),
-        # if the mode should be executed for a custom action, this is the list
-        # of action names to filter for.
-        # actions={'type': 'array', 'items': {'type': 'string'}},
         rinherit=LambdaMode.schema)
 
     ActionFinding = 'Security Hub Findings - Custom Action'
@@ -687,17 +699,6 @@ class SecurityHub(LambdaMode):
         ActionInsight: 'resolve_action_insight',
         ImportFinding: 'resolve_import_finding'
     }
-
-    def validate(self):
-        super(SecurityHub, self).validate()
-        exists = self.policy.resource_manager.action_registry.get('post-finding')
-        if not exists:
-            raise ValueError(
-                "Policy:%s resource:%s mode:%s not supported for %s" % (
-                    self.type,
-                    self.policy.data['name'],
-                    self.policy.data['resource'],
-                    self.policy.manager.resource_type))
 
     def resolve_findings(self, findings):
         rids = set()
