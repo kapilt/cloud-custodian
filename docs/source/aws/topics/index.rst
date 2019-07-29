@@ -1,9 +1,9 @@
 .. _topics:
 
-Example Policies
-================
+AWS Topics
+==========
 
-These use cases provide examples of specific policies for individual AWS modules.
+Deeper dives on custodian integration with particular services or common best practices.
 
 .. toctree::
   :titlesonly:
