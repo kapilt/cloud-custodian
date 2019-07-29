@@ -926,7 +926,7 @@ class LambdaModeTest(BaseTest):
 
     def test_tags_validation(self):
         log_file = self.capture_logging('c7n.policy', level=logging.INFO)
-        p = self.load_policy({
+        self.load_policy({
             'name': 'foobar',
             'resource': 'aws.ec2',
             'mode': {
@@ -952,7 +952,6 @@ class LambdaModeTest(BaseTest):
                     'xyz': 'bar'}
             }},
             validate=True)
-
 
         from c7n import mu
         policy_lambda = []
