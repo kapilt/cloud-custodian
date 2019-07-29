@@ -13,10 +13,12 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from c7n.exceptions import PolicyValidationError
-from .common import BaseTest, functional
-
+import json
 import time
+
+from c7n.exceptions import PolicyValidationError
+
+from .common import BaseTest, functional
 
 
 class TestOpsCenter(BaseTest):
@@ -67,8 +69,26 @@ class TestOpsCenter(BaseTest):
             ['oi-9be57440dcb3'])
 
     def test_post_ops_item_update(self):
-        pass
-
+        factory = self.replay_flight_data('test_post_ops_item_update')
+        p = self.load_policy({
+            'name': 'checking-lambdas',
+            'description': 'something good',
+            'resource': 'aws.lambda',
+            'source': 'config',
+            'query': [
+                {'clause': "resourceId = 'custodian-nuke-emr'"}],
+            'actions': [{
+                'type': 'post-item'}]},
+            session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        client = factory().client('ssm', region_name='us-east-1')
+        item = client.get_ops_item(
+            OpsItemId=resources[0]['c7n:opsitem']).get('OpsItem')
+        self.assertEqual(
+            json.loads(item['OperationalData']['/aws/resources']['Value']),
+            [{'arn': 'arn:aws:lambda:us-east-1::function:custodian-aws'},
+             {'arn': 'arn:aws:lambda:us-east-1::function:custodian-nuke-emr'}])
 
 
 class TestSSM(BaseTest):

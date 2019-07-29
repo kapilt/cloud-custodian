@@ -388,6 +388,8 @@ class PostItem(Action):
             #   to existing resources.
             resources = self.update_items(client, items, dict(item_template), resources)
 
+        item_ids = [i['OpsItemId'] for i in items[:5]]
+
         for resource_set in chunks(resources, 100):
             resource_arns = json.dumps(
                 [{'arn': arn} for arn in sorted(self.manager.get_arns(resource_set))])
@@ -395,9 +397,10 @@ class PostItem(Action):
                 'Type': 'SearchableString', 'Value': resource_arns}
             if items:
                 item_template['RelatedOpsItems'] = [
-                    {'OpsItemId': i['OpsItemId']} for i in items[:5]]
+                    {'OpsItemId': item_ids[:5]}]
             try:
                 oid = client.create_ops_item(**item_template).get('OpsItemId')
+                item_ids.insert(0, oid)
             except client.exceptions.OpsItemAlreadyExistsException:
                 pass
 
@@ -424,7 +427,7 @@ class PostItem(Action):
         items = client.describe_ops_items(OpsItemFilters=qf)['OpsItemSummaries']
         return list(sorted(items, key=operator.itemgetter('CreatedTime'), reverse=True))
 
-    def update_items(self, client, items, resources):
+    def update_items(self, client, items, item_template, resources):
         """Update existing Open OpsItems with new resources.
 
         Originally this tried to support attribute updates as well, but
@@ -478,10 +481,14 @@ class PostItem(Action):
         for i in items:
             if not i['OpsItemId'] in updated:
                 continue
+            i = dict(i)
+            for k in ('CreatedBy', 'CreatedTime', 'Source', 'LastModifiedBy',
+                      'LastModifiedTime'):
+                i.pop(k, None)
             i['OperationalData']['/aws/resources']['Value'] = json.dumps(
                 item_arn_map[i['OpsItemId']])
-            client.update_ops_item(
-                OpsItemId=i['OpsItemId'], OperationalData=i['OperationalData'])
+            i['OperationalData'].pop('/aws/dedup', None)
+            client.update_ops_item(**i)
         return remainder
 
     def get_item_template(self):
