@@ -11,9 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
-from azure_common import BaseTest, arm_template
+from azure.cosmos.cosmos_client import CosmosClient
+
+from azure_common import BaseTest, arm_template, cassette_name
+from c7n.utils import local_session
+from c7n_azure.resources.cosmos_db import CosmosDBChildResource
+from c7n_azure.session import Session
 
 
 class CosmosDBTest(BaseTest):
@@ -87,6 +93,7 @@ class CosmosDBTest(BaseTest):
         self.assertEqual(len(resources), 1)
 
     @arm_template('cosmosdb.json')
+    @cassette_name('firewall')
     def test_firewall_rules_include(self):
         p = self.load_policy({
             'name': 'test-azure-cosmosdb',
@@ -94,12 +101,13 @@ class CosmosDBTest(BaseTest):
             'filters': [
                 {'type': 'firewall-rules',
                  'include': ['3.1.1.1']}],
-        })
+        }, validate=True)
         resources = p.run()
         print(resources)
         self.assertEqual(1, len(resources))
 
     @arm_template('cosmosdb.json')
+    @cassette_name('firewall')
     def test_firewall_rules_include_cidr(self):
         p = self.load_policy({
             'name': 'test-azure-cosmosdb',
@@ -112,6 +120,7 @@ class CosmosDBTest(BaseTest):
         self.assertEqual(1, len(resources))
 
     @arm_template('cosmosdb.json')
+    @cassette_name('firewall')
     def test_firewall_rules_not_equal(self):
         p = self.load_policy({
             'name': 'test-azure-cosmosdb',
@@ -138,3 +147,64 @@ class CosmosDBTest(BaseTest):
 
         self.assertEqual(1, len(resources))
         self.assertEqual('Hash', resources[0]['partitionKey']['kind'])
+
+
+class CosmosDBReplaceOfferActionTest(BaseTest):
+
+    def setUp(self, *args, **kwargs):
+        super(CosmosDBReplaceOfferActionTest, self).setUp(*args, **kwargs)
+        client = local_session(Session).client('azure.mgmt.cosmosdb.CosmosDB')
+        key = CosmosDBChildResource.get_cosmos_key(
+            'test_cosmosdb', 'cctestcosmosdb', client, readonly=False)
+        self.data_client = CosmosClient(
+            url_connection='https://cctestcosmosdb.documents.azure.com:443/',
+            auth={
+                'masterKey': key
+            }
+        )
+
+    def tearDown(self, *args, **kwargs):
+        super(CosmosDBReplaceOfferActionTest, self).tearDown(*args, **kwargs)
+        self.data_client.ReplaceOffer(
+            self.initial_offer['_self'],
+            self.initial_offer
+        )
+
+    def test_replace_offer_collection_action(self):
+
+        p = self.load_policy({
+            'name': 'test-azure-cosmosdb',
+            'resource': 'azure.cosmosdb-collection',
+            'filters': [
+                {
+                    'type': 'value',
+                    'key': 'id',
+                    'op': 'eq',
+                    'value': 'cccontainer'
+                },
+                {
+                    'type': 'offer',
+                    'key': 'content.offerThroughput',
+                    'op': 'eq',
+                    'value': 400
+                }
+            ],
+            'actions': [
+                {
+                    'type': 'replace-offer',
+                    'throughput': 500
+                }
+            ]
+        })
+        collections = p.run()
+        self.assertEqual(len(collections), 1)
+
+        self.initial_offer = collections[0]['c7n:offer'][0]
+        self.collection = collections[0]
+        self._assert_offer_throughput_equals(500, collections[0]['_self'])
+
+    def _assert_offer_throughput_equals(self, throughput, resource_self):
+        offers = self.data_client.ReadOffers()
+        offer = next((o for o in offers if o['resource'] == resource_self), None)
+        self.assertIsNotNone(offer)
+        self.assertEqual(offer['content']['offerThroughput'], throughput)

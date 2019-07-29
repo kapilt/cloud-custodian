@@ -21,7 +21,6 @@ from c7n_azure.actions.base import AzureBaseAction
 from c7n_azure.provider import Azure
 from c7n_azure.provider import resources
 from c7n_azure.query import QueryResourceManager, DescribeSource
-from c7n_azure.session import Session
 from c7n_azure.utils import GraphHelper
 
 from c7n.filters import Filter
@@ -62,7 +61,9 @@ class RoleAssignment(QueryResourceManager):
                   value: Owner
     """
 
-    class resource_type(object):
+    class resource_type(QueryResourceManager.resource_type):
+        doc_groups = ['Active Directory']
+
         service = 'azure.mgmt.authorization'
         client = 'AuthorizationManagementClient'
         enum_spec = ('role_assignments', 'list', None)
@@ -79,7 +80,7 @@ class RoleAssignment(QueryResourceManager):
         )
 
     def augment(self, resources):
-        s = Session(resource='https://graph.windows.net')
+        s = self.get_session().get_session_for_resource('https://graph.windows.net')
         graph_client = GraphRbacManagementClient(s.get_credentials(), s.get_tenant_id())
 
         object_ids = list(set(
@@ -118,7 +119,9 @@ class RoleDefinition(QueryResourceManager):
                   op: contains
     """
 
-    class resource_type(object):
+    class resource_type(QueryResourceManager.resource_type):
+        doc_groups = ['Active Directory']
+
         service = 'azure.mgmt.authorization'
         client = 'AuthorizationManagementClient'
         get_spec = ('role_definitions', 'get_by_id', None)
