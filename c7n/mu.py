@@ -873,6 +873,9 @@ class PolicyLambda(AbstractLambdaFunction):
         if self.policy.data['mode']['type'] == 'config-rule':
             events.append(
                 ConfigRule(self.policy.data['mode'], session_factory))
+        elif self.policy.data['mode']['type'] == 'hub-action':
+            events.append(
+                SecurityHubAction(self.policy, session_factory))
         else:
             events.append(
                 CloudWatchEventSource(
@@ -1033,6 +1036,14 @@ class CloudWatchEventSource(object):
                 'eventTypeCode': list(self.data['events'])}
             if self.data.get('categories', []):
                 payload['detail']['eventTypeCategory'] = self.data['categories']
+        elif event_type == 'hub-finding':
+            payload['source'] = ['aws.securityhub']
+            payload['detail-type'] = ['Security Hub Findings']
+        elif event_type == 'hub-action':
+            payload['source'] = ['aws.securityhub']
+            payload['detail-type'] = [
+                'Security Hub Findings - Custom Action',
+                'Security Hub Insight Results']
         elif event_type == 'periodic':
             pass
         else:
@@ -1079,7 +1090,7 @@ class CloudWatchEventSource(object):
         # Add Targets
         found = False
         response = self.client.list_targets_by_rule(Rule=func.name)
-        # CWE seems to be quite picky about function arns (no aliases/versions)
+        # CloudWatchE seems to be quite picky about function arns (no aliases/versions)
         func_arn = func.arn
 
         if func_arn.count(':') > 6:
@@ -1128,6 +1139,75 @@ class CloudWatchEventSource(object):
                     "Could not remove targets for rule %s error: %s",
                     func.name, e)
             self.client.delete_rule(Name=func.name)
+
+
+class SecurityHubAction(object):
+
+    def __init__(self, policy, session_factory):
+        self.policy = policy
+        self.session_factory = session_factory
+        self.cwe = CloudWatchEventSource(
+            self.policy.data['mode'], session_factory)
+
+    def __repr__(self):
+        return "<SecurityHub Action %s>" % self.policy.name
+
+    def _get_arn(self):
+        return 'arn:aws:securityhub:%s:%s:action/custom/%s' % (
+            self.policy.options.region,
+            self.policy.options.account_id,
+            self.policy.name)
+
+    def delta(self, src, tgt):
+        for k in ('Name', 'Description'):
+            if src[k] != tgt[k]:
+                return True
+        return False
+
+    def get(self, name):
+        client = local_session(self.session_factory).client('securityhub')
+        subscriber = self.cwe.get(name)
+        arn = self._get_arn()
+        actions = client.describe_action_targets(
+            ActionTargetArns=[arn]).get('ActionTargets', ())
+        assert len(actions) in (0, 1), "Found duplicate action %s" % (
+            actions,)
+        action = actions and actions.pop() or None
+        return {'event': subscriber, 'action': action}
+
+    def add(self, func):
+        self.cwe.add(func)
+        client = local_session(self.session_factory).client('securityhub')
+        action = self.get(func.name).get('action')
+        arn = self._get_arn()
+        params = {'Name': (
+            self.policy.data.get('title') or (
+                "%s %s" % (self.policy.resource_type.split('.')[-1].title(),
+                          self.policy.name))),
+                  'Description': (
+                      self.policy.data.get('description') or
+                      self.policy.data.get('title') or
+                      self.policy.name),
+                  'Id': self.policy.name}
+        params['Description'] = params['Description'].strip()[:500]
+        if not action:
+            log.debug('Creating SecurityHub Action %s' % arn)
+            return client.create_action_target(
+                **params).get('ActionTargetArn')
+        params.pop('Id')
+        if self.delta(action, params):
+            log.debug('Updating SecurityHub Action %s' % arn)
+            client.update_action_target(ActionTargetArn=arn, **params)
+        return arn
+
+    def update(self, func):
+        self.cwe.update(func)
+        self.add(func)
+
+    def remove(self, func):
+        self.cwe.remove(func)
+        client = local_session(self.session_factory).client('securityhub')
+        client.delete_action_target(ActionTargetArn=self._get_arn())
 
 
 class BucketLambdaNotification(object):

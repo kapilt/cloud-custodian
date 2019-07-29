@@ -50,6 +50,7 @@ Navigate below to your cloud provider and get started with Cloud Custodian!
    aws/aws-modes
    aws/usage
    aws/lambda
+   aws/topics/index
    aws/resources/index
 
 .. toctree::
