@@ -290,7 +290,7 @@ class OpsItemFilter(Filter):
                   'Values': self.data.get('status', ('Open',))})
         if self.data.get('priority'):
             q.append({'Key': 'Priority', 'Operator': 'Equal',
-                      'Values': self.data['priority']})
+                      'Values': list(map(str, self.data['priority']))})
         if self.data.get('title'):
             q.append({'Key': 'Title', 'Operator': 'Contains',
                       'Values': [self.data['title']]})

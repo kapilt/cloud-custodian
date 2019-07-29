@@ -44,6 +44,35 @@ class TestOpsCenter(BaseTest):
         self.assertEqual(item['Title'], p.name)
         self.assertEqual(item['Description'], p.data['description'])
 
+    def test_ops_item_filter(self):
+        factory = self.replay_flight_data('test_ops_item_filter')
+        p = self.load_policy({
+            'name': 'checking-lambdas',
+            'description': 'something good',
+            'resource': 'aws.lambda',
+            'source': 'config',
+            'query': [
+                {'clause': "resourceId = 'custodian-aws'"}],
+            'filters': [{
+                'type': 'ops-item',
+                'priority': [3, 4, 5],
+                'title': 'checking-lambdas',
+                'source': 'Cloud Custodian',
+            }]},
+            session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(
+            resources[0]['c7n:opsitems'],
+            ['oi-9be57440dcb3'])
+
+    def test_post_ops_item_update(self):
+        pass
+
+
+
+class TestSSM(BaseTest):
+
     def test_ec2_ssm_send_command_validate(self):
         self.assertRaises(
             PolicyValidationError,
