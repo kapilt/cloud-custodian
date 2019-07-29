@@ -374,7 +374,8 @@ class LambdaMode(ServerlessExecutionMode):
         if reserved_overlap:
             log.warning((
                 'Custodian reserves policy lambda '
-                'tags starting with custodian'))
+                'tags starting with custodian - policy specifies %s' % (
+                    ', '.join(reserved_overlap))))
 
     def get_metrics(self, start, end, period):
         from c7n.mu import LambdaManager, PolicyLambda
@@ -488,9 +489,9 @@ class LambdaMode(ServerlessExecutionMode):
     def provision(self):
         # auto tag lambda policies with mode and version, we use the
         # version in mugc to effect cleanups.
-        tags = self.policy.data['mode'].get('tags', {})
+        tags = self.policy.data['mode'].setdefault('tags', {})
         tags['custodian-info'] = "mode=%s;version=%s" % (
-            self.policy.data['mode'], version)
+            self.policy.data['mode']['type'], version)
 
         from c7n import mu
         with self.policy.ctx:
