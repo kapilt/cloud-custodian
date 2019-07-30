@@ -52,6 +52,9 @@ jobs:
   - script: python -m pip install --upgrade pip && pip install tox
     displayName: 'Install Test Runner'
 
+  - script: TOXENV=docs tox --notest
+    displayName: 'Install Dependencies'
+
   - script: TOXENV=docs tox
     displayName: "Docs Build"
 
