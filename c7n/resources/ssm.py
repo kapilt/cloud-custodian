@@ -300,8 +300,6 @@ class OpsItemFilter(Filter):
 
     schema = type_schema(
         'ops-item',
-        # before, after, last_days
-        # created {'days': before':, 'after',
         status={'type': 'array',
                 'default': ['Open'],
                 'items': {'enum': ['Open', 'In progress', 'Resolved']}},
@@ -566,6 +564,8 @@ class PostItem(Action):
                 '/custodian/execution-id': {
                     'Type': 'String',
                     'Value': self.manager.ctx.execution_id},
+                # We need our own dedup string to be able to filter
+                # search on it.
                 '/custodian/dedup': {
                     'Type': 'SearchableString',
                     'Value': dedup},
