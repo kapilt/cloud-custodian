@@ -175,6 +175,53 @@ class OpsItem(QueryResourceManager):
             'Status', 'Title', 'LastModifiedTime',
             'CreatedBy', 'CreatedTime')
 
+    QueryKeys = set((
+        'Status',
+        'CreatedBy',
+        'Source',
+        'Priority',
+        'Title',
+        'OpsItemId',
+        'CreatedTime',
+        'LastModifiedTime',
+        'OperationalData',
+        'OperationalDataKey',
+        'OperationalDataValue',
+        'ResourceId',
+        'AutomationId'))
+    QueryOperators = set(('Equal', 'LessThan', 'GreaterThan', 'Contains'))
+
+    def validate(self):
+        self.query = self.resource_query()
+        return super(OpsItem, self).validate()
+
+    def get_resources(self, ids, cache=True, augment=True):
+        if isinstance(ids, str):
+            ids = [ids]
+        return self.resources({
+            'OpsItemFilters': [{
+                'Key': 'OpsItemId',
+                'Values': [i],
+                'Operator': 'Equal'} for i in ids]})
+
+    def resources(self, query=None):
+        q = self.resource_query()
+        if q and query and 'OpsItemFilters' in query:
+            q['OpsItemFilters'].extend(query['OpsItemFilters'])
+        return super(OpsItem, self).resources(query=q)
+
+    def resource_query(self):
+        filters = []
+        for q in self.data.get('query', ()):
+            if (not isinstance(q, dict) or
+                not set(q.keys()) == set(('Key', 'Values', 'Operator')) or
+                q['Key'] not in self.QueryKeys or
+                    q['Operator'] not in self.QueryOperators):
+                raise PolicyValidationError(
+                    "invalid ops-item query %s" % self.data['query'])
+            filters.append(q)
+        return {'OpsItemFilters': filters}
+
 
 @OpsItem.action_registry.register('update')
 class UpdateOpsItem(Action):
