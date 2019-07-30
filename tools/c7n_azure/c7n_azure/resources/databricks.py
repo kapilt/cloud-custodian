@@ -21,6 +21,7 @@ class Databricks(ArmResourceManager):
     """Databricks Resource
 
     :example:
+
     Returns all databricks named my-test-databricks
 
     .. code-block:: yaml
@@ -37,6 +38,8 @@ class Databricks(ArmResourceManager):
     """
 
     class resource_type(ArmResourceManager.resource_type):
+        doc_groups = ['AI + Machine Learning']
+
         service = 'azure.mgmt.databricks.databricks_client'
         client = 'DatabricksClient'
         enum_spec = ('workspaces', 'list_by_subscription', None)

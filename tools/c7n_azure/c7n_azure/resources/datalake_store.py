@@ -21,6 +21,7 @@ class DataLakeStore(ArmResourceManager):
     """Data Lake Resource
 
     :example:
+
     This policy will find all Datalake Stores with one million or more
     write requests in the last 72 hours
 
@@ -39,6 +40,8 @@ class DataLakeStore(ArmResourceManager):
 
     """
     class resource_type(ArmResourceManager.resource_type):
+        doc_groups = ['Storage']
+
         service = 'azure.mgmt.datalake.store'
         client = 'DataLakeStoreAccountManagementClient'
         enum_spec = ('accounts', 'list', None)
