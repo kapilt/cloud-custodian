@@ -126,9 +126,8 @@ class BucketMetrics(BaseTest):
             'filters': [{
                 'type': 'metrics',
                 'name': 'BucketSizeBytes',
-                'dimensions': [
-                    {'Name': 'StorageType',
-                     'Value': 'StandardStorage'}],
+                'dimensions': {
+                    'StorageType': 'StandardStorage'},
                 'days': 7,
                 'value': 100,
                 'op': 'gte'}]},

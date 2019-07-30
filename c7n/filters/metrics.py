@@ -83,11 +83,10 @@ class MetricsFilter(Filter):
         'metrics',
         **{'namespace': {'type': 'string'},
            'name': {'type': 'string'},
-           'dimensions': {'type': 'array', 'items': {
+           'dimensions': {
                'type': 'object',
-               'properties': {
-                   'Name': {'type': 'string'},
-                   'Value': {'type': 'string'}}}},
+               'patternProperties': {
+                   '^.*$': {'type': 'string'}}},
            # Type choices
            'statistics': {'type': 'string', 'enum': [
                'Average', 'Sum', 'Maximum', 'Minimum', 'SampleCount']},
@@ -176,6 +175,14 @@ class MetricsFilter(Filter):
         return [{'Name': self.model.dimension,
                  'Value': resource[self.model.dimension]}]
 
+    def get_user_dimensions(self):
+        dims = []
+        if 'dimensions' not in self.data:
+            return dims
+        for k, v in self.data['dimensions'].items():
+            dims.append({'Name': k, 'Value': v})
+        return dims
+
     def process_resource_set(self, resource_set):
         client = local_session(
             self.manager.session_factory).client('cloudwatch')
@@ -187,8 +194,7 @@ class MetricsFilter(Filter):
             dimensions = self.get_dimensions(r)
             # Merge in any filter specified metrics, get_dimensions is
             # commonly overridden so we can't do it there.
-            if 'dimensions' in self.data:
-                dimensions.extend(self.data['dimensions'])
+            dimensions.extend(self.get_user_dimensions())
 
             collected_metrics = r.setdefault('c7n.metrics', {})
             # Note this annotation cache is policy scoped, not across

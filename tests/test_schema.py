@@ -90,6 +90,26 @@ class SchemaTest(BaseTest):
         self.assertTrue("'asdf' is not of type 'boolean'" in str(err).replace("u'", "'"))
         self.assertEqual(policy, 'policy-ec2')
 
+    def test_semantic_error_common_filter_provider_prefixed(self):
+        data = {
+            'policies': [{
+                'name': 'test',
+                'resource': 's3',
+                'filters': [{
+                    'type': 'metrics',
+                    'name': 'BucketSizeBytes',
+                    'dimensions': [{
+                        'StorageType': 'StandardStorage'}],
+                    'days': 7,
+                    'value': 100,
+                    'op': 'gte'}]}]}
+        errors = list(self.validator.iter_errors(data))
+        self.assertEqual(len(errors), 1)
+        error = specific_error(errors[0])
+        self.assertIn(
+            "[{'StorageType': 'StandardStorage'}] is not of type 'object'",
+            str(error))
+
     def test_semantic_mode_error(self):
         data = {
             'policies': [{
