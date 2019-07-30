@@ -4,7 +4,7 @@ AWS Systems Manager
 EC2 Systems Manager
 +++++++++++++++++++
 
-Cloud cusotdian enables several use cases with SSM
+Cloud custodian enables several use cases with SSM
 
  - filtering instances on the basis of their association to SSM
    See :ref:`ssm filter <aws.ec2.filters.ssm>`
