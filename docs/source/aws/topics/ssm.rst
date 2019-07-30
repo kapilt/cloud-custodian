@@ -7,9 +7,10 @@ EC2 Systems Manager
 Cloud cusotdian enables several use cases with SSM
 
  - filtering instances on the basis of their association to SSM
+   See :ref:`ssm filter <aws.ec2.filters.ssm>`
 
  - executing actions on instances with ssm agent's installed.
-
+   See :ref:`ec2 send command action <aws.ec2.actions.send-command>`
 
 Ops Center
 ++++++++++
@@ -33,7 +34,7 @@ custodian you can.
     See :ref:`post-item action <aws.common.actions.post-item>`
 
   - Manage ops items as a resource, , close or update ops items.
-    See :ref:`post-item action <aws.ops-item>`
+    See :ref:`ops-item resource <aws.ops-item>`
 
 
 OmniSSM
