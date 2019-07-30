@@ -37,7 +37,7 @@ jobs:
     inputs:
       key: |
         c7n-tox
-        $(python.version)
+        3.7
         $(Agent.OS)
       path: $(LINUX_CACHE_DIR)
 
