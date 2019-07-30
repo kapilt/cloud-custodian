@@ -254,7 +254,7 @@ class UpdateOpsItem(Action):
         description={'type': 'string'},
         priority={'enum': list(range(1, 6))},
         title={'type': 'string'},
-        topics={'type': 'string'},
+        topics={'type': 'array', 'items': {'type': 'string'}},
         status={'enum': ['Open', 'In Progress', 'Resolved']},
     )
     permissions = ('ssm:UpdateOpsItem',)
