@@ -25,14 +25,13 @@ Modes
 
 Execute a policy lambda in response to security hub finding event or action.
 
-.. example:
 
 This policy will provision a lambda and security hub custom action.
 The action can be invoked on a finding or insight result (collection
 of findings). The action name will have the resource type prefixed as
 custodian actions are resource specific.
 
-.. code-block: yaml
+.. code-block:: yaml
 
    policy:
      - name: remediate
@@ -46,12 +45,11 @@ custodian actions are resource specific.
           name: null
         - stop
 
-.. example:
 
 This policy will provision a lambda that will process high alert findings from
 guard duty (note custodian also has support for guard duty events directly).
 
-.. code-block: yaml
+.. code-block:: yaml
 
    policy:
      - name: remediate
