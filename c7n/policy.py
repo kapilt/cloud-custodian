@@ -14,7 +14,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from datetime import datetime
-from dateutil import parser, tz as tzutil
 import json
 import fnmatch
 import itertools
@@ -22,12 +21,14 @@ import logging
 import os
 import time
 
+from dateutil import parser, tz as tzutil
 import jmespath
 import six
 
 from c7n.cwe import CloudWatchEvents
 from c7n.ctx import ExecutionContext
 from c7n.exceptions import PolicyValidationError, ClientError, ResourceLimitExceeded
+from c7n.filters import FilterRegistry
 from c7n.output import DEFAULT_NAMESPACE, NullBlobOutput
 from c7n.resources import load_resources
 from c7n.registry import PluginRegistry
@@ -372,25 +373,7 @@ class PullMode(PolicyExecutionMode):
         )
 
     def is_runnable(self):
-        now = datetime.now(self.policy.tz)
-        if self.policy.start and self.policy.start > now:
-            self.policy.log.info(
-                "Skipping policy:%s start-date:%s is after current-date:%s",
-                self.policy.name, self.policy.start, now)
-            return False
-        if self.policy.end and self.policy.end < now:
-            self.policy.log.info(
-                "Skipping policy:%s end-date:%s is before current-date:%s",
-                self.policy.name, self.policy.end, now)
-            return False
-        if self.policy.region and (
-                self.policy.region != self.policy.options.region):
-            self.policy.log.info(
-                "Skipping policy:%s target-region:%s current-region:%s",
-                self.policy.name, self.policy.region,
-                self.policy.options.region)
-            return False
-        return True
+        return bool(self.policy.conditions.evaluate())
 
 
 class LambdaMode(ServerlessExecutionMode):
@@ -834,12 +817,60 @@ class ConfigRuleMode(LambdaMode):
         return resources
 
 
+
 def get_session_factory(provider_name, options):
     try:
         return clouds[provider_name]().get_session_factory(options)
     except KeyError:
         raise RuntimeError(
             "%s provider not installed" % provider_name)
+
+
+class PolicyConditions(object):
+
+    filter_registry = FilterRegistry('c7n.policy.filters')
+
+    def __init__(self, policy, data):
+        self.policy = policy
+        self.data = data
+        self.filters = None
+
+    def validate(self):
+        if self.filters:
+            return
+        self.data.extend(self.convert_deprecated())
+        self.filters = self.filter_registry.parse(
+            self.data, self.policy.resource_manager)
+
+    def evaluate(self):
+        policy_vars = {
+            'region': self.policy.options.region,
+            'resource': self.policy.resource_type,
+            'provider': self.policy.provider_name,
+            'account_id': self.policy.options.account_id,
+            'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
+            'policy': self.policy.data
+        }
+        return all([f.process(policy_vars) for f in self.filters])
+
+    def convert_deprecated(self):
+        filters = []
+        if self.policy.region:
+            filters.append({'region': self.policy.region})
+        if self.policy.start:
+            filters.append({
+                'type': 'value',
+                'key': 'now',
+                'value_type': 'date',
+                'op': 'gte',
+                'value': self.start})
+        if self.policy.end:
+            filters.append({
+                'type': 'value',
+                'key': 'now',
+                'value_type': 'date',
+                'op': 'lte',
+                'value': self.end})
 
 
 class Policy(object):
@@ -877,6 +908,7 @@ class Policy(object):
             provider_name = 'aws'
         return provider_name
 
+    ## Preexecution Conditions
     @property
     def region(self):
         return self.data.get('region')
@@ -897,6 +929,7 @@ class Policy(object):
             return parser.parse(self.data.get('end'), ignoretz=True).replace(tzinfo=self.tz)
         return None
 
+    # Runtime circuit breakers
     @property
     def max_resources(self):
         return self.data.get('max-resources')
