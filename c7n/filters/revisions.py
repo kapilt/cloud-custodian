@@ -169,6 +169,7 @@ class JsonDiff(Diff):
         selector={'enum': ['previous', 'date', 'locked']},
         # For date selectors allow value specification
         selector_value={'type': 'string'})
+    schema_alias = True
 
     def diff(self, source, target):
         source, target = (
