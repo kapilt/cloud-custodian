@@ -195,7 +195,7 @@ class VpcTest(BaseTest):
         self.assertEqual(resources[0]["VpcId"], vpc_id1)
 
     def test_eni_vpc_filter(self):
-        self.session_factory = self.record_flight_data("test_eni_vpc_filter")
+        self.session_factory = self.replay_flight_data("test_eni_vpc_filter")
         p = self.load_policy({
             "name": "ec2-eni-vpc-filter",
             "resource": "eni",
