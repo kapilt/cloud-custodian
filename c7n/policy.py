@@ -701,6 +701,7 @@ class ConfigRuleMode(LambdaMode):
     schema = utils.type_schema('config-rule', rinherit=LambdaMode.schema)
 
     def validate(self):
+        super(ConfigRuleMode, self).validate()
         if not self.policy.resource_manager.resource_type.config_type:
             raise PolicyValidationError(
                 "policy:%s AWS Config does not support resource-type:%s" % (
