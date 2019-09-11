@@ -2004,7 +2004,7 @@ class CreateFlowLogs(BaseAction):
         self.state = self.data.get('state', True)
         if not self.state:
             return
-        destination_type = self.log.get(
+        destination_type = self.data.get(
             'LogDestinationType', 'cloud-watch-logs')
         dvalidation = self.SchemaValidation[destination_type]
         for r in dvalidation.get('required', ()):
