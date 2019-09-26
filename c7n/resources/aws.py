@@ -559,7 +559,7 @@ class AWS(object):
                 candidate = candidates and candidates[0] or 'us-east-1'
                 svc_regions = [candidate]
             elif 'all' in options.regions:
-                svc_regions = list(set(available_regions).intersect(enabled_regions))
+                svc_regions = list(set(available_regions).intersection(enabled_regions))
             else:
                 svc_regions = options.regions
 
