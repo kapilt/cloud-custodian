@@ -2,7 +2,7 @@ import pygit2
 import click
 
 from datetime import datetime, timedelta
-from dateutil.tz import tzoffset, tzutc
+from dateutil.tz import tzoffset
 
 
 def commit_date(commit):
@@ -20,7 +20,7 @@ aliases = {
     'dockerfile': 'tools',
     'ci': 'tests'}
 
-skip = set('release',)
+skip = set(('release',))
 
 
 @click.command()
@@ -70,8 +70,6 @@ def main(path, output, since):
             if k in skip:
                 continue
             print("# %s" % k, file=fh)
-            messages = groups[k]
-
             for c in sorted(groups[k]):
                 print(" - %s" % c.strip(), file=fh)
             print("\n", file=fh)
