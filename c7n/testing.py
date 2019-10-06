@@ -200,13 +200,19 @@ class CustodianTestCore(object):
         self.assertEqual(value, expected)
 
 
+class _TestUtils(unittest.TestCase):
+    # used to expose unittest feature set as a pytest fixture
+    def test_utils(self):
+        """dummy method for py2.7 unittest"""
+
+
 class PyTestUtils(CustodianTestCore):
     """Pytest compatibile testing utils intended for use as fixture."""
     def __init__(self, request):
         self.request = request
 
         # Copy over asserts from unit test
-        t = unittest.TestCase()
+        t = _TestUtils('test_utils')
         for n in dir(t):
             if n.startswith('assert'):
                 setattr(self, n, getattr(t, n))
