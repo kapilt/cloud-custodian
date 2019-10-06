@@ -29,6 +29,7 @@ from botocore.response import StreamingBody
 from placebo import pill
 from six import StringIO
 
+from c7n.testing import CustodianTestCore
 
 ###########################################################################
 # BEGIN PLACEBO MONKEY PATCH
@@ -255,7 +256,7 @@ def attach(session, data_path, prefix=None, debug=False):
     return pill
 
 
-class PillTest(unittest.TestCase):
+class PillTest(CustodianTestCore):
 
     archive_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "placebo_data.zip"
@@ -271,9 +272,6 @@ class PillTest(unittest.TestCase):
 
     recording = False
 
-    def assertJmes(self, expr, instance, expected):
-        value = jmespath.search(expr, instance)
-        self.assertEqual(value, expected)
 
     def cleanUp(self):
         self.pill = None
