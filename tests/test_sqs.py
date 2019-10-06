@@ -95,7 +95,6 @@ class TestSqs(object):
         test.assertEqual(check_master_key, key_id)
 
 
-
 class TestSqsAction(BaseTest):
 
     @functional

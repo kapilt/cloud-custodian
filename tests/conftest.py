@@ -1,6 +1,6 @@
 import pytest
 
-from .common import C7N_SCHEMA
+from .common import C7N_SCHEMA, ACCOUNT_ID
 from .zpill import PillTest
 from c7n.testing import PyTestUtils, reset_session_cache
 

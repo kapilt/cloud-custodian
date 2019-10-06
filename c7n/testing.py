@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import datetime
 import functools
 import io
+import jmespath
 import json
 import logging
 import os
@@ -214,7 +215,6 @@ class PyTestUtils(CustodianTestCore):
         self.request.addfinalizer(functools.partial(func, *args, **kw))
 
 
-
 class TestUtils(unittest.TestCase, CustodianTestCore):
 
     def tearDown(self):
@@ -223,7 +223,6 @@ class TestUtils(unittest.TestCase, CustodianTestCore):
     def cleanUp(self):
         # Clear out thread local session cache
         reset_session_cache()
-
 
 
 class TextTestIO(io.StringIO):

@@ -17,13 +17,11 @@ import fnmatch
 import json
 import os
 import shutil
-import unittest
 import zipfile
 from datetime import datetime, timedelta, tzinfo
 from distutils.util import strtobool
 
 import boto3
-import jmespath
 import placebo
 from botocore.response import StreamingBody
 from placebo import pill
@@ -271,7 +269,6 @@ class PillTest(CustodianTestCore):
     )
 
     recording = False
-
 
     def cleanUp(self):
         self.pill = None
