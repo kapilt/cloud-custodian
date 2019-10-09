@@ -11,6 +11,13 @@ Cloud Custodian
 [![](https://codecov.io/gh/cloud-custodian/cloud-custodian/branch/master/graph/badge.svg)](https://codecov.io/gh/cloud-custodian/cloud-custodian)
 [![](https://requires.io/github/cloud-custodian/cloud-custodian/requirements.svg?branch=master)](https://requires.io/github/cloud-custodian/cloud-custodian/requirements/?branch=master)
 
+Cloud Custodian was originally developed at CapitalOne, but they do
+not materially contribute or support this project, nor do they have
+any active maintainers. They represent just one of the thousands of
+users of this project. Like many opensource projects, development is
+lead by the community and several cloud providers have dedicated teams
+working on Custodian.
+
 Cloud Custodian is a rules engine for managing public cloud accounts and
 resources. It allows users to define policies to enable a well managed
 cloud infrastructure, that\'s both secure and cost optimized. It
