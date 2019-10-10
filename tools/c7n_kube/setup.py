@@ -39,7 +39,7 @@ setup(
             'kube = c7n_kube.entry:initialize_kube']
     },
     install_requires=[
-        "c7n>=0.8.40.0",
-        "kubernetes==9.0.0"
+        "c7n>=0.8.45.0",
+        "kubernetes>=9.0.0"
     ]
 )

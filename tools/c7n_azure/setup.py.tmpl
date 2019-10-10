@@ -38,6 +38,7 @@ setup(
         "custodian.resources": [
             'azure = c7n_azure.entry:initialize_azure']
     },
+    python_requires=">=3.6",
     install_requires=[
       {% for dep in pinned_packages %}
         "{{ dep }}",
