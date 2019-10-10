@@ -96,7 +96,7 @@ setup(
                       "jsonpickle",
                       "requests",
                       "PyJWT",
-                      "c7n>=0.8.45.0",
+                      "c7n>=0.8.45.1",
                       "azure-cli-core",
                       "adal",
                       "backports.functools_lru_cache",
