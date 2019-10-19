@@ -41,8 +41,7 @@ class RDSCluster(QueryResourceManager):
     class resource_type(TypeInfo):
 
         service = 'rds'
-        arn_type = 'cluster'
-        arn_separator = ":"
+        arn = 'DBClusterArn'
         enum_spec = ('describe_db_clusters', 'DBClusters', None)
         name = id = 'DBClusterIdentifier'
         dimension = 'DBClusterIdentifier'
@@ -51,9 +50,6 @@ class RDSCluster(QueryResourceManager):
     augment = tags.universal_augment
 
 
-
-RDSCluster.filter_registry.register('tag-count', tags.TagCountFilter)
-RDSCluster.filter_registry.register('marked-for-op', tags.TagActionFilter)
 RDSCluster.filter_registry.register('offhour', OffHour)
 RDSCluster.filter_registry.register('onhour', OnHour)
 
