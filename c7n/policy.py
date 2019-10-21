@@ -81,9 +81,11 @@ class PolicyCollection(object):
         self.policies = policies
 
     @classmethod
-    def from_data(cls, data, options):
-        policies = [Policy(p, options,
-                           session_factory=cls.session_factory())
+    def from_data(cls, data, options, session_factory=None):
+        # session factory param introduction needs an audit and review
+        # on tests.
+        sf = session_factory if session_factory else cls.session_factory()
+        policies = [Policy(p, options, session_factory=sf)
                     for p in data.get('policies', ())]
         return cls(policies, options)
 
@@ -1073,14 +1075,16 @@ class Policy(object):
             try:
                 p_tz = tzutil.gettz(policy_tz)
             except Exception as e:
-                raise ValueError(
-                    "Policy: %s TZ not parsable: %s, %s" % (policy_name, policy_tz, e))
+                raise PolicyValidationError(
+                    "Policy: %s TZ not parsable: %s, %s" % (
+                        policy_name, policy_tz, e))
 
             # Type will be tzwin on windows, but tzwin is null on linux
             if not (isinstance(p_tz, tzutil.tzfile) or
                     (tzutil.tzwin and isinstance(p_tz, tzutil.tzwin))):
-                raise ValueError(
-                    "Policy: %s TZ not parsable: %s" % (policy_name, policy_tz))
+                raise PolicyValidationError(
+                    "Policy: %s TZ not parsable: %s" % (
+                        policy_name, policy_tz))
 
         for i in [policy_start, policy_end]:
             if i:

@@ -29,12 +29,14 @@ def load_resources(resource_types=('*',)):
         pmap.setdefault(parts[0], []).append(r)
 
     load_providers(set(pmap))
-
+    missing = []
     for pname, p in clouds.items():
         if '*' in pmap:
             p.get_resource_types(('*',))
         elif pname in pmap:
-            p.get_resource_types(pmap[pname])
+            _, not_found = p.get_resource_types(pmap[pname])
+            missing.extend(not_found)
+    return missing
 
 
 def should_load_provider(name, provider_types):

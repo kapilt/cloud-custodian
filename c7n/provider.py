@@ -73,9 +73,11 @@ def import_resource_classes(resource_map, resource_types):
 
     mod_map = {}
     rmods = set()
+    not_found = []
 
     for r in resource_types:
         if r not in resource_map:
+            not_found.append(r)
             continue
         rmodule, rclass = resource_map[r].rsplit('.', 1)
         rmods.add(rmodule)
@@ -86,7 +88,7 @@ def import_resource_classes(resource_map, resource_types):
     return [getattr(mod_map[rmodule], rclass, None) for
             rmodule, rclass in [
                 resource_map[r].rsplit('.', 1) for r in resource_types
-                if r in resource_map]]
+                if r in resource_map]], not_found
 
 
 # nosetests seems to think this function is a test

@@ -113,7 +113,6 @@ class SecurityHubMode(BaseTest):
 class SecurityHubTest(BaseTest):
 
     def test_custom_classifier(self):
-
         templ = {
             'name': 's3',
             'resource': 's3',
@@ -125,7 +124,8 @@ class SecurityHubTest(BaseTest):
         templ['actions'][0]['types'] = ['Effects/CustomB/CustomA/CustomD']
         self.assertRaises(PolicyValidationError, self.load_policy, templ)
         templ['actions'][0]['types'] = []
-        self.assertRaises(ValidationError, self.load_policy, templ, validate=True)
+        self.assertRaises(
+            PolicyValidationError, self.load_policy, templ, validate=True)
 
     def test_s3_bucket_arn(self):
         policy = self.load_policy({

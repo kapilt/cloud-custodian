@@ -13,7 +13,10 @@
 # limitations under the License.
 
 import logging
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 import six
 from c7n_azure import constants
@@ -59,7 +62,7 @@ class ResourceQuery(object):
             log.error("Failed to query resource.\n"
                       "Type: azure.{0}.\n"
                       "Error: {1}".format(resource_manager.type, e))
-            six.raise_from(Exception('Failed to query resources.'), e)
+            raise
 
         raise TypeError("Enumerating resources resulted in a return"
                         "value which could not be iterated.")

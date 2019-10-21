@@ -31,8 +31,7 @@ import six
 import yaml
 
 from c7n import policy
-from c7n.schema import StructureParser, generate, validate as schema_validate
-from c7n.resources import load_resources
+from c7n.loader import PolicyLoader
 from c7n.ctx import ExecutionContext
 from c7n.utils import reset_session_cache
 from c7n.config import Bag, Config
@@ -47,6 +46,9 @@ functional = pytest.mark.functional
 class CustodianTestCore(object):
 
     custodian_schema = None
+    # thread local? tests are single threaded, multiprocess execution
+    policy_loader = PolicyLoader(Config.empty())
+    policy_loader.default_policy_validate = C7N_VALIDATE
 
     def addCleanup(self, func, *args, **kw):
         raise NotImplementedError("subclass required")
@@ -92,27 +94,26 @@ class CustodianTestCore(object):
         output_dir=None,
         cache=False,
     ):
-
         pdata = {'policies': [data]}
-        load_resources(StructureParser().get_resource_types(pdata))
+        if not (config and isinstance(config, Config)):
+            config = self._get_policy_config(
+                output_dir=output_dir, cache=cache, **(config or {}))
+        collection = self.policy_loader.load_data(
+            pdata, validate=validate,
+            file_uri="memory://test",
+            session_factory=session_factory,
+            config=config)
+        # policy non schema validation is also lazy initialization
+        [p.validate() for p in collection]
+        return list(collection)[0]
 
-        if validate:
-            custodian_schema = generate()
-            errors = schema_validate(pdata, custodian_schema)
-            if errors:
-                raise errors[0]
-
-        config = config or {}
-        if not output_dir:
-            temp_dir = self.get_temp_dir()
-            config["output_dir"] = temp_dir
-        if cache:
+    def _get_policy_config(self, **kw):
+        config = kw
+        config["output_dir"] = temp_dir = self.get_temp_dir()
+        if config.get('cache'):
             config["cache"] = os.path.join(temp_dir, "c7n.cache")
             config["cache_period"] = 300
-        conf = Config.empty(**config)
-        p = policy.Policy(data, conf, session_factory)
-        p.validate()
-        return p
+        return Config.empty(**config)
 
     def load_policy_set(self, data, config=None):
         filename = self.write_policy_file(data, format="json")

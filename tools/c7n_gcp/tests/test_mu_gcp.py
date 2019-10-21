@@ -62,8 +62,7 @@ class FunctionTest(BaseTest):
             func_info['name'],
             'projects/custodian-1291/locations/us-central1/functions/custodian-dev')
 
-    @mock.patch('c7n.policy.PolicyCollection.from_data')
-    def test_handler_run(self, from_data):
+    def test_handler_run(self):
         func_cwd = self.get_temp_dir()
         output_temp = self.get_temp_dir()
         pdata = {
@@ -79,9 +78,11 @@ class FunctionTest(BaseTest):
         event = event_data('bq-dataset-create.json')
         p = self.load_policy(pdata)
 
+        from c7n.policy import PolicyCollection
+        self.patch(PolicyCollection, 'from_data', lambda *args, **kw: [p])
         self.patch(p, 'push', lambda evt, ctx: None)
         self.patch(handler, 'get_tmp_output_dir', lambda: output_temp)
-        from_data.return_value = [p]
+
         self.change_cwd(func_cwd)
         self.assertEqual(handler.run(event), True)
 
