@@ -120,6 +120,15 @@ class PolicyMeta(BaseTest):
                     "%s resource has universal augment masking resource augment" % k
                 )
 
+    def test_resource_universal_taggable_arn_type(self):
+        for k, v in manager.resources.items():
+            if not getattr(v, 'augment', None):
+                continue
+            if (
+                v.augment.__name__ == "universal_augment" and not v.arn_type
+            ):
+                self.fail(
+                    "%s universal taggable resource missing arn_type" % k)
     def test_resource_shadow_source_augment(self):
         shadowed = []
         bad = []
