@@ -97,7 +97,7 @@ class RDS(QueryResourceManager):
         dimension = 'DBInstanceIdentifier'
         config_type = 'AWS::RDS::DBInstance'
         arn = 'DBInstanceArn'
-        univeral_taggable = True
+        universal_taggable = True
         default_report_fields = (
             'DBInstanceIdentifier',
             'DBName',
@@ -953,7 +953,7 @@ class RDSSnapshot(QueryResourceManager):
         date = 'SnapshotCreateTime'
         config_type = "AWS::RDS::DBSnapshot"
         filter_name = "DBSnapshotIdentifier"
-        univeral_taggable = True
+        universal_taggable = True
 
     def get_source(self, source_type):
         if source_type == 'describe':

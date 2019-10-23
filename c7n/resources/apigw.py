@@ -22,7 +22,6 @@ from c7n.filters import FilterRegistry, ValueFilter
 from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources, ResourceManager
 from c7n import query, utils
-from c7n.tags import universal_augment
 from c7n.utils import generate_arn, type_schema
 
 
@@ -151,7 +150,7 @@ class RestApi(query.QueryResourceManager):
     def get_source(self, source_type):
         if source_type == 'describe':
             return ApiDescribeSource(self)
-        return super(RestStage, self).get_source(source_type)
+        return super(RestApi, self).get_source(source_type)
 
 
 class ApiDescribeSource(query.DescribeSource):

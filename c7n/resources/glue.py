@@ -184,7 +184,6 @@ class GlueCrawler(QueryResourceManager):
     augment = universal_augment
 
 
-
 @GlueCrawler.action_registry.register('delete')
 class DeleteCrawler(BaseAction, StateTransitionFilter):
 
