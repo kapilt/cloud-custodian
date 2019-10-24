@@ -451,7 +451,8 @@ class StructureParser(object):
     allowed_file_keys = set(('vars', 'policies'))
     required_policy_keys = set(('name', 'resource'))
     allowed_policy_keys = set(
-        ('name', 'resource', 'title', 'description', 'mode', 'tags', 'max-resources',
+        ('name', 'resource', 'title', 'description', 'mode',
+         'tags', 'max-resources', 'source', 'query',
          'filters', 'actions', 'source', 'tags',
          # legacy keys subject to deprecation.
          'region', 'start', 'end', 'max-resources-percent', 'comments', 'comment'
