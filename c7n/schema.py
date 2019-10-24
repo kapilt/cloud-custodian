@@ -31,6 +31,7 @@ from collections import Counter
 import json
 import inspect
 import logging
+import six
 
 from jsonschema import Draft4Validator as Validator
 from jsonschema.exceptions import best_match
@@ -502,8 +503,9 @@ class StructureParser(object):
             raise PolicyValidationError((
                 'policy:%s must use a list for filters found:%s' % (
                     p['name'], type(p['filters']).__name__)))
+        element_types = (dict,) + six.string_types
         for f in p.get('filters', ()):
-            if not isinstance(f, dict):
+            if not isinstance(f, element_types):
                 raise PolicyValidationError((
                     'policy:%s filter must be a mapping/dict found:%s' % (
                         p.get('name', 'unknown'), type(f).__name__)))
@@ -512,7 +514,7 @@ class StructureParser(object):
                 'policy:%s must use a list for actions found:%s' % (
                     p.get('name', 'unknown'), type(p['actions']).__name__)))
         for a in p.get('actions', ()):
-            if not isinstance(a, dict):
+            if not isinstance(a, element_types):
                 raise PolicyValidationError((
                     'policy:%s action must be a mapping/dict found:%s' % (
                         p.get('name', 'unknown'), type(a).__name__)))
