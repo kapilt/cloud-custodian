@@ -456,8 +456,8 @@ class StructureParser(object):
          'tags', 'max-resources', 'source', 'query',
          'filters', 'actions', 'source', 'tags',
          # legacy keys subject to deprecation.
-         'region', 'start', 'end', 'max-resources-percent', 'comments', 'comment'
-    ))
+         'region', 'start', 'end', 'max-resources-percent',
+         'comments', 'comment'))
 
     def validate(self, data):
         if not isinstance(data, dict):
@@ -493,7 +493,7 @@ class StructureParser(object):
         pkeys = set(p)
         if self.required_policy_keys.difference(pkeys):
             raise PolicyValidationError(
-                'policy missing required keys (name, resource) data:\n %s' %  (
+                'policy missing required keys (name, resource) data:\n %s' % (
                     json.dumps(p, indent=2)))
         if pkeys.difference(self.allowed_policy_keys):
             raise PolicyValidationError(
