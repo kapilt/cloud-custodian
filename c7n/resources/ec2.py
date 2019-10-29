@@ -702,6 +702,8 @@ class DefaultVpc(DefaultVpcBase):
 
 
 def deserialize_user_data(user_data):
+    if user_data is None:
+        return None
     data = base64.b64decode(user_data)
     # try raw and compressed
     try:
@@ -1888,11 +1890,17 @@ class LaunchTemplate(query.QueryResourceManager):
     def get_asg_templates(self, asgs):
         templates = {}
         for a in asgs:
-            if 'LaunchTemplate' not in a:
+            t = a.get('LaunchTemplate')
+            if t:
+                templates.setdefault(
+                    (t['LaunchTemplateId'], t['Version']), []).append(
+                        a['AutoScalingGroupName'])
+            if 'MixedInstancesPolicy' not in a:
                 continue
-            t = a['LaunchTemplate']
+            mip_spec = a['MixedInstancesPolicy'][
+                'LaunchTemplate']['LaunchTemplateSpecification']
             templates.setdefault(
-                (t['LaunchTemplateId'], t['Version']), []).append(
+                (mip_spec['LaunchTemplateId'], mip_spec['Version']), []).append(
                     a['AutoScalingGroupName'])
         return templates
 

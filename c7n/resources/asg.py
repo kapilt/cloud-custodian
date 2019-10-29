@@ -115,23 +115,37 @@ class LaunchInfo(object):
             cfg['LaunchConfigurationName']: cfg for cfg in configs
             if cfg['LaunchConfigurationName'] in config_names}
 
-    def get_launch_id(self, asg):
+    def get_launch_ids(self, asg):
+        lids = []
         lid = asg.get('LaunchConfigurationName')
         if lid is not None:
             # We've noticed trailing white space allowed in some asgs
-            return lid.strip()
+            lids.append(lid.strip())
 
         lid = asg.get('LaunchTemplate')
         if lid is not None:
-            return (lid['LaunchTemplateId'], lid['Version'])
+            lids.append((lid['LaunchTemplateId'], lid['Version']))
 
+        if 'MixedInstancesPolicy' in asg:
+            mip_spec = asg['MixedInstancesPolicy']['LaunchTemplate']['LaunchTemplateSpecification']
+            lids.append((mip_spec['LaunchTemplateId'], mip_spec['Version']))
+
+        if lids:
+            return lids
         # we've noticed some corner cases where the asg name is the lc name, but not
         # explicitly specified as launchconfiguration attribute.
         lid = asg['AutoScalingGroupName']
-        return lid
+        return [lid]
 
     def get(self, asg):
-        lid = self.get_launch_id(asg)
+        launches = []
+        for lid in self.get_launch_ids(asg):
+            l = self.get_launch(lid)
+            if l:
+                launches.append(l)
+        return launches
+
+    def get_launch(self, lid):
         if isinstance(lid, tuple):
             return self.templates.get(lid)
         else:
@@ -237,7 +251,9 @@ class LaunchConfigFilter(ValueFilter):
         return super(LaunchConfigFilter, self).process(asgs, event)
 
     def __call__(self, asg):
-        return self.match(self.launch_info.get(asg))
+        for l in self.launch_info.get(asg):
+            if self.match(l):
+                return True
 
 
 class ConfigValidFilter(Filter):
@@ -334,14 +350,19 @@ class ConfigValidFilter(Filter):
             if appelb_target not in self.appelb_target_groups:
                 errors.append(('invalid-appelb-target-group', appelb_target))
 
-        cfg_id = self.launch_info.get_launch_id(asg)
-        cfg = self.launch_info.get(asg)
+        for cfg_id in self.launch_info.get_launch_ids(asg):
+            self.check_launch_errors(asg, cfg_id, errors)
 
+        if errors:
+            asg['Invalid'] = errors
+        return errors
+
+    def check_launch_errors(self, asg, cfg_id, errors):
+        cfg = self.launch_info.get_launch(cfg_id)
         if cfg is None:
             errors.append(('invalid-config', cfg_id))
             self.log.debug(
                 "asg:%s no launch config or template found" % asg['AutoScalingGroupName'])
-            asg['Invalid'] = errors
             return True
 
         for sg in itertools.chain(*(
@@ -469,21 +490,25 @@ class NotEncryptedFilter(Filter):
         return super(NotEncryptedFilter, self).process(asgs, event)
 
     def __call__(self, asg):
-        launch = self.launch_info.get(asg)
-        if not launch:
+        launches = self.launch_info.get(asg)
+        if not launches:
             self.log.warning(
                 "ASG %s instances: %d has missing config or template",
                 asg['AutoScalingGroupName'], len(asg['Instances']))
             return False
 
-        launch_id = self.launch_info.get_launch_id(asg)
+        launch_ids = self.launch_info.get_launch_ids(asg)
         unencrypted = []
-        if not self.data.get('exclude_image'):
-            if launch['ImageId'] in self.unencrypted_images:
+        for l in launches:
+            if self.data.get('exclude_image'):
+                continue
+            if l['ImageId'] in self.unencrypted_images:
                 unencrypted.append('Image')
-
-        if launch_id in self.unencrypted_launch:
-            unencrypted.append('LaunchConfig')
+                break
+        for lid in launch_ids:
+            if lid in self.unencrypted_launch:
+                unencrypted.append('LaunchConfig')
+                break
         if unencrypted:
             asg['Unencrypted'] = unencrypted
         return bool(unencrypted)
@@ -570,10 +595,12 @@ class ImageAgeFilter(AgeFilter):
         return super(ImageAgeFilter, self).process(asgs, event)
 
     def get_resource_date(self, asg):
-        cfg = self.launch_info.get(asg)
-        ami = self.images.get(cfg.get('ImageId'), {})
-        return parse(ami.get(
-            self.date_attribute, "2000-01-01T01:01:01.000Z"))
+        ages = []
+        for cfg in self.launch_info.get(asg):
+            ami = self.images.get(cfg.get('ImageId'), {})
+            ages.append(parse(ami.get(
+                self.date_attribute, "2000-01-01T01:01:01.000Z")))
+        return list(sorted(ages))[0]
 
 
 @ASG.filter_registry.register('image')
@@ -828,15 +855,12 @@ class UserDataFilter(ValueFilter):
 
         results = []
         for asg in asgs:
-            launch_config = launch_info.get(asg)
-            if self.annotation not in launch_config:
-                if not launch_config.get('UserData'):
-                    asg[self.annotation] = None
-                else:
-                    asg[self.annotation] = deserialize_user_data(
-                        launch_config['UserData'])
-            if self.match(asg):
-                results.append(asg)
+            for launch_config in launch_info.get(asg):
+                asg[self.annotation] = deserialize_user_data(
+                    launch_config.get('UserData'))
+                if self.match(asg):
+                    results.append(asg)
+                    break
         return results
 
 
