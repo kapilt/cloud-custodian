@@ -20,6 +20,7 @@ from .common import BaseTest
 
 from c7n.resources.asg import LaunchInfo
 
+
 class LaunchConfigTest(BaseTest):
 
     def test_config_unused(self):
@@ -80,15 +81,14 @@ class AutoScalingTemplateTest(BaseTest):
         d = {
             "AutoScalingGroupName": "devx",
             "MixedInstancesPolicy": {
-            "LaunchTemplate": {
-                "LaunchTemplateSpecification": {
-                    "LaunchTemplateId": "lt-0877401c93c294001",
-                    "LaunchTemplateName": "test",
-                    "Version": "4"
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": "lt-0877401c93c294001",
+                        "LaunchTemplateName": "test",
+                        "Version": "4"},
+                    "Overrides": [{"InstanceType": "t1.micro"},
+                                  {"InstanceType": "t2.small"}]
                 },
-                "Overrides": [{"InstanceType": "t1.micro"},
-                              {"InstanceType": "t2.small"}]
-            },
                 "InstancesDistribution": {
                     "OnDemandAllocationStrategy": "prioritized",
                     "OnDemandBaseCapacity": 1,
@@ -108,7 +108,8 @@ class AutoScalingTemplateTest(BaseTest):
         p = self.load_policy({"name": "mixed-instance", "resource": "asg"})
         self.assertEqual(
             list(p.resource_manager.get_resource_manager(
-                'launch-template-version').get_asg_templates([d]).keys()), [("lt-0877401c93c294001", "4")])
+                'launch-template-version').get_asg_templates([d]).keys()),
+            [("lt-0877401c93c294001", "4")])
         self.assertEqual(
             LaunchInfo(p.resource_manager).get_launch_id(d), ("lt-0877401c93c294001", "4"))
 
