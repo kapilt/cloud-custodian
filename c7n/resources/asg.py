@@ -140,9 +140,9 @@ class LaunchInfo(object):
     def get(self, asg):
         launches = []
         for lid in self.get_launch_ids(asg):
-            l = self.get_launch(lid)
-            if l:
-                launches.append(l)
+            launch = self.get_launch(lid)
+            if launch:
+                launches.append(launch)
         return launches
 
     def get_launch(self, lid):
