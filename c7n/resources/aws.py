@@ -235,8 +235,8 @@ class CloudWatchLogOutput(LogOutput):
             self.log_group = self.config['path'].strip('/')
         else:
             # join netloc to path for casual usages of aws://log/group/name
-            self.log_group = "%s/%s" % (
-                self.config['netloc'], self.config['path'].strip('/'))
+            self.log_group = ("%s/%s" % (
+                self.config['netloc'], self.config['path'].strip('/'))).strip('/')
         self.region = self.config.get('region', ctx.options.region)
         self.destination = (
             self.config.scheme == 'aws' and

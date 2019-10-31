@@ -211,15 +211,15 @@ class OutputLogsTest(BaseTest):
 
         log_output = output.log_outputs.select('/custodian/xyz/', ctx)
         self.assertEqual(log_output.log_group, 'custodian/xyz')
-        self.assertEqual(log_output.construct_stream_name(), 'test')
 
         log_output = output.log_outputs.select('aws://somewhere/out/there', ctx)
         self.assertEqual(log_output.log_group, 'somewhere/out/there')
-        self.assertEqual(log_output.construct_stream_name(), 'test')
 
         log_output = output.log_outputs.select('aws:///somewhere/out', ctx)
         self.assertEqual(log_output.log_group, 'somewhere/out')
-        self.assertEqual(log_output.construct_stream_name(), 'test')
+
+        log_output = output.log_outputs.select('aws://somewhere', ctx)
+        self.assertEqual(log_output.log_group, 'somewhere')
 
         log_output = output.log_outputs.select(
             "aws:///somewhere/out?stream={region}/{policy}", ctx)
