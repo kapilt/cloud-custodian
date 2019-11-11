@@ -508,8 +508,11 @@ class AWS(object):
         return options
 
     def get_session_factory(self, options):
+        r = options.region
+        if not r and options.regions:
+            r = options.regions[0]
         return SessionFactory(
-            options.region,
+            r,
             options.profile,
             options.assume_role,
             options.external_id)
