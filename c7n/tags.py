@@ -33,7 +33,7 @@ import jmespath
 import time
 
 from c7n.manager import resources as aws_resources
-from c7n.actions import BaseAction as Action, AutoTagUser
+from c7n.actions import BaseAction as Action, EventAction, AutoTagUser
 from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from c7n.filters import Filter, OPERATORS
 from c7n.filters.offhours import Time
@@ -374,7 +374,7 @@ class TagCountFilter(Filter):
         return op(tag_count, count)
 
 
-class Tag(Action):
+class Tag(EventAction):
     """Tag an ec2 resource.
     """
 
@@ -399,7 +399,7 @@ class Tag(Action):
                     self.manager.data,))
         return self
 
-    def process(self, resources):
+    def process(self, resources, event=None):
         # Legacy
         msg = self.data.get('msg')
         msg = self.data.get('value') or msg
@@ -418,7 +418,7 @@ class Tag(Action):
         if msg:
             tags.append({'Key': tag, 'Value': msg})
 
-        self.interpolate_values(tags)
+        self.interpolate_values(tags, event)
 
         batch_size = self.data.get('batch_size', self.batch_size)
 
@@ -435,10 +435,11 @@ class Tag(Action):
             Tags=tags,
             DryRun=self.manager.config.dryrun)
 
-    def interpolate_values(self, tags):
+    def interpolate_values(self, tags, event):
         params = {
             'account_id': self.manager.config.account_id,
             'now': utils.FormatDate.utcnow(),
+            'event': event,
             'region': self.manager.config.region}
         for t in tags:
             t['Value'] = t['Value'].format(**params)
