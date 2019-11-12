@@ -65,6 +65,8 @@ class EKSVpcFilter(VpcFilter):
 @EKS.action_registry.register('tag')
 class EKSTag(tags.Tag):
 
+    permissions = ('eks:TagResource',)
+
     def process_resource_set(self, client, resource_set, tags):
         for r in resource_set:
             try:
@@ -82,6 +84,8 @@ EKS.action_registry.register('mark-for-op', tags.TagDelayedAction)
 
 @EKS.action_registry.register('remove-tag')
 class EKSRemoveTag(tags.RemoveTag):
+
+    permissions = ('eks:UntagResource',)
 
     def process_resource_set(self, client, resource_set, tags):
         for r in resource_set:
