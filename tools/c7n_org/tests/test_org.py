@@ -12,11 +12,11 @@ from c7n_org import cli as org
 ACCOUNTS_AWS_DEFAULT = yaml.safe_dump({
     'accounts': [
         {'name': 'dev',
-         'account_id': 'foobar',
+         'account_id': '112233445566',
          'tags': ['red', 'black'],
          'role': 'arn:aws:iam:{account_id}::/role/foobar'},
         {'name': 'qa',
-         'account_id': 'barfoo',
+         'account_id': '002244668899',
          'tags': ['red', 'green'],
          'role': 'arn:aws:iam:{account_id}::/role/foobar'},
     ],
