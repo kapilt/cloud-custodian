@@ -57,10 +57,26 @@ class FunctionAppDeploymentUnit(DeploymentUnit):
 
         # general app settings
         con_string = params['storage_account_connection_string']
-        site_config.app_settings.append(azure_name_value_pair('AzureWebJobsStorage', con_string))
-        site_config.app_settings.append(azure_name_value_pair('FUNCTIONS_EXTENSION_VERSION',
-                                                              FUNCTION_EXT_VERSION))
-        site_config.app_settings.append(azure_name_value_pair('FUNCTIONS_WORKER_RUNTIME', 'python'))
+        site_config.app_settings.append(
+            azure_name_value_pair('AzureWebJobsStorage', con_string))
+        site_config.app_settings.append(
+            azure_name_value_pair('FUNCTIONS_EXTENSION_VERSION', FUNCTION_EXT_VERSION))
+        site_config.app_settings.append(
+            azure_name_value_pair('FUNCTIONS_WORKER_RUNTIME', 'python'))
+
+
+        # "BUILD_FLAGS": "UseExpressBuild",
+        # "XDG_CACHE_HOME": "/tmp/.cache"})
+        
+        #site_config.app_settings.append(
+        #    azure_name_value_pair("SCM_RUN_FROM_PACKAGE", "true"))
+        site_config.app_settings.append(
+            azure_name_value_pair("SCM_DO_BUILD_DURING_DEPLOYMENT", "1"))
+        site_config.app_settings.append(
+            azure_name_value_pair("ENABLE_ORYX_BUILD", "true"))
+        
+        # site_config.app_settings.append(
+        #    azure_name_value_pair('WEBSITE_NODE_DEFAULT_VERSION', '3.7'))
 
         return self.client.web_apps.create_or_update(params['resource_group_name'],
                                                      params['name'],

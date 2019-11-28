@@ -17,6 +17,11 @@ Azure Functions
 """
 # Docker version from https://hub.docker.com/r/microsoft/azure-functions/
 FUNCTION_DOCKER_VERSION = 'DOCKER|mcr.microsoft.com/azure-functions/python:2.0-python3.6-appservice'
+FUNCTION_DOCKER_IMAGE = {
+    '3.6': 'mcr.microsoft.com/azure-functions/python:2.0-python3.6-appservice',
+    '3.7': 'mcr.microsoft.com/azure-functions/python:2.0-python3.7-appservice'
+},
+
 FUNCTION_EXT_VERSION = '~2'
 FUNCTION_EVENT_TRIGGER_MODE = 'azure-event-grid'
 FUNCTION_TIME_TRIGGER_MODE = 'azure-periodic'

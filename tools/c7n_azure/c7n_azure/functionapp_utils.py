@@ -122,7 +122,7 @@ class FunctionAppUtilities(object):
     def publish_functions_package(cls, function_params, package):
         session = local_session(Session)
         web_client = session.client('azure.mgmt.web.WebSiteManagementClient')
-
+        import pdb; pdb.set_trace()
         cls.log.info('Publishing Function application')
 
         # provision using Kudu Zip-Deploy
@@ -171,24 +171,35 @@ class FunctionAppUtilities(object):
                 blob_name,
                 sas_token=sas)
 
-            # update application settings function package
-            app_settings = web_client.web_apps.list_application_settings(
-                function_params.function_app_resource_group_name,
-                function_params.function_app_name)
-            app_settings.properties['WEBSITE_RUN_FROM_PACKAGE'] = blob_url
-            web_client.web_apps.update_application_settings(
-                function_params.function_app_resource_group_name,
-                function_params.function_app_name,
-                kind=str,
-                properties=app_settings.properties
-            )
-
             # Sync the scale controller for the Function App.
             # Not required for the dedicated plans.
-            cls._sync_function_triggers(function_params)
+            # cls._sync_function_triggers(function_params)
 
         cls.log.info('Finished publishing Function application')
 
+    @classmethod
+    def _ensure_remote_builds(cls, function_params, web_client):
+        # update application settings function package
+        app_settings = web_client.web_apps.list_application_settings(
+            function_params.function_app_resource_group_name,
+            function_params.function_app_name)
+        
+        # azure hates developers so ofc these aren't documented
+        # only cargo culted from reverse engineering another impl.
+        app_settings.properties.update({
+            "SCM_RUN_FROM_PACKAGE": "true",
+            "ENABLE_ORYX_BUILD": "true",
+            "SCM_DO_BUILD_DURING_DEPLOYMENT": "1",
+            "BUILD_FLAGS": "UseExpressBuild",
+            "XDG_CACHE_HOME": "/tmp/.cache"})
+        
+        web_client.web_apps.update_application_settings(
+            function_params.function_app_resource_group_name,
+            function_params.function_app_name,
+            kind=str,
+            properties=app_settings.properties
+        )
+        
     @classmethod
     def _sync_function_triggers(cls, function_params):
         cls.log.info('Sync Triggers...')

@@ -27,6 +27,7 @@ from c7n_azure.constants import (ENV_CUSTODIAN_DISABLE_SSL_CERT_VERIFICATION,
                                  FUNCTION_EXTENSION_BUNDLE_CONFIG)
 from c7n_azure.dependency_manager import DependencyManager
 from c7n_azure.session import Session
+from c7n_azure.mu import custodian_archive
 
 from c7n.mu import PythonPackageArchive
 from c7n.utils import local_session
@@ -143,13 +144,12 @@ class FunctionPackage(object):
         return os.path.join(c7n_azure_root, 'cache')
 
     def build(self, policy, modules, non_binary_packages, excluded_packages, queue_name=None):
-        cache_zip_file = self.build_cache(modules, excluded_packages, non_binary_packages)
-
-        self.pkg = AzurePythonPackageArchive(cache_file=cache_zip_file)
-
-        exclude = os.path.normpath('/cache/') + os.path.sep
-        self.pkg.add_modules(lambda f: (exclude in f),
-                             [m.replace('-', '_') for m in modules])
+        self.pkg = custodian_archive()
+        #cache_zip_file = self.build_cache(modules, excluded_packages, non_binary_packages)
+        #self.pkg = AzurePythonPackageArchive(cache_file=cache_zip_file)
+        #exclude = os.path.normpath('/cache/') + os.path.sep
+        #self.pkg.add_modules(lambda f: (exclude in f),
+        #                     [m.replace('-', '_') for m in modules])
 
         # add config and policy
         self._add_functions_required_files(policy, queue_name)

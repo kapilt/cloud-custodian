@@ -14,6 +14,7 @@
 
 import logging
 import sys
+import os
 
 from os.path import dirname, join
 
@@ -31,7 +32,11 @@ if sys.version_info[0] >= 3:
 max_dequeue_count = 3
 
 def main(input):
-    logging.info("Running Azure Cloud Custodian Policy")
+    logging.info("Running Azure Cloud Custodian Policy v3")
+
+    logging.info("Grandparent entries \n %s" % (
+        "\n ".join(os.listdir(
+            dirname(function_directory)))))
 
     context = {
         'config_file': join(function_directory, 'config.json'),

@@ -202,6 +202,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
         raise NotImplementedError("subclass responsibility")
 
     def provision(self):
+        import pdb; pdb.set_trace()
         # Make sure we have auth data for function provisioning
         session = local_session(self.policy.session_factory)
         session.get_functions_auth_string("")
