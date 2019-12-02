@@ -757,7 +757,7 @@ def tag_org_account(account, region, db, creator_tag, user_suffix, dryrun, type)
 @click.option('--user-suffix', help="Ignore users without the given suffix")
 @click.option('--dryrun', is_flag=True)
 @click.option('--type', multiple=True, help="Only process resources of type")
-@click.option("--profile", help="AWS cli profile for resourec tagging")
+@click.option("--profile", help="AWS cli profile for resource tagging")
 def tag(assume, region, db, creator_tag, user_suffix, dryrun,
         summary=True, profile=None, type=()):
     """Tag resources with their creator.
