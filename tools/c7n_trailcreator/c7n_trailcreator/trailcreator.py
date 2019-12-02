@@ -679,7 +679,6 @@ def load_athena(table, workgroup, athena_db, athena_output, resource_map,
         day=day and parse(day) or None)
 
 
-
 @cli.command()
 @click.option('--config', required=True, help="c7n-org Accounts config file", type=click.Path())
 @click.option('--db', required=True, help="Resource Owner DB (sqlite)", type=click.Path())
