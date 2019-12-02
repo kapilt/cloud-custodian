@@ -82,8 +82,12 @@ c7n-trailcreator load-athena \
 	--year 2019
 ```
 
-By default we'll use the default s3 athena output used by the console, and the default db and primary workgroup,
-you can pass all of these in on the cli to be more explicit.
+By default we'll use the default s3 athena output used by the console,
+and the default db and primary workgroup, you can pass all of these in
+on the cli to be more explicit.
+
+You can also specify to just process a month with `--month 2019/11` or
+an individual day with `--day 2019/02/01`
 
 ```
 INFO:c7n_trailowner:Athena query:569712dc-d1e9-4474-b86f-6579c53b5b46
