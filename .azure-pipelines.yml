@@ -66,7 +66,10 @@ jobs:
       Python38:
         python.version: '3.8'
         TOXENV: py38
-    maxParallel: 4
+      PyPy3:
+        python.version: 'pypy3'
+        TOXENV: pypy3
+    maxParallel: 5
 
   steps:
   - checkout: self
