@@ -153,7 +153,7 @@ class FlowLogFilter(Filter):
                         traffic_type is None) or op(
                         fl['TrafficType'],
                         traffic_type.upper())
-                    log_group_match = (log_group is None) or op(fl['LogGroupName'], log_group)
+                    log_group_match = (log_group is None) or op(fl.get('LogGroupName'), log_group)
 
                     # combine all conditions to check if flow log matches the spec
                     fl_match = (status_match and traffic_type_match and dest_match and
