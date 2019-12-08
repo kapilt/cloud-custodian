@@ -902,8 +902,9 @@ class Policy(object):
         return self.data.get('mode', {'type': 'pull'})['type']
 
     def get_execution_mode(self):
-        exec_mode = execution[self.execution_mode]
-        if exec_mode is None:
+        try:
+            exec_mode = execution[self.execution_mode]
+        except KeyError:
             return None
         return exec_mode(self)
 
