@@ -3,8 +3,11 @@ from io import open
 from setuptools import setup, find_packages
 
 
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
+def read(fname, default=''):
+    fpath = os.path.join(os.path.dirname(__file__), fname)
+    if fpath:
+        return open(fpath, encoding='utf-8').read()
+    return default
 
 
 setup(
