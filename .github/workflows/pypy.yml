@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pypy_version: [pypy2, pypy3]
+        pypy_version: [pypy3]
     steps:
       - uses: actions/checkout@v1
       - name: Set up Python ${{ matrix.pypy_version }}
