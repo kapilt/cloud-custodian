@@ -1508,7 +1508,10 @@ class UserAccessKey(ValueFilter):
                 value: Active
     """
 
-    schema = type_schema('access-key', rinherit=ValueFilter.schema)
+    schema = type_schema(
+        'access-key',
+        rinherit=ValueFilter.schema,
+        **{'match-operator': {'enum': ['and', 'or']}})
     schema_alias = False
     permissions = ('iam:ListAccessKeys',)
     annotation_key = 'c7n:AccessKeys'
@@ -1532,9 +1535,13 @@ class UserAccessKey(ValueFilter):
                 chunks(augment_set, 50)))
 
         matched = []
+        match_op = self.data.get('match-operator', 'or')
         for r in resources:
+            keys = r[self.annotation_key]
+            if self.matched_annotation_key in r and match_op == 'and':
+                keys = r[self.matcheed_annotation_key]
             k_matched = []
-            for k in r[self.annotation_key]:
+            for k in keys:
                 if self.match(k):
                     k_matched.append(k)
             for k in k_matched:
