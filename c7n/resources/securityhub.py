@@ -200,25 +200,30 @@ class SecurityHub(LambdaMode):
 
     def run(self, event, lambda_context):
         self.setup_exec_environment(event)
-        resource_arns = self.get_resource_arns(event)
-        # Group resources by account_id, region for role assumes
-        resource_sets = {}
-        for rarn in resource_arns:
-            resource_sets.setdefault((rarn.account_id, rarn.region), []).append(rarn)
-        # If we're not configured for member-role and we have multiple accounts resources.
-        # warn loudly.
-        if (not self.policy.data['mode'].get('member-role') and
-                set((self.policy.options.account_id,)) != {
-                    rarn.account_id for rarn in resource_arns}):
-            self.policy.log.warning((
-                'hub-mode not configured for multi-account member-role '
-                'but multiple resource accounts found'))
+        resource_sets = self.get_resource_sets(event)
         result_sets = {}
         for (account_id, region), rarns in resource_sets.items():
             self.assume_member({'account': account_id, 'region': region})
             resources = self.resolve_resources(event)
             result_sets[(account_id, region)] = self.run_resource_set(event, resources)
         return result_sets
+
+    def get_resource_sets(self, event):
+        # return a mapping of (account_id, region): [resource_arns]
+        # per the finding in the event.
+        resource_arns = self.get_resource_arns(event)
+        # Group resources by account_id, region for role assumes
+        resource_sets = {}
+        for rarn in resource_arns:
+            resource_sets.setdefault((rarn.account_id, rarn.region), []).append(rarn)
+        # Warn if not configured for member-role and have multiple accounts resources.
+        if (not self.policy.data['mode'].get('member-role') and
+                set((self.policy.options.account_id,)) != {
+                    rarn.account_id for rarn in resource_arns}):
+            self.policy.log.warning((
+                'hub-mode not configured for multi-account member-role '
+                'but multiple resource accounts found'))
+        return resource_sets
 
     def get_resource_arns(self, event):
         event_type = event['detail-type']
