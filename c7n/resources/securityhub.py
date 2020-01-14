@@ -198,17 +198,39 @@ class SecurityHub(LambdaMode):
     def resolve_import_finding(self, event):
         return self.resolve_findings(event['detail']['findings'])
 
-    def resolve_resources(self, event):
-        # For centralized setups in a hub aggregator account
-        self.assume_member(event)
+    def run(self, event, lambda_context):
+        self.setup_exec_environment(event)
+        resource_arns = self.get_resource_arns(event)
+        # Group resources by account_id, region for role assumes
+        resource_sets = {}
+        for rarn in resource_arns:
+            resource_sets.setdefault((rarn.account_id, rarn.region), []).append(rarn)
+        # If we're not configured for member-role and we have multiple accounts resources.
+        # warn loudly.
+        if (not self.policy.data['mode'].get('member-role') and
+                set((self.policy.options.account_id,)) != {
+                    rarn.account_id for rarn in resource_arns}):
+            self.policy.log.warning((
+                'hub-mode not configured for multi-account member-role '
+                'but multiple resource accounts found'))
+        result_sets = {}
+        for (account_id, region), rarns in resource_sets.items():
+            self.assume_member({'account': account_id, 'region': region})
+            resources = self.resolve_resources(event)
+            result_sets[(account_id, region)] = self.run_resource_set(event, resources)
+        return result_sets
 
+    def get_resource_arns(self, event):
         event_type = event['detail-type']
         arn_resolver = getattr(self, self.handlers[event_type])
         arns = arn_resolver(event)
-
         # Lazy import to avoid aws sdk runtime dep in core
         from c7n.resources.aws import Arn
-        resource_map = {Arn.parse(r) for r in arns}
+        return {Arn.parse(r) for r in arns}
+
+    def resolve_resources(self, event):
+        # For centralized setups in a hub aggregator account
+        resource_map = self.get_resource_arns(event)
 
         # sanity check on finding resources matching policy resource
         # type's service.

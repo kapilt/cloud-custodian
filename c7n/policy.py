@@ -499,29 +499,34 @@ class LambdaMode(ServerlessExecutionMode):
         If metrics execution option is enabled, custodian will generate
         metrics per normal.
         """
-        from c7n.actions import EventAction
-
-        mode = self.policy.data.get('mode', {})
-        if not bool(mode.get("log", True)):
-            root = logging.getLogger()
-            map(root.removeHandler, root.handlers[:])
-            root.handlers = [logging.NullHandler()]
-
+        self.setup_exec_environment(event)
         resources = self.resolve_resources(event)
         if not resources:
             return resources
+        rcount = len(resources)
         resources = self.policy.resource_manager.filter_resources(
             resources, event)
 
         if 'debug' in event:
-            self.policy.log.info("Filtered resources %d" % len(resources))
+            self.policy.log.info(
+                "Filtered resources %d of %d", len(resources), rcount)
 
         if not resources:
             self.policy.log.info(
                 "policy:%s resources:%s no resources matched" % (
                     self.policy.name, self.policy.resource_type))
             return
+        return self.run_resource_set(event, resources)
 
+    def setup_exec_environment(self, event):
+        mode = self.policy.data.get('mode', {})
+        if not bool(mode.get("log", True)):
+            root = logging.getLogger()
+            map(root.removeHandler, root.handlers[:])
+            root.handlers = [logging.NullHandler()]
+
+    def run_resource_set(self, event, resources):
+        from c7n.actions import EventAction
         with self.policy.ctx:
             self.policy.ctx.metrics.put_metric(
                 'ResourceCount', len(resources), 'Count', Scope="Policy",
