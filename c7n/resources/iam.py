@@ -1539,7 +1539,7 @@ class UserAccessKey(ValueFilter):
         for r in resources:
             keys = r[self.annotation_key]
             if self.matched_annotation_key in r and match_op == 'and':
-                keys = r[self.matcheed_annotation_key]
+                keys = r[self.matched_annotation_key]
             k_matched = []
             for k in keys:
                 if self.match(k):

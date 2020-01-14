@@ -79,6 +79,21 @@ class SecurityHubMode(BaseTest):
                 'arn:aws:iam::644160558196:user/david.yun',
                 'arn:aws:iam::644160558196:user/kapil']))
 
+    def test_resolve_multi_account(self):
+        factory = self.record_flight_data(
+            'test_security_hub_multi_account_mode')
+        policy = self.load_policy({
+            'name': 'iam-key',
+            'resource': 'aws.iam-user',
+            'mode': {
+                'type': 'hub-action',
+                'role': 'foo',
+                'member-role': 'bar'}},
+            config={'region': 'us-east-2'})
+        hub = policy.get_execution_mode()
+        event = event_data('event-securityhub-cloudtrail-finding-action.json')
+        hub.get_resource_sets(event)
+
 
 class SecurityHubTest(BaseTest):
 
