@@ -205,7 +205,9 @@ class SecurityHub(LambdaMode):
         for (account_id, region), rarns in resource_sets.items():
             self.assume_member({'account': account_id, 'region': region})
             resources = self.resolve_resources(event)
-            result_sets[(account_id, region)] = self.run_resource_set(event, resources)
+            rset = result_sets.setdefault((account_id, region), [])
+            if resources:
+                rset.extend(self.run_resource_set(event, resources))
         return result_sets
 
     def get_resource_sets(self, event):

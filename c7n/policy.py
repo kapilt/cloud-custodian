@@ -464,6 +464,7 @@ class LambdaMode(ServerlessExecutionMode):
             member_role = member_role.format(account_id=member_id)
             utils.reset_session_cache()
             self.policy.options['account_id'] = member_id
+            self.policy.options['region'] = region
             self.policy.session_factory.region = region
             self.policy.session_factory.assume_role = member_role
             self.policy.log.info(
