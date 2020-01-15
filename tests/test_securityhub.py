@@ -80,7 +80,7 @@ class SecurityHubMode(BaseTest):
                 'arn:aws:iam::644160558196:user/kapil']))
 
     def test_resolve_multi_account_resource_sets(self):
-        factory = self.record_flight_data(
+        factory = self.replay_flight_data(
             'test_security_hub_multi_account_mode')
         policy = self.load_policy({
             'name': 'lambda-remediate',
