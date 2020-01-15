@@ -328,7 +328,7 @@ class TagActionFilter(Filter):
             action_date = parse(action_date_str)
         except Exception:
             self.log.warning("could not parse tag:%s value:%s on %s" % (
-                tag, v, i['InstanceId']))
+                tag, v, i[self.manager.resource_type.id]))
 
         if self.current_date is None:
             self.current_date = datetime.now()
