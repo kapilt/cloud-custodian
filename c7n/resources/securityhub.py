@@ -319,6 +319,8 @@ class PostFinding(Action):
 
     permissions = ('securityhub:BatchImportFindings',)
 
+    resource_type = ""
+
     schema_alias = True
     schema = type_schema(
         "post-finding",
@@ -542,6 +544,20 @@ class PostFinding(Action):
 
         return filter_empty(finding)
 
+    def format_envelope(self, r):
+        details = {}
+        envelope = filter_empty({
+            'Id': self.get_arns([r])[0],
+            'Region': self.manager.config.region,
+            'Tags': {t['Key']: t['Value'] for t in r.get('Tags', [])},
+            'Partition': get_partition(self.manager.config.region),
+            'Details': {self.resource_type: details},
+            'Type': self.resource_type
+        })
+        return envelope, details
+
+    filter_empty = staticmethod(filter_empty)
+
     def format_resource(self, r):
         raise NotImplementedError("subclass responsibility")
 
@@ -580,6 +596,7 @@ class OtherResourcePostFinding(PostFinding):
             'Id': self.manager.get_arns([r])[0],
             'Region': self.manager.config.region,
             'Partition': get_partition(self.manager.config.region),
+            'Tags': {t['Key']: t['Value'] for t in r['Tags']},
             'Details': {'Other': filter_empty(details)}
         }
         tags = {t['Key']: t['Value'] for t in r.get('Tags', [])}
