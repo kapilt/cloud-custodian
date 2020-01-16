@@ -43,9 +43,7 @@ class RestAccount(ResourceManager):
         dimension = None
         arn = False
 
-    @classmethod
-    def get_permissions(cls):
-        return ('apigateway:GET',)
+    permissions = ('apigateway:GET',)
 
     @classmethod
     def has_arn(self):

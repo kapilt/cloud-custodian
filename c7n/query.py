@@ -716,6 +716,18 @@ class TypeInfo(object):
     ###########
     # Optional
 
+    ############
+    # Permissions
+
+    # Permission string prefix if not service
+    permission_prefix = None
+
+    # Permissions for resource enumeration/get. Normally we autogen
+    # but in some cases we need to specify statically
+    permissions_enum = None
+    # Permissions for resourcee augment
+    permissions_augment = None
+
     ###########
     # Arn handling / generation metadata
 
