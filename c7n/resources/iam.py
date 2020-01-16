@@ -1565,7 +1565,7 @@ class UserMfaDevice(ValueFilter):
 
     schema = type_schema('mfa-device', rinherit=ValueFilter.schema)
     schema_alias = False
-    permissions = ('iam:ListMfaDevices',)
+    permissions = ('iam:ListMFADevices',)
 
     def __init__(self, *args, **kw):
         super(UserMfaDevice, self).__init__(*args, **kw)

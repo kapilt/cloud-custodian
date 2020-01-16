@@ -54,7 +54,7 @@ class Tag(Tag):
                     value: OwnerName
     """
 
-    permissions = ('cloudhsmv2:TagResource',)
+    permissions = ('cloudhsm:TagResource',)
 
     def process_resource_set(self, client, clusters, tags):
         for c in clusters:
@@ -82,7 +82,7 @@ class RemoveTag(RemoveTag):
                     tags: [OldTagKey1, OldTagKey2]
     """
 
-    permissions = ('cloudhsmv2:UntagResource',)
+    permissions = ('cloudhsm:UntagResource',)
 
     def process_resource_set(self, client, clusters, tag_keys):
         for c in clusters:

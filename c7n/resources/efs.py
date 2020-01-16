@@ -118,9 +118,9 @@ class KmsFilter(KmsRelatedFilter):
 class Delete(Action):
 
     schema = type_schema('delete')
-    permissions = ('efs:DescribeMountTargets',
-                   'efs:DeleteMountTargets',
-                   'efs:DeleteFileSystem')
+    permissions = ('elasticfilesystem:DescribeMountTargets',
+                   'elasticfilesystem:DeleteMountTarget',
+                   'elasticfilesystem:DeleteFileSystem')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('efs')

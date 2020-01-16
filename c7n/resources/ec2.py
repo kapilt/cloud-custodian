@@ -1443,10 +1443,7 @@ class AutorecoverAlarm(BaseAction, StateTransitionFilter):
     """
 
     schema = type_schema('autorecover-alarm')
-    permissions = ('ec2:DescribeInstanceStatus',
-                   'ec2:RecoverInstances',
-                   'ec2:DescribeInstanceRecoveryAttribute')
-
+    permissions = ('cloudwatch:PutMetricAlarm',)
     valid_origin_states = ('running', 'stopped', 'pending', 'stopping')
     filter_asg_membership = ValueFilter({
         'key': 'tag:aws:autoscaling:groupName',
