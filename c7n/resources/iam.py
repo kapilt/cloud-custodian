@@ -118,6 +118,12 @@ class Role(QueryResourceManager):
     }
 
 
+@Role.action_registry.register('post-finding')
+class RolePostFinding(PostFinding):
+
+    resource_type = 'AwsIamRole'
+
+
 @Role.action_registry.register('tag')
 class RoleTag(Tag):
     """Tag an iam role."""

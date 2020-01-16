@@ -1081,20 +1081,9 @@ class InstanceFinding(PostFinding):
         if "IamInstanceProfile" in r:
             details["IamInstanceProfileArn"] = r["IamInstanceProfile"]["Arn"]
 
-        instance = {
-            "Type": "AwsEc2Instance",
-            "Id": "arn:{}:ec2:{}:{}:instance/{}".format(
-                utils.REGION_PARTITION_MAP.get(self.manager.config.region, 'aws'),
-                self.manager.config.region,
-                self.manager.config.account_id,
-                r["InstanceId"]),
-            "Region": self.manager.config.region,
-            "Tags": {t["Key"]: t["Value"] for t in r.get("Tags", [])},
-            "Details": {"AwsEc2Instance": filter_empty(details)},
-        }
-
-        instance = filter_empty(instance)
-        return instance
+        envelope, payload = self.format_envelope(r)
+        payload.update(filter_empty(details))
+        return envelope
 
 
 @actions.register('start')
