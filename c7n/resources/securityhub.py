@@ -24,7 +24,7 @@ import logging
 
 from c7n.actions import Action
 from c7n.filters import Filter
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from c7n.manager import resources
 from c7n.policy import LambdaMode, execution
 from c7n.utils import (
@@ -222,9 +222,10 @@ class SecurityHub(LambdaMode):
         if (not self.policy.data['mode'].get('member-role') and
                 set((self.policy.options.account_id,)) != {
                     rarn.account_id for rarn in resource_arns}):
-            self.policy.log.warning((
-                'hub-mode not configured for multi-account member-role '
-                'but multiple resource accounts found'))
+            msg = ('hub-mode not configured for multi-account member-role '
+                   'but multiple resource accounts found')
+            self.policy.log.warning(msg)
+            raise PolicyExecutionError(msg)
         return resource_sets
 
     def get_resource_arns(self, event):
