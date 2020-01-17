@@ -42,7 +42,13 @@ class RestAccount(ResourceManager):
         name = id = 'account_id'
         dimension = None
         arn = False
-        permissions_enum = ('apigateway:GET',)
+
+    @classmethod
+    def get_permissions(cls):
+        # this resource is not query manager based as its a pseudo
+        # resource. in that it always exists, it represents the
+        # service's account settings.
+        return ('apigateway:GET',)
 
     @classmethod
     def has_arn(self):
