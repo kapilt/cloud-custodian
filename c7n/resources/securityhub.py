@@ -250,6 +250,9 @@ class SecurityHub(LambdaMode):
             resource_arns = [
                 r for r in resource_map
                 if r.service == self.policy.resource_manager.resource_type.service]
+            if not resource_arns:
+                log.info("mode:security-hub no matching resources arns")
+                return []
             resources = self.policy.resource_manager.get_resources(
                 [r.resource for r in resource_arns])
         else:
