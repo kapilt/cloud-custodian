@@ -69,7 +69,8 @@ class TestIamGen(BaseTest):
                 p['actions'] = [n]
                 invalid.extend(
                     self.check_permissions(
-                        perms, a({}, mgr).get_permissions(), f"{k}.actions.{n}"))
+                        perms, a({}, mgr).get_permissions(),
+                        "{k}.actions.{n}".format(k=k, n=n)))
 
             for n, f in v.filter_registry.items():
                 if n in ('or', 'and', 'not', 'missing'):
@@ -77,7 +78,8 @@ class TestIamGen(BaseTest):
                 p['filters'] = [n]
                 invalid.extend(
                     self.check_permissions(
-                        perms, f({}, mgr).get_permissions(), f"{k}.filters.{n}"))
+                        perms, f({}, mgr).get_permissions(),
+                        "{k}.filters.{n}".format(k=k, n=n)))
 
             if invalid:
                 for k, perm_set in invalid:
