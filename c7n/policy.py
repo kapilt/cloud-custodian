@@ -409,7 +409,6 @@ class LambdaMode(ServerlessExecutionMode):
                 raise PolicyValidationError(
                     "Lambda memory size must be a multiple of 64, policy:%s",
                     self.policy.name)
-        from c7n.aws import Arn
 
     def get_member_account_id(self, event):
         return event.get('account')
