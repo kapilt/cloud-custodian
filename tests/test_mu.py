@@ -766,13 +766,13 @@ class PolicyLambdaProvision(BaseTest):
 
     def test_optional_packages(self):
         data = {
-                "name": "s3-lambda-extra",
-                "resource": "s3",
-                "mode": {
-                    "type": "cloudtrail",
-                    "packages": ["boto3"],
-                    "events": ["CreateBucket"],
-                },
+            "name": "s3-lambda-extra",
+            "resource": "s3",
+            "mode": {
+                "type": "cloudtrail",
+                "packages": ["boto3"],
+                "events": ["CreateBucket"],
+            },
         }
         p = self.load_policy(data)
         pl = PolicyLambda(p)
