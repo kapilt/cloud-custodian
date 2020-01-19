@@ -41,4 +41,7 @@ setup(
         "urllib3",
         "certifi"
     ],
+    extra_requires={
+        ":python_version<'3.3'": ["backports.functools-lru-cache"]
+    }
 )

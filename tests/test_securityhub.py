@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from jsonschema.exceptions import ValidationError
 from c7n.exceptions import PolicyValidationError
 from .common import BaseTest, event_data
 
@@ -677,7 +676,5 @@ class SecurityHubTest(BaseTest):
                 "Type": "Other",
                 "Id": "arn:aws:rds:us-east-1:101010101111:db:testme",
                 "Tags": {
-                    "workload-type": "other"
-                }
-            }
-        )
+                    "workload-type": "other"}
+            })

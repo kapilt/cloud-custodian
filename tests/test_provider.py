@@ -15,7 +15,7 @@
 
 from .common import BaseTest
 
-from c7n.provider import clouds, get_resource_class, import_resource_classes
+from c7n.provider import get_resource_class, import_resource_classes
 from c7n.resources import load_resources
 from c7n.resources.resource_map import ResourceMap
 

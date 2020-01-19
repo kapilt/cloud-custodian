@@ -43,7 +43,6 @@ from c7n.mu import (
     CloudWatchEventSource
 )
 
-from c7n.policy import Policy
 from c7n.ufuncs import logsub
 from .common import (
     BaseTest, event_data, functional, Bag, ACCOUNT_ID)
