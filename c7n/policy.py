@@ -378,7 +378,7 @@ class LambdaMode(ServerlessExecutionMode):
             'memory': {'type': 'integer', 'minimum': 128, 'maximum': 3008},
             'environment': {'type': 'object'},
             'tags': {'type': 'object',
-                     'patternProperties': {"*": {'type': 'string'}}},
+                     'patternProperties': {".*": {'type': 'string'}}},
             'dead_letter_config': {'type': 'object'},
             'kms_key_arn': {'type': 'string'},
             'tracing_config': {'type': 'object'},
@@ -404,8 +404,8 @@ class LambdaMode(ServerlessExecutionMode):
                 'Custodian reserves policy lambda '
                 'tags starting with custodian - policy specifies %s' % (
                     ', '.join(reserved_overlap))))
-        if self.data['mode'].get('memory') is not None:
-            if self.data['mode']['memory'] % 64 != 0:
+        if self.policy.data['mode'].get('memory') is not None:
+            if self.policy.data['mode']['memory'] % 64 != 0:
                 raise PolicyValidationError(
                     "Lambda memory size must be a multiple of 64, policy:%s",
                     self.policy.name)
