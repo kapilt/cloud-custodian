@@ -34,7 +34,7 @@ from botocore.validate import ParamValidator
 
 from c7n.credentials import SessionFactory
 from c7n.config import Bag
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyValidationError, InvalidCliOption
 from c7n.log import CloudWatchLogHandler
 
 # Import output registries aws provider extends.
@@ -541,9 +541,15 @@ class AWS(object):
         service_region_map, resource_service_map = get_service_region_map(
             options.regions, policy_collection.resource_types)
         if 'all' in options.regions:
+            session = get_profile_session(options)
+            if session.region_name is None:
+                raise InvalidCliOption(
+                    'using `--region=all` needs a default region '
+                    'environment variable (AWS_DEFAULT_REGION) '
+                    'or a aws cli profile region set, to '
+                    'determine available and active regions')
             enabled_regions = set([
-                r['RegionName'] for r in
-                get_profile_session(options).client('ec2').describe_regions(
+                r['RegionName'] for r in session.client('ec2').describe_regions(
                     Filters=[{'Name': 'opt-in-status',
                               'Values': ['opt-in-not-required', 'opted-in']}]
                 ).get('Regions')])

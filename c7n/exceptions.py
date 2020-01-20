@@ -24,6 +24,10 @@ class CustodianError(Exception):
     """
 
 
+class InvalidCliOption(CustodianError):
+    """a cli parameter was passed that was not valid"""
+
+
 class InvalidOutputConfig(CustodianError):
     """Invalid configuration for an output"""
 
