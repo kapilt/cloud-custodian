@@ -1495,6 +1495,11 @@ class GroupMembership(ValueFilter):
 class UserAccessKey(ValueFilter):
     """Filter IAM users based on access-key values
 
+    By default multiple uses of this filter will match
+    on any user key satisfying either filter. To find
+    specific keys that match multiple access-key filters,
+    use `match-operator: and`
+
     :example:
 
     .. code-block:: yaml
@@ -1506,6 +1511,11 @@ class UserAccessKey(ValueFilter):
               - type: access-key
                 key: Status
                 value: Active
+              - type: access-key
+                match-operator: and
+                key: CreateDate
+                value_type: age
+                value: 90
     """
 
     schema = type_schema(
