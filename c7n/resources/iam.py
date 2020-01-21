@@ -1545,7 +1545,7 @@ class UserAccessKey(ValueFilter):
                 if self.match(k):
                     k_matched.append(k)
             for k in k_matched:
-                k['c7n:matched-type'] = 'access'
+                k['c7n:match-type'] = 'access'
             self.merge_annotation(r, self.matched_annotation_key, k_matched)
             if k_matched:
                 matched.append(r)
