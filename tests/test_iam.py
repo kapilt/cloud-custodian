@@ -525,7 +525,7 @@ class IamUserTest(BaseTest):
         self.assertEqual(len(resources), 1)
         self.assertEqual(len(resources[0]['c7n:matched-keys']), 1)
         self.assertEqual(
-            resources[0]['c7n:matched-keys'][0]['c7n:matched-type'], 'access')
+            resources[0]['c7n:matched-keys'][0]['c7n:match-type'], 'access')
 
     def test_iam_user_delete_some_access(self):
         # TODO: this test could use a rewrite
