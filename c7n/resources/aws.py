@@ -542,14 +542,16 @@ class AWS(object):
             options.regions, policy_collection.resource_types)
         if 'all' in options.regions:
             session = get_profile_session(options)
-            if session.region_name is None:
-                raise InvalidCliOption(
-                    'using `--region=all` needs a default region '
-                    'environment variable (AWS_DEFAULT_REGION) '
-                    'or a aws cli profile region set, to '
-                    'determine available and active regions')
+            default_region = session.region_name
+            if default_region is None:
+                default_region = os.environ.get(
+                    'AWS_REGION', os.environ.get('AWS_DEFAULT_REGION'))
+                if default_region is None:
+                    default_region = 'us-east-1'
+                    log.warn('AWS_DEFAULT_REGION not set with --region all, using us-east-1')
             enabled_regions = set([
-                r['RegionName'] for r in session.client('ec2').describe_regions(
+                r['RegionName'] for r in session.client(
+                    'ec2', region_name=default_region).describe_regions(
                     Filters=[{'Name': 'opt-in-status',
                               'Values': ['opt-in-not-required', 'opted-in']}]
                 ).get('Regions')])
