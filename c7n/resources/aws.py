@@ -34,7 +34,7 @@ from botocore.validate import ParamValidator
 
 from c7n.credentials import SessionFactory
 from c7n.config import Bag
-from c7n.exceptions import PolicyValidationError, InvalidCliOption
+from c7n.exceptions import PolicyValidationError
 from c7n.log import CloudWatchLogHandler
 
 # Import output registries aws provider extends.
