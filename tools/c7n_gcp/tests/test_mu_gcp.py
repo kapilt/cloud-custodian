@@ -18,7 +18,6 @@ import os
 import shutil
 import sys
 
-import mock
 
 from c7n.exceptions import PolicyValidationError
 from c7n.testing import functional
