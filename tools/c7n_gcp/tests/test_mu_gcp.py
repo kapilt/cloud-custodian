@@ -79,7 +79,7 @@ class FunctionTest(BaseTest):
         p = self.load_policy(pdata)
 
         from c7n.policy import PolicyCollection
-        self.patch(PolicyCollection, 'from_data', lambda *args, **kw: [p])
+        self.patch(PolicyCollection, 'from_data', staticmethod(lambda *args, **kw: [p]))
         self.patch(p, 'push', lambda evt, ctx: None)
         self.patch(handler, 'get_tmp_output_dir', lambda: output_temp)
 
