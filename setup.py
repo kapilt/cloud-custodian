@@ -9,13 +9,14 @@ def read(fname):
 
 setup(
     name="c7n",
-    version='0.8.46.0',
+    use_scm_version={'write_to': 'c7n/version.py'},
+    setup_requires=['setuptools_scm'],
     description="Cloud Custodian - Policy Rules Engine",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     classifiers=[
-        "Topic :: System :: Systems Administration",
-        "Topic :: System :: Distributed Computing",
+        'Topic :: System :: Systems Administration',
+        'Topic :: System :: Distributed Computing',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
