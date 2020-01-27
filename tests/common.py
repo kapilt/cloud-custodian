@@ -31,7 +31,7 @@ logging.getLogger("botocore").setLevel(logging.WARNING)
 
 
 # Custodian Test Account. This is used only for testing.
-# Access is avaiable for community project maintainers.
+# Access is available for community project maintainers.
 ACCOUNT_ID = "644160558196"
 
 C7N_VALIDATE = bool(os.environ.get("C7N_VALIDATE", ""))
