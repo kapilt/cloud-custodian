@@ -34,8 +34,13 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 
 # We use this for freezing dependencies for serverless environments
-# that support service side building.
-# Its also used for release engineering on our pypi uploads
+# that support service side building. Its also used for release
+# engineering on our pypi uploads
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
+
 try:
     import importlib_metadata as pkgmd
 except (ImportError, FileNotFoundError):
