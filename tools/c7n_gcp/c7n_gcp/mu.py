@@ -295,7 +295,15 @@ def run(event, context=None):
     if trigger_type == 'HTTP_TRIGGER':
         event = {'request': event}
     else:
-        event = json.loads(base64.b64decode(event['data']).decode('utf-8'))
+        try:
+           event = base64.b64decode(event['data'])
+           event = event.decode('utf-8')
+           event = json.loads(event)
+        except Exception as e:
+           print("error loading event %r" % event)
+           traceback.print_exc()
+           raise
+
     print("Event: %s" % (event,))
 
     try:
