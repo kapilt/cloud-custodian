@@ -817,7 +817,6 @@ class ConfigRuleMode(LambdaMode):
         return resources
 
 
-
 def get_session_factory(provider_name, options):
     try:
         return clouds[provider_name]().get_session_factory(options)
@@ -885,8 +884,7 @@ class Policy(object):
         self.options = options
         assert "name" in self.data
         if session_factory is None:
-            session_factory = get_session_factory(
-                self.provider_name, options)
+            session_factory = get_session_factory(self.provider_name, options)
         self.session_factory = session_factory
         self.ctx = ExecutionContext(self.session_factory, self, self.options)
         self.resource_manager = self.load_resource_manager()
@@ -912,7 +910,7 @@ class Policy(object):
             provider_name = 'aws'
         return provider_name
 
-    ## Preexecution Conditions
+    # Preexecution Conditions
     @property
     def region(self):
         return self.data.get('region')
