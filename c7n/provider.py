@@ -131,10 +131,6 @@ def get_resource_class(resource_type):
     if resource_type not in provider.resource_map:
         raise KeyError("Invalid resource: %s for provider: %s" % (
             resource, provider_name))
-
     factory = provider.resources.get(resource)
-    if factory is None:
-        import_resource_classes(provider.resource_map, (resource_type,))
-        factory = provider.resources.get(resource)
-
+    assert factory, "Resource:%s not loaded" % resource_type
     return factory
