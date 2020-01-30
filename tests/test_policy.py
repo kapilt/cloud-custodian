@@ -1101,7 +1101,7 @@ class PullModeTest(BaseTest):
 
         lines = log_file.getvalue().strip().split("\n")
         self.assertIn(
-            "Skipping policy:{} target-region:us-east-1 current-region:us-west-2".format(
+            "Skipping policy:{} due to execution conditions".format(
                 policy_name
             ),
             lines,

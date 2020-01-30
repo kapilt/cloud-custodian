@@ -833,14 +833,12 @@ class PolicyConditions(object):
     def __init__(self, policy, data):
         self.policy = policy
         self.data = data
-        self.filters = None
+        self.filters = []
 
     def validate(self):
-        if self.filters:
-            return
-        self.data.extend(self.convert_deprecated())
+        self.filters.extend(self.convert_deprecated())
         self.filters = self.filter_registry.parse(
-            self.data, self.policy.resource_manager)
+            self.filters, self.policy.resource_manager)
 
     def evaluate(self):
         policy_vars = {
@@ -851,7 +849,11 @@ class PolicyConditions(object):
             'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
             'policy': self.policy.data
         }
-        return all([f.process(policy_vars) for f in self.filters])
+        state = all([f.process([policy_vars]) for f in self.filters])
+        if not state:
+            self.policy.log.info(
+                'Skipping policy:%s due to execution conditions', self.policy.name)
+        return state
 
     def convert_deprecated(self):
         filters = []
@@ -863,14 +865,15 @@ class PolicyConditions(object):
                 'key': 'now',
                 'value_type': 'date',
                 'op': 'gte',
-                'value': self.start})
+                'value': self.policy.start})
         if self.policy.end:
             filters.append({
                 'type': 'value',
                 'key': 'now',
                 'value_type': 'date',
                 'op': 'lte',
-                'value': self.end})
+                'value': self.policy.end})
+        return filters
 
 
 class Policy(object):
@@ -887,6 +890,7 @@ class Policy(object):
         self.session_factory = session_factory
         self.ctx = ExecutionContext(self.session_factory, self, self.options)
         self.resource_manager = self.load_resource_manager()
+        self.conditions = PolicyConditions(self, data)
 
     def __repr__(self):
         return "<Policy resource:%s name:%s region:%s>" % (
@@ -963,6 +967,7 @@ class Policy(object):
         return True
 
     def validate(self):
+        self.conditions.validate()
         m = self.get_execution_mode()
         if m is None:
             raise PolicyValidationError(
