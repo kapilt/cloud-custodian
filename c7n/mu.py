@@ -313,7 +313,7 @@ def _package_deps(package, deps=None, ignore=()):
         if pkg_name not in deps:
             try:
                 _package_deps(pkg_name, deps, ignore)
-            except pkgmd.PackageNotFoundError as e:
+            except pkgmd.PackageNotFoundError:
                 continue
             deps.append(pkg_name)
     return deps
