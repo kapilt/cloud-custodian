@@ -1,9 +1,20 @@
+"""
+Supplemental tooling for managing custodian depgraph
+
+Todo
+ - [ ] check
+ - [ ] ensure sanity across dependency graph
+ - [ ] generate a find links directory from a wheel cache
+
+"""
 import click
 import os
 import sys
+import zipfile
 
 from collections import defaultdict
 from pathlib import Path
+from pip._internal.utils import appdirs
 
 
 @click.group()
@@ -12,10 +23,36 @@ def cli():
 
     some simple tooling to sync poetry files to setup/pip
     """
-
     # If there is a global installation of poetry, prefer that.
     poetry_python_lib = os.path.expanduser('~/.poetry/lib')
     sys.path.append(os.path.realpath(poetry_python_lib))
+
+
+@cli.command()
+@click.option('--cache', default=appdirs.user_cache_dir('pip'))
+@click.option('--link-dir', type=click.Path())
+def gen_links(cache, link_dir):
+    # generate a find links directory to perform an install offline.
+    # note there we still need to download any packages needed for
+    # an offline install.
+    found = {}
+    link_dir = Path(link_dir)
+    wrote = 0
+    for root, dirs, files in os.walk(cache):
+        for f in files:
+            if not f.endswith('whl'):
+                continue
+            found[f] = os.path.join(root, f)
+    if not link_dir.exists():
+        link_dir.mkdir()
+    entries = {f.name for f in link_dir.iterdir()}
+    for f, src in found.items():
+        if f in entries:
+            continue
+        os.symlink(src, link_dir / f)
+        wrote += 1
+    if wrote:
+        print('Updated %d Find Links' % wrote)
 
 
 @cli.command()
