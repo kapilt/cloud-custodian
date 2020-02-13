@@ -48,6 +48,22 @@ def should_load_provider(name, provider_types):
         return True
     return False
 
+def load_available():
+    """Load available installed providers
+
+    Unlike load_resources() this will catch ImportErrors on uninstalled
+    providers.
+    """
+    found = []
+    for provider in ('aws', 'azure', 'gcp', 'k8s'):
+        try:
+            load_providers((provider,))
+        except ImportError as e:
+            continue
+        else:
+            found.append(provider)
+    load_resources(['%s.*' % s for s in found])
+
 
 def load_available(resources=True):
     """Load available installed providers
