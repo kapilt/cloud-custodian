@@ -8,6 +8,10 @@ install:
 	. bin/activate && pip install -r tools/c7n_gcp/requirements.txt
 	. bin/activate && pip install -r tools/c7n_kube/requirements.txt
 
+sync-setup:
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_gcp
+
+
 test:
 	./bin/tox -e py27
 

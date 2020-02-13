@@ -32,9 +32,13 @@ def cli():
 @click.option('--cache', default=appdirs.user_cache_dir('pip'))
 @click.option('--link-dir', type=click.Path())
 def gen_links(cache, link_dir):
+    # wheel only
+    #
     # generate a find links directory to perform an install offline.
     # note there we still need to download any packages needed for
-    # an offline install.
+    # an offline install. this is effectively an alternative to
+    # pip download -d to utilize already cached wheel resources.
+    #
     found = {}
     link_dir = Path(link_dir)
     wrote = 0
@@ -96,7 +100,9 @@ def gen_frozensetup(package_dir, output):
     setup_content = builder.build_setup()
     
     with open(os.path.join(package_dir, output), 'wb') as fh:
-        fh.write(b'# Automatically generated from poetry/pyproject.toml\n')
+        fh.write(b'# Automatically generated from pyproject.toml\n')
+        fh.write(b'# flake8: noqa\n')
+
         fh.write(setup_content)
 
 
@@ -104,7 +110,6 @@ def locked_deps(poetry):
     reqs = []
     packages = poetry.locker.locked_repository(False).packages
 
-    import pdb; pdb.set_trace()
     for p in packages:
         dep = p.to_dependency()
         line = "{}=={}".format(p.name, p.version)
