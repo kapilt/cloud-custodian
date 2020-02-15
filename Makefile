@@ -10,6 +10,7 @@ install:
 
 sync-setup:
 	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_gcp
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_azure
 
 
 test:
