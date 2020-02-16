@@ -2,12 +2,20 @@
 name = "c7n_azure"
 version = "0.6.3"
 description = "Cloud Custodian - Azure Support"
-authors = ["Kapil Thangavelu <kapilt@gmail.com>"]
+readme = "readme.md"
+homepage="https://cloudcustodian.io"
+repository="https://github.com/cloud-custodian/cloud-custodian"
+documentation="https://cloudcustodian.io/docs/"
+authors = ["Cloud Custodian Project <https://github.com/cloud-custodian/cloud-custodian>"]
 license = "Apache-2.0"
+classifiers=[
+   "Topic :: System :: Systems Administration",
+   "Topic :: System :: Distributed Computing"
+]
 
 [tool.poetry.dependencies]
 python = "^3.6"
-custodian = {path = "../..", develop = true}
+c7n = {path = "../..", develop = true}
 
 azure-mgmt-authorization = "^0.60.0"
 azure-mgmt-apimanagement = "^0.1.0"

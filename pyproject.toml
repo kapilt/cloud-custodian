@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "custodian"
+name = "c7n"
 version = "0.9.0"
 description = "Cloud Custodian - Policy Rules Engine"
 authors = ["Cloud Custodian Project <https://github.com/cloud-custodian/cloud-custodian>"]
@@ -37,5 +37,5 @@ pytest-cov = "^2.8.1"
 mock = "^4.0.1"
 vcrpy = "^4.0.2"
 aws-xray-sdk = "^2.4.3"
-importlib_metadata = "1.4.0;python_version<3.8"
+importlib_metadata = "^1.4.0;python_version<3.8"
 

@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = "^3.6"
-custodian = {path = "../..", develop = true}
+c7n = {path = "../..", develop = true}
 kubernetes = "^10.0.1"
 
 [tool.poetry.dev-dependencies]
