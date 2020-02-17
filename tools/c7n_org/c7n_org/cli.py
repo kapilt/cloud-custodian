@@ -275,7 +275,7 @@ def filter_policies(policies_config, tags, policies, resource, not_policies=None
 def report_account(account, region, policies_config, output_path, cache_path, debug):
     output_path = os.path.join(output_path, account['name'], region)
     cache_path = os.path.join(cache_path, "%s-%s.cache" % (account['name'], region))
-
+    load_resources()
     config = Config.empty(
         region=region,
         output_dir=output_path,
@@ -513,7 +513,7 @@ def run_account(account, region, policies_config, output_path,
     logging.getLogger('custodian.output').setLevel(logging.ERROR + 1)
     CONN_CACHE.session = None
     CONN_CACHE.time = None
-
+    load_resources()
     # allow users to specify interpolated output paths
     if '{' not in output_path:
         output_path = os.path.join(output_path, account['name'], region)
