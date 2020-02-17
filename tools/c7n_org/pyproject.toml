@@ -15,7 +15,7 @@ c7n-org = 'c7n_org.cli:cli'
 
 [tool.poetry.dependencies]
 python = "^3.6"
-c7n = {path = "../..", develop = true, version="^0.9"}
+c7n = {path = "../..", develop = true}
 
 click = "^7.0"
 
