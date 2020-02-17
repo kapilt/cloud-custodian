@@ -13,6 +13,8 @@ classifiers = [
    "Topic :: System :: Distributed Computing"
 ]
 
+[tool.poetry.scripts]
+c7n-org = 'c7n_org.cli:cli'
 
 [tool.poetry.dependencies]
 python = "^3.6"

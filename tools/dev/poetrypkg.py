@@ -10,7 +10,6 @@ Todo
 import click
 import os
 import sys
-import zipfile
 
 from collections import defaultdict
 from pathlib import Path
@@ -72,7 +71,7 @@ def gen_setup(package_dir):
 
     builder = SdistBuilder(poetry, None, None)
     setup_content = builder.build_setup()
-    
+
     with open(os.path.join(package_dir, 'setup.py'), 'wb') as fh:
         fh.write(b'# Automatically generated from poetry/pyproject.toml\n')
         fh.write(setup_content)
@@ -98,7 +97,7 @@ def gen_frozensetup(package_dir, output):
 
     builder = Builder(poetry, None, None)
     setup_content = builder.build_setup()
-    
+
     with open(os.path.join(package_dir, output), 'wb') as fh:
         fh.write(b'# Automatically generated from pyproject.toml\n')
         fh.write(b'# flake8: noqa\n')

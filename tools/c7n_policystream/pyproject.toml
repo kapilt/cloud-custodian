@@ -13,6 +13,9 @@ classifiers = [
    "Topic :: System :: Distributed Computing"
 ]
 
+[tool.poetry.scripts]
+c7n-policystream = 'policystream:cli'
+
 [tool.poetry.dependencies]
 python = "^3.6"
 c7n = {path = "../..", develop = true}

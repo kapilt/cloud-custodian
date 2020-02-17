@@ -38,4 +38,5 @@ mock = "^4.0.1"
 vcrpy = "^4.0.2"
 aws-xray-sdk = "^2.4.3"
 importlib_metadata = "^1.4.0;python_version<3.8"
+flake8 = "^3.7.9"
 
