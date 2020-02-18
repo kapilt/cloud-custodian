@@ -666,6 +666,7 @@ class BucketDelete(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "delete", "remove-contents": True}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         resources = p.run()
@@ -1327,6 +1328,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2442,6 +2444,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2484,6 +2487,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2538,6 +2542,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "encrypt-keys", "report-only": True}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         report_resources = report_policy.run()
@@ -2551,6 +2556,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2602,6 +2608,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "encrypt-keys"}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
 
@@ -2638,6 +2645,7 @@ class S3Test(BaseTest):
                     {"type": "encrypt-keys", "crypto": "aws:kms", "key-id": key_one}
                 ],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2656,6 +2664,7 @@ class S3Test(BaseTest):
                     {"type": "encrypt-keys", "crypto": "aws:kms", "key-id": key_two}
                 ],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
