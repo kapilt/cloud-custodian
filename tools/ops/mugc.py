@@ -197,7 +197,7 @@ def main():
     logging.getLogger('c7n.cache').setLevel(logging.WARNING)
 
     if not options.policy_regex:
-        options.policy_regex = f"^{options.prefix}.*"
+        options.policy_regex = "^{}.*".format(options.prefix)
 
     if not options.regions:
         options.regions = [os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')]
