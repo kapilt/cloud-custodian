@@ -1770,8 +1770,8 @@ class ScanBucket(BucketActionBase):
 
     def write_denied_buckets_file(self):
         if (self.denied_buckets and
-            self.manager.ctx.log_dir and
-            not isinstance(self.manager.ctx.output, NullBlobOutput)):
+                self.manager.ctx.log_dir and
+                not isinstance(self.manager.ctx.output, NullBlobOutput)):
             with open(
                     os.path.join(
                         self.manager.ctx.log_dir, 'denied.json'), 'w') as fh:
