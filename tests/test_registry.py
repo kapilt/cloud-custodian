@@ -58,6 +58,10 @@ class RegistryTest(unittest.TestCase):
             pass
 
         self.assertEqual(observed[0], (registry, _plugin_impl1))
+
+        self.assertEqual(len(observed), 1)
+        registry.notify(_plugin_impl2)
+
         self.assertEqual(observed[1], (registry, _plugin_impl2))
         self.assertEqual(list(sorted(registry.keys())), ['hot', 'water'])
 

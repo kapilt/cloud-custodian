@@ -69,7 +69,7 @@ class PluginRegistry(object):
             klass.type = name
             klass.type_aliases = aliases
             self._factories[name] = klass
-            self.notify(klass)
+#            self.notify(klass)
             return klass
 
         # invoked as class decorator
@@ -79,7 +79,7 @@ class PluginRegistry(object):
             self._factories[name] = klass
             klass.type = name
             klass.type_aliases = aliases
-            self.notify(klass)
+#            self.notify(klass)
             return klass
         return _register_class
 
