@@ -3,9 +3,11 @@ name: Release Branch (0.8) Tests
 
 on:
   push:
-    branches: ["release/0.8"]
+    branches:
+      - "release/0.8"
   pull_request:
-    branches: ["release/0.8"]
+    branches:
+      - "release/0.8"
 
 jobs:
   Linux:
