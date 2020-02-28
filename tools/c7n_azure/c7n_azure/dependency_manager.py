@@ -38,7 +38,7 @@ class DependencyManager(object):
         dists = {d.key: d for d in DependencyManager._get_installed_distributions()}
         res = []
         for p in packages:
-            if p not in dists:
+            if p not in dists: # pragma: no cover
                 continue
             res.extend(map(str, dists[p].requires()))
 
