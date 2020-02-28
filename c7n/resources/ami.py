@@ -48,7 +48,10 @@ class AMI(QueryResourceManager):
 
     def resources(self, query=None):
         query = query or {}
-        if query.get('Owners') is None:
+        if 'query' in self.data:
+            for q in self.data.get('query'):
+                query.update(q)
+        if not query:
             query['Owners'] = ['self']
         return super(AMI, self).resources(query=query)
 

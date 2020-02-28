@@ -23,6 +23,20 @@ from .common import BaseTest
 
 class TestAMI(BaseTest):
 
+    def test_query_filter(self):
+        factory = self.replay_flight_data('test_ami_query_executable')
+        p = self.load_policy({
+            'name': 'test-ami',
+            'resource': 'ami',
+            'query': [{
+                'ExecutableUsers': ['self']}]},
+            session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 8)
+        self.assertEqual(
+            {'041673875206'},
+            {r['OwnerId'] for r in resources})
+
     def test_query(self):
         factory = self.replay_flight_data("test_ami")
         p = self.load_policy(
