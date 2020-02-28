@@ -79,7 +79,7 @@ class DependencyManagerTest(BaseTest):
             ['azure-cli-core'])
 
         # expected dependencies
-        self.assertTrue('adal' in d)
+        self.assertIn('adal', d)
 
         # excluded packages are missing
         self.assertTrue('azure-cli-core' not in d)
