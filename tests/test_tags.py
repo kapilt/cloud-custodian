@@ -34,7 +34,7 @@ class UniversalTagTest(BaseTest):
                 'name': 'sfn-auto',
                 'resource': 'step-machine',
                 'mode': {'type': 'cloudtrail',
-                         'events': [{'ids': 'some', 'service': 'thing', 'name': 'wicked'}]},
+                         'events': [{'ids': 'some', 'source': 'thing', 'event': 'wicked'}]},
                 'actions': [{'type': 'auto-tag-user', 'tag': 'creator'}]})
         except Exception as e:
             self.fail('auto-tag policy failed to load %s' % e)
