@@ -54,9 +54,9 @@ jobs:
     vmImage: 'Ubuntu-18.04'
   strategy:
     matrix:
-      Python37:
-        python.version: '3.7'
-        TOXENV: py37
+      Python36:
+        python.version: '3.6'
+        TOXENV: py36-cov
     maxParallel: 4
 
   steps:
