@@ -57,9 +57,9 @@ class RegistryTest(unittest.TestCase):
         class _plugin_impl2:
             pass
 
-        self.assertEqual(observed[0], (registry, _plugin_impl1))
+        self.assertEqual(observed, [])
 
-        self.assertEqual(len(observed), 1)
+        registry.notify(_plugin_impl1)
         registry.notify(_plugin_impl2)
 
         self.assertEqual(observed[1], (registry, _plugin_impl2))
