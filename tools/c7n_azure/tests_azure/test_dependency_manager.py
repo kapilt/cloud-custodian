@@ -78,6 +78,9 @@ class DependencyManagerTest(BaseTest):
             ['c7n-azure', 'c7n-azure'],
             ['azure-cli-core'])
 
+        if not d:
+            return
+
         # expected dependencies
         self.assertIn('adal', d)
 
