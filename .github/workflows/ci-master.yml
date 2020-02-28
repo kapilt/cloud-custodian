@@ -20,20 +20,20 @@ jobs:
             os: ubuntu-latest
             tox-target: py36
           - python-version: 3.7
-            os: windows-latest
+            os: ubuntu-latest
             tox-target: py37
           - python-version: 3.8
-            os: macos-latest
+            os: ubuntu-latest
             tox-target: py38
 
           - python-version: 3.6
-            os: ubuntu-latest
+            os: windows-latest
             tox-target: py36
           - python-version: 3.7
-            os: ubuntu-latest
+            os: windows-latest
             tox-target: py37
           - python-version: 3.8
-            os: macos-latest
+            os: windows-latest
             tox-target: py38
 
           - python-version: 3.6
@@ -46,7 +46,7 @@ jobs:
             tox-target: py38
             os: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v1
         with:
