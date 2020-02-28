@@ -38,6 +38,8 @@ class DependencyManager(object):
         dists = {d.key: d for d in DependencyManager._get_installed_distributions()}
         res = []
         for p in packages:
+            if p not in dists:
+                continue
             res.extend(map(str, dists[p].requires()))
 
         # regex for the package version constraints

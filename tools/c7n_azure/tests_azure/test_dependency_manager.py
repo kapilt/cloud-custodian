@@ -76,7 +76,7 @@ class DependencyManagerTest(BaseTest):
     def test_get_installed_distributions(self):
         d = DependencyManager.get_dependency_packages_list(
             ['c7n-azure', 'c7n-azure'],
-            ['azure-cli-core'])
+            ['azure-cli-core', 'mickey-mouse'])
 
         if not d:
             return
