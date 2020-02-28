@@ -96,7 +96,7 @@ def import_resource_classes(resource_map, resource_types):
         rmodule, rclass = resource_map[rtype].rsplit('.', 1)
         r = getattr(mod_map[rmodule], rclass, None)
         if r is None:
-            not_found.append(rtype)
+            not_found.add(rtype)
         else:
             found.append(r)
     return found, list(not_found)
