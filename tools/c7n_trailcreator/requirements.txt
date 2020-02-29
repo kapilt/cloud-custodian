@@ -1,0 +1,15 @@
+The lock file does not exist. Locking.
+> /Users/kapilt/projects/poetry/poetry/installation/installer.py(56)__init__()
+-> installed = self._get_installed()
+(Pdb) (Pdb) (Pdb) (Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) 
+[OSError]
+[Errno 5] Input/output error

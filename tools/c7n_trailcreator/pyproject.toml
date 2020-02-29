@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "c7n_trailcreator"
+version = "0.1.5"
+readme = "README.md"
+description = "Cloud Custodian - Retroactive Tag Resource Creators from CloudTrail"
+authors = ["Cloud Custodian Project <https://github.com/cloud-custodian/cloud-custodian>"]
+license = "Apache-2.0"
+
+classifiers=[
+   "Topic :: System :: Systems Administration",
+   "Topic :: System :: Distributed Computing"
+]
+
+[tool.poetry.scripts]
+c7n-trailcreator = 'c7n_trailcreator.trailcreator:cli'
+
+[tool.poetry.dependencies]
+python = "^3.6"
+click = "^7.0"
+c7n_org = {path = "../c7n_org", develop = true}
+c7n = {path = "../..", develop = true}
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.3.5"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

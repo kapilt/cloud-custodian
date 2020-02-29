@@ -24,7 +24,6 @@ google-auth = "^1.11.0"
 ratelimiter = "^1.2.0"
 google-cloud-monitoring = "^0.34.0"
 
-
 [tool.poetry.dev-dependencies]
 
 [build-system]

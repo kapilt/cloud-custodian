@@ -61,8 +61,6 @@ requests = "^2.22.0"
 PyJWT = "^1.7.1"
 azure-cli-core = "^2.0.81"
 adal = "^1.2.2"
-"backports.functools_lru_cache" = "^1.6.1"
-futures = ">=3.1.1"
 
 
 azure-functions = { version = "^1.0.8", python = "~3" }
