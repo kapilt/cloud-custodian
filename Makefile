@@ -9,17 +9,18 @@ install:
 	. bin/activate && pip install -r tools/c7n_kube/requirements.txt
 
 sync-requirements:
-	poetry export -f requirements.txt > requirements.txt
+	poetry export --without-hashes -f requirements.txt > requirements.txt
+	poetry export --dev --without-hashes -f requirements.txt > requirements-ci.txt
 	# ci uses requirements-dev.txt to install all of tools
 	# poetry export --dev -f requirements.txt > requirements-dev.txt
-	cd tools/c7n_gcp && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_azure && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_kube && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_org && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_mailer && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_logexporter && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_policystream && poetry export -f requirements.txt > requirements.txt
-	cd tools/c7n_trailcreator && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_gcp && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_azure && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_kube && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_org && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_mailer && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_logexporter && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_policystream && poetry export --without-hashes -f requirements.txt > requirements.txt
+	cd tools/c7n_trailcreator && poetry export --without-hashes -f requirements.txt > requirements.txt
 
 sync-update:
 	poetry update
