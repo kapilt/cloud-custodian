@@ -8,9 +8,29 @@ install:
 	. bin/activate && pip install -r tools/c7n_gcp/requirements.txt
 	. bin/activate && pip install -r tools/c7n_kube/requirements.txt
 
-sync-setup:
+sync-requirements:
+	poetry export -f requirements.txt > requirements.txt
+	poetry export --dev -f requirements.txt > requirements-dev.txt
+	cd tools/c7n_gcp && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_azure && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_kube && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_org && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_mailer && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_logexporter && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_policystream && poetry export -f requirements.txt > requirements.txt
+	cd tools/c7n_trailcreator && poetry export -f requirements.txt > requirements.txt
+
+sync-frozen-setup:
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p .
 	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_gcp
 	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_azure
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_kube
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_org
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_mailer
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_logexporter
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_policystream
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_trailcreator
+
 
 
 test:

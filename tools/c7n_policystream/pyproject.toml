@@ -12,6 +12,7 @@ classifiers = [
    "Topic :: System :: Systems Administration",
    "Topic :: System :: Distributed Computing"
 ]
+packages = [{"include" = "policystream.py"}]
 
 [tool.poetry.scripts]
 c7n-policystream = 'policystream:cli'
