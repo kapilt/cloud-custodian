@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -60,7 +61,7 @@ install_requires = \
  'azure-storage-blob>=2.1,<2.2',
  'azure-storage-file>=2.1.0,<3.0.0',
  'azure-storage-queue>=2.1,<2.2',
- 'c7n',
+ 'c7n (>=0.9,<0.10)',
  'click>=7.0,<8.0',
  'distlib>=0.3.0,<0.4.0',
  'jsonpickle>=1.2,<2.0',

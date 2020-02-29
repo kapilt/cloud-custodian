@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -13,7 +14,7 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['c7n', 'kubernetes>=10.0.1,<11.0.0']
+['c7n (>=0.9,<0.10)', 'kubernetes>=10.0.1,<11.0.0']
 
 setup_kwargs = {
     'name': 'c7n-kube',

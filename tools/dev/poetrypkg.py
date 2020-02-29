@@ -63,17 +63,30 @@ def gen_links(cache, link_dir):
 def gen_setup(package_dir):
     """Generate a setup suitable for dev compatibility with pip.
     """
-    from poetry.masonry.builders.sdist import SdistBuilder
+    from poetry.masonry.builders.sdist import SdistBuilder as BaseBuilder
     from poetry.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
 
-    builder = SdistBuilder(poetry, None, None)
+    class InjectedBuilder(BaseBuilder):
+        # to enable poetry with a monorepo, we have internal deps
+        # as source path dev dependencies, when we go to generate
+        # setup.py we need to ensure that the source deps are
+        # recorded faithfully.
+
+        @classmethod
+        def convert_dependencies(cls, package, dependencies):
+            reqs, default = super().convert_dependencies(package, dependencies)
+            inject_deps(package, reqs)
+            return reqs, default
+
+    builder = InjectedBuilder(poetry, None, None)
     setup_content = builder.build_setup()
 
     with open(os.path.join(package_dir, 'setup.py'), 'wb') as fh:
         fh.write(b'# Automatically generated from poetry/pyproject.toml\n')
+        fh.write(b'# flake8: noqa\n')
         fh.write(setup_content)
 
 
@@ -89,26 +102,32 @@ def gen_frozensetup(package_dir, output):
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
 
-    class Builder(BaseBuilder):
+    class FrozenBuilder(BaseBuilder):
 
         @classmethod
         def convert_dependencies(cls, package, dependencies):
-            return locked_deps(poetry)
+            return locked_deps(package, poetry)
 
-    builder = Builder(poetry, None, None)
+    builder = FrozenBuilder(poetry, None, None)
     setup_content = builder.build_setup()
 
     with open(os.path.join(package_dir, output), 'wb') as fh:
         fh.write(b'# Automatically generated from pyproject.toml\n')
         fh.write(b'# flake8: noqa\n')
-
         fh.write(setup_content)
 
 
-def locked_deps(poetry):
+def inject_deps(package, reqs):
+    if package.name not in ('c7n', 'c7n_mailer'):
+        from c7n.version import version
+        from poetry.packages.dependency import Dependency
+        reqs.append(Dependency('c7n', '^{}'.format(version)).to_pep_508())
+
+
+def locked_deps(package, poetry):
     reqs = []
     packages = poetry.locker.locked_repository(False).packages
-
+    inject_deps(package, reqs)
     for p in packages:
         dep = p.to_dependency()
         line = "{}=={}".format(p.name, p.version)

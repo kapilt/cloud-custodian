@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -6,7 +7,7 @@ modules = \
 ['policystream']
 install_requires = \
 ['boto3>=1.12.0,<2.0.0',
- 'c7n',
+ 'c7n (>=0.9,<0.10)',
  'click>=7.0,<8.0',
  'jmespath>=0.9.4,<0.10.0',
  'pygit2>=1.0,<1.1',

@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -9,7 +10,7 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['c7n',
+['c7n (>=0.9,<0.10)',
  'google-api-python-client>=1.7,<2.0',
  'google-auth>=1.11.0,<2.0.0',
  'google-cloud-logging>=1.14,<2.0',

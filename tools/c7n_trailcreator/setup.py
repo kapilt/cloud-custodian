@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -9,7 +10,7 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['c7n', 'c7n_org', 'click>=7.0,<8.0']
+['c7n (>=0.9,<0.10)', 'click>=7.0,<8.0']
 
 entry_points = \
 {'console_scripts': ['c7n-trailcreator = c7n_trailcreator.trailcreator:cli']}

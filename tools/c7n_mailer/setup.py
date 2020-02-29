@@ -1,4 +1,5 @@
 # Automatically generated from poetry/pyproject.toml
+# flake8: noqa
 # -*- coding: utf-8 -*-
 from setuptools import setup
 
@@ -11,6 +12,7 @@ package_data = \
 install_requires = \
 ['Jinja2>=2.11,<3.0',
  'boto3>=1.11.12,<2.0.0',
+ 'c7n (>=0.9,<0.10)',
  'datadog>=0.34.0,<0.35.0',
  'jsonschema>=3.2.0,<4.0.0',
  'ldap3>=2.6.1,<3.0.0',
@@ -20,7 +22,7 @@ install_requires = \
  'sendgrid>=6.1.1,<7.0.0']
 
 entry_points = \
-{'console_scripts': ['c7n-org = c7n_org.cli:cli']}
+{'console_scripts': ['c7n-mailer = c7n_mailer.cli:main']}
 
 setup_kwargs = {
     'name': 'c7n-mailer',
