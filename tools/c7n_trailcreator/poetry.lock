@@ -1,5 +1,5 @@
 [[package]]
-category = "main"
+category = "dev"
 description = "Bash tab completion for argparse"
 name = "argcomplete"
 optional = false
@@ -24,7 +24,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 version = "1.3.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Classes Without Boilerplate"
 name = "attrs"
 optional = false
@@ -38,7 +38,7 @@ docs = ["sphinx", "zope.interface"]
 tests = ["coverage", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface"]
 
 [[package]]
-category = "main"
+category = "dev"
 description = "The AWS SDK for Python"
 name = "boto3"
 optional = false
@@ -51,7 +51,7 @@ jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.3.0,<0.4.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Low-level, data-driven core of boto 3."
 name = "botocore"
 optional = false
@@ -68,7 +68,7 @@ python = "<3.4.0 || >=3.5.0"
 version = ">=1.20,<1.26"
 
 [[package]]
-category = "main"
+category = "dev"
 description = ""
 develop = true
 name = "c7n"
@@ -91,7 +91,7 @@ type = "directory"
 url = "../.."
 
 [[package]]
-category = "main"
+category = "dev"
 description = ""
 develop = true
 name = "c7n-org"
@@ -100,7 +100,6 @@ python-versions = "^3.6"
 version = "0.5.7"
 
 [package.dependencies]
-c7n = "*"
 click = "^7.0"
 
 [package.source]
@@ -126,7 +125,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 version = "0.4.3"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Docutils -- Python Documentation Utilities"
 name = "docutils"
 optional = false
@@ -134,7 +133,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "0.15.2"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Read metadata from Python packages"
 name = "importlib-metadata"
 optional = false
@@ -149,7 +148,7 @@ docs = ["sphinx", "rst.linker"]
 testing = ["packaging", "importlib-resources"]
 
 [[package]]
-category = "main"
+category = "dev"
 description = "JSON Matching Expressions"
 name = "jmespath"
 optional = false
@@ -157,7 +156,7 @@ python-versions = "*"
 version = "0.9.5"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "An implementation of JSON Schema validation for Python"
 name = "jsonschema"
 optional = false
@@ -231,7 +230,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "2.4.6"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Persistent/Functional/Immutable data structures"
 name = "pyrsistent"
 optional = false
@@ -268,7 +267,7 @@ checkqa-mypy = ["mypy (v0.761)"]
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Extensions to the standard Python datetime module"
 name = "python-dateutil"
 optional = false
@@ -279,7 +278,7 @@ version = "2.8.1"
 six = ">=1.5"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "YAML parser and emitter for Python"
 name = "pyyaml"
 optional = false
@@ -287,7 +286,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 version = "5.3"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "An Amazon S3 Transfer Manager"
 name = "s3transfer"
 optional = false
@@ -298,7 +297,7 @@ version = "0.3.3"
 botocore = ">=1.12.36,<2.0a.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Python 2 and 3 compatibility utilities"
 name = "six"
 optional = false
@@ -306,7 +305,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "1.14.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Pretty-print tabular data"
 name = "tabulate"
 optional = false
@@ -317,7 +316,7 @@ version = "0.8.6"
 widechars = ["wcwidth"]
 
 [[package]]
-category = "main"
+category = "dev"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 marker = "python_version != \"3.4\""
 name = "urllib3"
@@ -339,9 +338,8 @@ python-versions = "*"
 version = "0.1.8"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-marker = "python_version < \"3.8\""
 name = "zipp"
 optional = false
 python-versions = ">=3.6"
@@ -352,7 +350,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "a8f63ad09c1263cf8368904fa09ae24e3e4381864180a1387c6d551fb01bb5a5"
+content-hash = "3b42b98ea96154cef0aae4cf25e4d6d3500a17d32df4f4468c047a5f4f848138"
 python-versions = "^3.6"
 
 [metadata.files]

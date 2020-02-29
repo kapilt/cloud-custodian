@@ -14,7 +14,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-c7n-org = 'c7n_org.cli:cli'
+c7n-mailer = 'c7n_mailer.cli:main'
 
 [tool.poetry.dependencies]
 python = "^3.6"

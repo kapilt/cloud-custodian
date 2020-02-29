@@ -9,7 +9,7 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['c7n>=0.8.46.1', 'c7n_org>=0.5.2', 'click>=7.0,<8.0']
+['c7n', 'c7n_org', 'click>=7.0,<8.0']
 
 entry_points = \
 {'console_scripts': ['c7n-trailcreator = c7n_trailcreator.trailcreator:cli']}

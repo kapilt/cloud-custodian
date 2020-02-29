@@ -1,5 +1,5 @@
 [[package]]
-category = "main"
+category = "dev"
 description = "Bash tab completion for argparse"
 name = "argcomplete"
 optional = false
@@ -24,7 +24,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 version = "1.3.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Classes Without Boilerplate"
 name = "attrs"
 optional = false
@@ -68,7 +68,7 @@ python = "<3.4.0 || >=3.5.0"
 version = ">=1.20,<1.26"
 
 [[package]]
-category = "main"
+category = "dev"
 description = ""
 develop = true
 name = "c7n"
@@ -140,7 +140,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 version = "2.9"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Read metadata from Python packages"
 name = "importlib-metadata"
 optional = false
@@ -163,7 +163,7 @@ python-versions = "*"
 version = "0.9.5"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "An implementation of JSON Schema validation for Python"
 name = "jsonschema"
 optional = false
@@ -245,7 +245,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "2.4.6"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Persistent/Functional/Immutable data structures"
 name = "pyrsistent"
 optional = false
@@ -338,7 +338,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "1.14.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Pretty-print tabular data"
 name = "tabulate"
 optional = false
@@ -370,9 +370,8 @@ python-versions = "*"
 version = "0.1.8"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-marker = "python_version < \"3.8\""
 name = "zipp"
 optional = false
 python-versions = ">=3.6"
@@ -383,7 +382,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "2131be9a9bb6681bf885aa5070552268ca95d52e30a24f73a382b54fd99406ce"
+content-hash = "ed1e1bb23732687405020a3946fbc21713321c32a723052254b2b3878a44a56e"
 python-versions = "^3.6"
 
 [metadata.files]

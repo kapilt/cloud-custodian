@@ -60,11 +60,9 @@ install_requires = \
  'azure-storage-blob>=2.1,<2.2',
  'azure-storage-file>=2.1.0,<3.0.0',
  'azure-storage-queue>=2.1,<2.2',
- 'backports.functools_lru_cache>=1.6.1,<2.0.0',
  'c7n',
  'click>=7.0,<8.0',
  'distlib>=0.3.0,<0.4.0',
- 'futures>=3.1.1',
  'jsonpickle>=1.2,<2.0',
  'netaddr>=0.7.19,<0.8.0',
  'requests>=2.22.0,<3.0.0']

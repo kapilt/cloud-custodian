@@ -15,7 +15,6 @@ classifiers=[
 
 [tool.poetry.dependencies]
 python = "^3.6"
-c7n = {path = "../..", develop = true}
 
 azure-mgmt-authorization = "^0.60.0"
 azure-mgmt-apimanagement = "^0.1.0"
@@ -74,6 +73,8 @@ azure-cosmos = "^3.1.2"
 azure-mgmt-redis = "^6.0.0"
 
 [tool.poetry.dev-dependencies]
+# setup custodian as a dev dependency
+c7n = {path = "../..", develop = true}
 vcrpy-unittest = "^0.1.7"
 parameterized = "^0.7.1"
 
