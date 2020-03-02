@@ -12,7 +12,6 @@ package_data = \
 install_requires = \
 ['Jinja2>=2.11,<3.0',
  'boto3>=1.11.12,<2.0.0',
- 'c7n (>=0.9,<0.10)',
  'datadog>=0.34.0,<0.35.0',
  'jsonschema>=3.2.0,<4.0.0',
  'ldap3>=2.6.1,<3.0.0',

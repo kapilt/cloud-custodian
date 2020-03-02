@@ -1,70 +1,36 @@
 
+PKG_SET = tools/c7n_gcp tools/c7n_azure tools/c7n_kube tools/c7n_mailer tools/c7n_logexporter tools/c7n_policystream tools/c7n_trailcreator
+
 install:
 	python3 -m venv .
-	. bin/activate && pip install -r requirements-dev.txt
-	. bin/activate && pip install -e .
-	. bin/activate && pip install -r tools/c7n_mailer/requirements.txt
-	. bin/activate && pip install -r tools/c7n_azure/requirements.txt
-	. bin/activate && pip install -r tools/c7n_gcp/requirements.txt
-	. bin/activate && pip install -r tools/c7n_kube/requirements.txt
+	. bin/activate && pip install -r requirements-ci.txt \
+            -r tools/c7n_mailer/requirements.txt \
+	    -r tools/c7n_azure/requirements.txt \
+            -r tools/c7n_gcp/requirements.txt \
+            -r tools/c7n_kube/requirements.txt \
+            -r tools/requirements-dev.txt
 
-sync-requirements:
+pkg-update:
+	poetry update
+	for pkg in $(PKG_SET); do pushd $$pkg && poetry update && popd; done
+
+pkg-show-update:
+	poetry show -o
+	for pkg in $(PKG_SET); do pushd $$pkg && poetry show -o && popd; done
+
+pkg-freeze-setup:
+	python3 tools/dev/poetrypkg.py gen-frozensetup -p .
+	for pkg in $(PKG_SET); do python3 tools/dev/poetrypkg.py gen-frozensetup -p $$pkg; done
+
+pkg-gen-setup:
+	python3 tools/dev/poetrypkg.py gen-setup -p .
+	for pkg in $(PKG_SET); do python3 tools/dev/poetrypkg.py gen-setup -p $$pkg; done
+
+pkg-gen-requirements:
+# we have todo without hashes due to https://github.com/pypa/pip/issues/4995
 	poetry export --without-hashes -f requirements.txt > requirements.txt
 	poetry export --dev --without-hashes -f requirements.txt > requirements-ci.txt
-	# ci uses requirements-dev.txt to install all of tools
-	# poetry export --dev -f requirements.txt > requirements-dev.txt
-	cd tools/c7n_gcp && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_azure && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_kube && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_org && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_mailer && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_logexporter && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_policystream && poetry export --without-hashes -f requirements.txt > requirements.txt
-	cd tools/c7n_trailcreator && poetry export --without-hashes -f requirements.txt > requirements.txt
-
-sync-update:
-	poetry update
-	cd tools/c7n_gcp && poetry update
-	cd tools/c7n_azure && poetry update
-	cd tools/c7n_kube && poetry update
-	cd tools/c7n_org && poetry update
-	cd tools/c7n_mailer && poetry update
-	cd tools/c7n_logexporter && poetry update
-	cd tools/c7n_policystream && poetry update
-	cd tools/c7n_trailcreator && poetry update
-
-sync-show:
-	poetry show -o
-	cd tools/c7n_gcp && poetry show -o
-	cd tools/c7n_azure && poetry show -o
-	cd tools/c7n_kube && poetry show -o
-	cd tools/c7n_org && poetry show -o
-	cd tools/c7n_mailer && poetry show -o
-	cd tools/c7n_logexporter && poetry show -o
-	cd tools/c7n_policystream && poetry show -o
-	cd tools/c7n_trailcreator && poetry show -o
-
-sync-frozen-setup:
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p .
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_gcp
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_azure
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_kube
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_org
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_mailer
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_logexporter
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_policystream
-	python3 tools/dev/poetrypkg.py gen-frozensetup -p tools/c7n_trailcreator
-
-sync-setup:
-	python3 tools/dev/poetrypkg.py gen-setup -p .
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_gcp
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_azure
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_kube
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_org
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_mailer
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_logexporter
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_policystream
-	python3 tools/dev/poetrypkg.py gen-setup -p tools/c7n_trailcreator
+	for pkg in $(PKG_SET); do pushd $$pkg && poetry export --without-hashes -f requirements.txt > requirements.txt && popd; done
 
 test:
 	./bin/tox -e py27

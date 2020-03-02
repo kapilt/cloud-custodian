@@ -10,7 +10,24 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['c7n (>=0.9,<0.10)', 'click>=7.0,<8.0']
+['argcomplete (>=1.11.1,<2.0.0)',
+ 'attrs (>=19.3.0,<20.0.0)',
+ 'boto3 (>=1.12.11,<2.0.0)',
+ 'botocore (>=1.15.11,<2.0.0)',
+ 'c7n (>=0.9.0,<0.10.0)',
+ 'click>=7.0,<8.0',
+ 'docutils (>=0.15.2,<0.16.0)',
+ 'importlib-metadata (>=1.5.0,<2.0.0)',
+ 'jmespath (>=0.9.5,<0.10.0)',
+ 'jsonschema (>=3.2.0,<4.0.0)',
+ 'pyrsistent (>=0.15.7,<0.16.0)',
+ 'python-dateutil (>=2.8.1,<3.0.0)',
+ 'pyyaml (>=5.3,<6.0)',
+ 's3transfer (>=0.3.3,<0.4.0)',
+ 'six (>=1.14.0,<2.0.0)',
+ 'tabulate (>=0.8.6,<0.9.0)',
+ 'urllib3 (>=1.25.8,<2.0.0)',
+ 'zipp (>=3.0.0,<4.0.0)']
 
 entry_points = \
 {'console_scripts': ['c7n-log-exporter = c7n_logexporter.exporter:cli']}

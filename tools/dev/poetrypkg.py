@@ -69,7 +69,7 @@ def gen_setup(package_dir):
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
 
-    class InjectedBuilder(BaseBuilder):
+    class SourceDevBuilder(BaseBuilder):
         # to enable poetry with a monorepo, we have internal deps
         # as source path dev dependencies, when we go to generate
         # setup.py we need to ensure that the source deps are
@@ -78,10 +78,10 @@ def gen_setup(package_dir):
         @classmethod
         def convert_dependencies(cls, package, dependencies):
             reqs, default = super().convert_dependencies(package, dependencies)
-            inject_deps(package, reqs)
+            resolve_source_deps(poetry, package, reqs)
             return reqs, default
 
-    builder = InjectedBuilder(poetry, None, None)
+    builder = SourceDevBuilder(poetry, None, None)
     setup_content = builder.build_setup()
 
     with open(os.path.join(package_dir, 'setup.py'), 'wb') as fh:
@@ -106,7 +106,9 @@ def gen_frozensetup(package_dir, output):
 
         @classmethod
         def convert_dependencies(cls, package, dependencies):
-            return locked_deps(package, poetry)
+            reqs, default = locked_deps(package, poetry)
+            resolve_source_deps(poetry, package, reqs, frozen=True)
+            return reqs, default
 
     builder = FrozenBuilder(poetry, None, None)
     setup_content = builder.build_setup()
@@ -117,17 +119,42 @@ def gen_frozensetup(package_dir, output):
         fh.write(setup_content)
 
 
-def inject_deps(package, reqs):
-    if package.name not in ('c7n', 'c7n_mailer'):
-        from c7n.version import version
-        from poetry.packages.dependency import Dependency
-        reqs.append(Dependency('c7n', '^{}'.format(version)).to_pep_508())
+def resolve_source_deps(poetry, package, reqs, frozen=False):
+    # find any source path dev deps and them and their recursive
+    # deps to reqs
+    if poetry.local_config['name'] not in (package.name, package.pretty_name):
+        return
+
+    source_deps = []
+    for dep_name, info in poetry.local_config.get('dev-dependencies', {}).items():
+        if isinstance(info, dict) and 'path' in info:
+            source_deps.append(dep_name)
+    if not source_deps:
+        return
+
+    from poetry.packages.dependency import Dependency
+
+    dep_map = {d['name']: d for d in poetry.locker.lock_data['package']}
+    seen = set(source_deps)
+    seen.add('setuptools')
+
+    prefix = '' if frozen else '^'
+    while source_deps:
+        dep = source_deps.pop()
+        if dep not in dep_map:
+            dep = dep.replace('_', '-')
+        version = dep_map[dep]['version']
+        reqs.append(Dependency(dep, '{}{}'.format(prefix, version)).to_pep_508())
+        for cdep, cversion in dep_map[dep].get('dependencies', {}).items():
+            if cdep in seen:
+                continue
+            source_deps.append(cdep)
+            seen.add(cdep)
 
 
 def locked_deps(package, poetry):
     reqs = []
     packages = poetry.locker.locked_repository(False).packages
-    inject_deps(package, reqs)
     for p in packages:
         dep = p.to_dependency()
         line = "{}=={}".format(p.name, p.version)
@@ -135,9 +162,9 @@ def locked_deps(package, poetry):
         if ';' in requirement:
             line += "; {}".format(requirement.split(";")[1].strip())
         reqs.append(line)
-
     return reqs, defaultdict(list)
 
 
 if __name__ == '__main__':
     cli()
+

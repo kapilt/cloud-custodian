@@ -7,11 +7,11 @@ datadog==0.34.1
 decorator==4.4.2
 docutils==0.15.2
 idna==2.9
-importlib-metadata==1.5.0; python_version < "3.8"
+importlib-metadata==1.5.0
 jinja2==2.11.1
 jmespath==0.9.5
 jsonschema==3.2.0
-ldap3==2.6.1
+ldap3==2.7
 markupsafe==1.1.1
 pyasn1==0.4.8
 pyrsistent==0.15.7
@@ -25,4 +25,4 @@ s3transfer==0.3.3
 sendgrid==6.1.2
 six==1.14.0
 urllib3==1.25.8
-zipp==3.0.0; python_version < "3.8"
+zipp==3.0.0
