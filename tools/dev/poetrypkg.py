@@ -167,4 +167,3 @@ def locked_deps(package, poetry):
 
 if __name__ == '__main__':
     cli()
-
