@@ -42,6 +42,7 @@ class Kafka(QueryResourceManager):
             r['Tags'] = tags
         return resources
 
+
 @Kafka.filter_registry.register('security-group')
 class KafkaSGFilter(SecurityGroupFilter):
 
