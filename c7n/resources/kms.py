@@ -47,6 +47,7 @@ class Key(QueryResourceManager):
         name = "KeyId"
         id = "KeyArn"
         universal_taggable = True
+        config_type = 'AWS::KMS::Key'
 
     def augment(self, resources):
         client = local_session(self.session_factory).client('kms')

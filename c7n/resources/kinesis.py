@@ -35,6 +35,7 @@ class KinesisStream(QueryResourceManager):
         name = id = 'StreamName'
         dimension = 'StreamName'
         universal_taggable = True
+        config_type = 'AWS::Kinesis::Stream'
 
     def augment(self, resources):
         return universal_augment(
@@ -102,6 +103,7 @@ class DeliveryStream(QueryResourceManager):
         date = 'CreateTimestamp'
         dimension = 'DeliveryStreamName'
         universal_taggable = object()
+        config_type = 'AWS::KinesisFirehose::DeliveryStream'
 
     def augment(self, resources):
         return universal_augment(
@@ -225,6 +227,7 @@ class AnalyticsApp(QueryResourceManager):
         arn = id = "ApplicationARN"
         arn_type = 'application'
         universal_taggable = object()
+        config_type = 'AWS::KinesisAnalytics::Application'
 
     def augment(self, resources):
         return universal_augment(

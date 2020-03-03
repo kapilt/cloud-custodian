@@ -33,6 +33,7 @@ class ECR(QueryResourceManager):
         arn_type = 'repository'
         filter_name = 'repositoryNames'
         filter_type = 'list'
+        config_type = 'AWS::ECR::Repository'
 
     def augment(self, resources):
         client = local_session(self.session_factory).client('ecr')
