@@ -1115,6 +1115,10 @@ class CloudWatchEventSource(object):
                 "Unknown lambda event source type: %s" % event_type)
         if not payload:
             return None
+        if self.data.get('pattern'):
+            pattern = dict(self.data['pattern'])
+            pattern.update(payload)
+            payload = pattern
         return json.dumps(payload)
 
     def add(self, func):
