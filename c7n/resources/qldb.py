@@ -52,6 +52,7 @@ class DescribeQLDB(DescribeSource):
 class Delete(Action):
 
     schema = type_schema('delete', force={'type': 'boolean'})
+    permissions = ('qldb:DeleteLedger', 'qldb:UpdateLedger')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('qldb')
@@ -75,5 +76,3 @@ class Delete(Action):
             self.log.warning((
                 'qldb delete found %d delete-protected resources, '
                 'configure force: true to delete'), protected)
-
-
