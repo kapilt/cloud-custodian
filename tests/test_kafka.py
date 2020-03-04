@@ -12,7 +12,7 @@ class KafkaTest(BaseTest):
         self.assertEqual(
             results[0]['Tags'],
             [{'Key': 'ResourceContact', 'Value': 'ouremailaddress@company.com'}])
-        
+
     def test_subnet_filter(self):
         factory = self.replay_flight_data('test_kafka_subnet_filter')
         p = self.load_policy({
