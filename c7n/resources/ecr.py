@@ -17,7 +17,7 @@ from c7n.actions import RemovePolicyBase, Action
 from c7n.exceptions import PolicyValidationError
 from c7n.filters import CrossAccountAccessFilter, Filter, ValueFilter
 from c7n.manager import resources
-from c7n.query import QueryResourceManager, TypeInfo
+from c7n.query import DescribeSource, QueryResourceManager, TypeInfo
 from c7n import tags
 from c7n.utils import local_session, type_schema
 
@@ -35,6 +35,15 @@ class ECR(QueryResourceManager):
         filter_type = 'list'
         config_type = 'AWS::ECR::Repository'
 
+    def get_source(self, source_type):
+        source = super().get_source(source_type)
+        if source_type == 'describe':
+            source = DescribeECR(self)
+        return source
+
+
+class DescribeECR(DescribeSource):
+
     def augment(self, resources):
         client = local_session(self.session_factory).client('ecr')
         results = []
@@ -45,7 +54,6 @@ class ECR(QueryResourceManager):
                 results.append(r)
             except client.exceptions.RepositoryNotFoundException:
                 continue
-
         return results
 
 
