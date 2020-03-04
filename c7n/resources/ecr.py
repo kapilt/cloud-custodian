@@ -33,7 +33,7 @@ class ECR(QueryResourceManager):
         arn_type = 'repository'
         filter_name = 'repositoryNames'
         filter_type = 'list'
-        config_type = 'AWS::ECR::Repository'
+        # config_type = 'AWS::ECR::Repository'
 
     def get_source(self, source_type):
         source = super().get_source(source_type)

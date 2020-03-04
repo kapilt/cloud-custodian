@@ -57,7 +57,7 @@ class ECSCluster(query.QueryResourceManager):
             'describe_clusters', 'clusters', None, 'clusters', {'include': ['TAGS']})
         name = "clusterName"
         arn = id = "clusterArn"
-        config_type = 'AWS::ECS::Cluster'
+        # config_type = 'AWS::ECS::Cluster'
 
     def augment(self, resources):
         resources = super(ECSCluster, self).augment(resources)
@@ -164,7 +164,7 @@ class Service(query.ChildResourceManager):
         enum_spec = ('list_services', 'serviceArns', None)
         parent_spec = ('ecs', 'cluster', None)
         supports_trailevents = True
-        config_type = 'AWS::ECS:Service'
+        # config_type = 'AWS::ECS:Service'
 
     @property
     def source_type(self):
@@ -465,7 +465,7 @@ class TaskDefinition(query.QueryResourceManager):
         service = 'ecs'
         arn = id = name = 'taskDefinitionArn'
         enum_spec = ('list_task_definitions', 'taskDefinitionArns', None)
-        config_type = 'AWS::ECS::TaskDefinition'
+        # config_type = 'AWS::ECS::TaskDefinition'
 
     def get_resources(self, ids, cache=True):
         if cache:

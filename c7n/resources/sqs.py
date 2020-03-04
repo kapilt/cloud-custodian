@@ -20,7 +20,7 @@ from c7n.filters import CrossAccountAccessFilter, MetricsFilter
 from c7n.filters.kms import KmsRelatedFilter
 from c7n.manager import resources
 from c7n.utils import local_session
-from c7n.query import QueryResourceManager, TypeInfo
+from c7n.query import DescribeSource, QueryResourceManager, TypeInfo
 from c7n.actions import BaseAction
 from c7n.utils import type_schema
 from c7n.tags import universal_augment
@@ -62,6 +62,15 @@ class SQS(QueryResourceManager):
                 continue
             ids_normalized.append(i.rsplit('/', 1)[-1])
         return super(SQS, self).get_resources(ids_normalized, cache)
+
+    def get_source(self, source_type):
+        source = super().get_source(source_type)
+        if source_type == 'describe':
+            source = DescribeQueue(self)
+        return source
+
+
+class DescribeQueue(DescribeSource):
 
     def augment(self, resources):
         client = local_session(self.session_factory).client('sqs')

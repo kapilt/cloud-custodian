@@ -15,7 +15,7 @@ import jmespath
 
 from c7n.actions import Action
 from c7n.manager import resources
-from c7n.query import QueryResourceManager, TypeInfo
+from c7n.query import DescribeSource, QueryResourceManager, TypeInfo
 from c7n.tags import universal_augment
 from c7n.utils import local_session, type_schema, get_retry
 
@@ -37,9 +37,17 @@ class KinesisStream(QueryResourceManager):
         universal_taggable = True
         config_type = 'AWS::Kinesis::Stream'
 
+    def get_source(self, source_type):
+        source = super().get_source(source_type)
+        if source_type == 'describe':
+            source = DescribeStream(self)
+        return source
+
+
+class DescribeStream(DescribeSource):
+
     def augment(self, resources):
-        return universal_augment(
-            self, super(KinesisStream, self).augment(resources))
+        return universal_augment(self.manager, super().augment(resources))
 
 
 @KinesisStream.action_registry.register('encrypt')
@@ -105,9 +113,17 @@ class DeliveryStream(QueryResourceManager):
         universal_taggable = object()
         config_type = 'AWS::KinesisFirehose::DeliveryStream'
 
+    def get_source(self, source_type):
+        source = super().get_source(source_type)
+        if source_type == 'describe':
+            source = DescribeDeliveryStream(self)
+        return source
+
+
+class DescribeDeliveryStream(DescribeSource):
+
     def augment(self, resources):
-        return universal_augment(
-            self, super(DeliveryStream, self).augment(resources))
+        return universal_augment(self.manager, super().augment(resources))
 
 
 @DeliveryStream.action_registry.register('delete')
@@ -229,9 +245,17 @@ class AnalyticsApp(QueryResourceManager):
         universal_taggable = object()
         config_type = 'AWS::KinesisAnalytics::Application'
 
+    def get_source(self, source_type):
+        source = super().get_source(source_type)
+        if source_type == 'describe':
+            source = DescribeApp(self)
+        return source
+
+
+class DescribeApp(DescribeSource):
+
     def augment(self, resources):
-        return universal_augment(
-            self, super(AnalyticsApp, self).augment(resources))
+        return universal_augment(self.manager, super().augment(resources))
 
 
 @AnalyticsApp.action_registry.register('delete')
