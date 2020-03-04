@@ -31,8 +31,7 @@ class QLDB(QueryResourceManager):
         id = name = 'Name'
         date = 'CreationDateTime'
         universal_taggable = object()
-        # its advertised in the sdk, but not active.
-        # config_type = 'AWS::QLDB::Ledger'
+        config_type = 'AWS::QLDB::Ledger'
         not_found_err = 'ResourceNotFoundException'
 
     def get_source(self, source_type):
