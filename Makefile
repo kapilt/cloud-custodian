@@ -10,6 +10,10 @@ install:
             -r tools/c7n_kube/requirements.txt \
             -r tools/requirements-dev.txt
 
+install-poetry:
+	poetry install
+	for pkg in $(PKG_SET); do pushd $$pkg && poetry install && popd; done
+
 pkg-update:
 	poetry update
 	for pkg in $(PKG_SET); do pushd $$pkg && poetry update && popd; done
@@ -28,8 +32,7 @@ pkg-gen-setup:
 
 pkg-gen-requirements:
 # we have todo without hashes due to https://github.com/pypa/pip/issues/4995
-	poetry export --without-hashes -f requirements.txt > requirements.txt
-	poetry export --dev --without-hashes -f requirements.txt > requirements-ci.txt
+	poetry export --dev --without-hashes -f requirements.txt > requirements.txt
 	for pkg in $(PKG_SET); do pushd $$pkg && poetry export --without-hashes -f requirements.txt > requirements.txt && popd; done
 
 test:
