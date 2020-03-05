@@ -779,7 +779,7 @@ class ConfigRuleMode(LambdaMode):
             raise PolicyValidationError(
                 "policy:%s AWS Config does not support resource-type:%s" % (
                     self.policy.name, self.policy.resource_type))
-        if self.data['mode'].get('pattern'):
+        if self.policy.data['mode'].get('pattern'):
             raise PolicyValidationError(
                 "policy:%s AWS Config does not support event pattern filtering" %s (
                     self.policy.name))
