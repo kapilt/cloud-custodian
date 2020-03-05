@@ -1024,6 +1024,26 @@ class TestPolicy(BaseTest):
         self.assertEqual(result, None)
 
 
+class PolicyConditionsTest(BaseTest):
+
+    def test_event_filter(self):
+        p = self.load_policy({
+            'name': 'profx',
+            'resource': 'aws.ec2',
+            'conditions': [{
+                'type': 'event',
+                'key': 'detail.userIdentity.userName',
+                'value': 'deputy'}]})
+        self.assertTrue(
+            p.conditions.evaluate(
+                {'detail': {'userIdentity': {'userName': 'deputy'}}}))
+        self.assertTrue(p.conditions.evaluate(None))
+        self.assertFalse(p.conditions.evaluate({}))
+        self.assertFalse(
+            p.conditions.evaluate(
+                {'detail': {'userIdentity': {'userName': 'mike'}}}))
+
+
 class PolicyExecutionModeTest(BaseTest):
 
     def test_run_unimplemented(self):

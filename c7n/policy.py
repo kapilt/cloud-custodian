@@ -834,7 +834,7 @@ class PolicyConditions(object):
     def __init__(self, policy, data):
         self.policy = policy
         self.data = data
-        self.filters = []
+        self.filters = self.data.get('conditions', [])
 
     def validate(self):
         self.filters.extend(self.convert_deprecated())
@@ -850,7 +850,7 @@ class PolicyConditions(object):
             'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
             'policy': self.policy.data
         }
-        state = all([f.process([policy_vars, event]) for f in self.filters])
+        state = all([f.process([policy_vars], event) for f in self.filters])
         if not state:
             self.policy.log.info(
                 'Skipping policy:%s due to execution conditions', self.policy.name)
