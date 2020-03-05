@@ -489,6 +489,8 @@ class LambdaMode(ServerlessExecutionMode):
         metrics per normal.
         """
         self.setup_exec_environment(event)
+        if not self.policy.conditions.evaluate(event):
+            return
         resources = self.resolve_resources(event)
         if not resources:
             return resources
@@ -839,7 +841,7 @@ class PolicyConditions(object):
         self.filters = self.filter_registry.parse(
             self.filters, self.policy.resource_manager)
 
-    def evaluate(self):
+    def evaluate(self, event=None):
         policy_vars = {
             'region': self.policy.options.region,
             'resource': self.policy.resource_type,
@@ -848,7 +850,7 @@ class PolicyConditions(object):
             'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
             'policy': self.policy.data
         }
-        state = all([f.process([policy_vars]) for f in self.filters])
+        state = all([f.process([policy_vars, event]) for f in self.filters])
         if not state:
             self.policy.log.info(
                 'Skipping policy:%s due to execution conditions', self.policy.name)
