@@ -28,7 +28,7 @@ import six
 from c7n.cwe import CloudWatchEvents
 from c7n.ctx import ExecutionContext
 from c7n.exceptions import PolicyValidationError, ClientError, ResourceLimitExceeded
-from c7n.filters import FilterRegistry
+from c7n.filters import FilterRegistry, And, Or, Not
 from c7n.output import DEFAULT_NAMESPACE, NullBlobOutput
 from c7n.resources import load_resources
 from c7n.registry import PluginRegistry
@@ -827,9 +827,27 @@ def get_session_factory(provider_name, options):
             "%s provider not installed" % provider_name)
 
 
+class PolicyConditionAnd(And):
+    def get_resource_type_id(self):
+        return 'name'
+
+
+class PolicyConditionOr(Or):
+    def get_resource_type_id(self):
+        return 'name'
+
+
+class PolicyConditionNot(Not):
+    def get_resource_type_id(self):
+        return 'name'
+
+
 class PolicyConditions(object):
 
     filter_registry = FilterRegistry('c7n.policy.filters')
+    filter_registry.register('and', PolicyConditionAnd)
+    filter_registry.register('or', PolicyConditionOr)
+    filter_registry.register('not', PolicyConditionNot)
 
     def __init__(self, policy, data):
         self.policy = policy
@@ -843,6 +861,7 @@ class PolicyConditions(object):
 
     def evaluate(self, event=None):
         policy_vars = {
+            'name': self.policy.name,
             'region': self.policy.options.region,
             'resource': self.policy.resource_type,
             'provider': self.policy.provider_name,

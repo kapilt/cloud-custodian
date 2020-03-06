@@ -1043,6 +1043,35 @@ class PolicyConditionsTest(BaseTest):
             p.conditions.evaluate(
                 {'detail': {'userIdentity': {'userName': 'mike'}}}))
 
+    def test_boolean_or_blocks(self):
+        p = self.load_policy({
+            'name': 'magenta',
+            'resource': 'aws.codebuild',
+            'conditions': [{
+                'or': [
+                    {'region': 'us-east-1'},
+                    {'region': 'us-west-2'}]}]})
+        self.assertTrue(p.conditions.evaluate(None))
+
+    def test_boolean_and_blocks(self):
+        p = self.load_policy({
+            'name': 'magenta',
+            'resource': 'aws.codebuild',
+            'conditions': [{
+                'and': [
+                    {'region': 'us-east-1'},
+                    {'region': 'us-west-2'}]}]})
+        self.assertFalse(p.conditions.evaluate(None))
+
+    def test_boolean_not_blocks(self):
+        p = self.load_policy({
+            'name': 'magenta',
+            'resource': 'aws.codebuild',
+            'conditions': [{
+                'not': [
+                    {'region': 'us-east-1'}]}]})
+        self.assertFalse(p.conditions.evaluate(None))
+
 
 class PolicyExecutionModeTest(BaseTest):
 
