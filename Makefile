@@ -3,12 +3,7 @@ PKG_SET = tools/c7n_gcp tools/c7n_azure tools/c7n_kube tools/c7n_mailer tools/c7
 
 install:
 	python3 -m venv .
-	. bin/activate && pip install -r requirements-ci.txt \
-            -r tools/c7n_mailer/requirements.txt \
-	    -r tools/c7n_azure/requirements.txt \
-            -r tools/c7n_gcp/requirements.txt \
-            -r tools/c7n_kube/requirements.txt \
-            -r tools/requirements-dev.txt
+	. bin/activate && pip install -r requirements-dev.txt
 
 install-poetry:
 	poetry install
@@ -36,10 +31,7 @@ pkg-gen-requirements:
 	for pkg in $(PKG_SET); do pushd $$pkg && poetry export --without-hashes -f requirements.txt > requirements.txt && popd; done
 
 test:
-	./bin/tox -e py27
-
-test3:
-	./bin/tox -e py37
+	./bin/tox -e py38
 
 ftest:
 	C7N_FUNCTIONAL=yes AWS_DEFAULT_REGION=us-east-2 ./bin/py.test -m functional tests
@@ -62,4 +54,3 @@ lint:
 
 clean:
 	rm -rf .tox .Python bin include lib pip-selfcheck.json
-
