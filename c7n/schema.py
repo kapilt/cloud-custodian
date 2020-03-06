@@ -214,13 +214,12 @@ def generate(resource_types=()):
                 'name': {
                     'type': 'string',
                     'pattern': "^[A-z][A-z0-9]*(-[A-z0-9]+)*$"},
-
                 'conditions': {
                     'type': 'array',
-                    'items': {'oneOf': [
-                        '#/definitions/filters/value',
-                        '#/definitions/filters/event',
-                        '#/definitions/filters/valuekv']}},
+                    'items': {'anyOf': [
+                        {'$ref': '#/definitions/filters/value'},
+                        {'$ref': '#/definitions/filters/event'},
+                        {'$ref': '#/definitions/filters/valuekv'}]}},
                 # these should be deprecated for conditions
                 'region': {'type': 'string'},
                 'tz': {'type': 'string'},
