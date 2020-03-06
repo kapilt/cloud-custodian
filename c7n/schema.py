@@ -217,6 +217,15 @@ def generate(resource_types=()):
                 'conditions': {
                     'type': 'array',
                     'items': {'anyOf': [
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'or': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'not': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'and': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
                         {'$ref': '#/definitions/filters/value'},
                         {'$ref': '#/definitions/filters/event'},
                         {'$ref': '#/definitions/filters/valuekv'}]}},
