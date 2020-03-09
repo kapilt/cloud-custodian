@@ -84,7 +84,6 @@ install_requires = \
  'urllib3 (>=1.25.8,<2.0.0)',
  'zipp (>=3.0.0,<4.0.0)']
 
-
 extras_require = \
 {':python_version >= "3" and python_version < "4"': ['azure-functions>=1.0.8,<2.0.0']}
 
@@ -105,5 +104,5 @@ setup_kwargs = {
     'python_requires': '>=3.6,<4.0',
 }
 
-setup(**setup_kwargs)
 
+setup(**setup_kwargs)

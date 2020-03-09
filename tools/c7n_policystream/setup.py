@@ -48,5 +48,6 @@ setup_kwargs = {
     'entry_points': entry_points,
     'python_requires': '>=3.6,<4.0',
 }
-setup(**setup_kwargs)
 
+
+setup(**setup_kwargs)

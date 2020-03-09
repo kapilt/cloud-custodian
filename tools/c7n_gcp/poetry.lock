@@ -43,10 +43,10 @@ description = "The AWS SDK for Python"
 name = "boto3"
 optional = false
 python-versions = "*"
-version = "1.12.11"
+version = "1.12.16"
 
 [package.dependencies]
-botocore = ">=1.15.11,<1.16.0"
+botocore = ">=1.15.16,<1.16.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.3.0,<0.4.0"
 
@@ -56,7 +56,7 @@ description = "Low-level, data-driven core of boto 3."
 name = "botocore"
 optional = false
 python-versions = "*"
-version = "1.15.11"
+version = "1.15.16"
 
 [package.dependencies]
 docutils = ">=0.10,<0.16"
@@ -148,10 +148,6 @@ requests = ">=2.18.0,<3.0.0dev"
 setuptools = ">=34.0.0"
 six = ">=1.10.0"
 
-[package.dependencies.grpcio]
-optional = true
-version = ">=1.8.2,<2.0dev"
-
 [package.extras]
 grpc = ["grpcio (>=1.8.2,<2.0dev)"]
 grpcgcp = ["grpcio-gcp (>=0.2.2)"]
@@ -219,14 +215,14 @@ description = "Stackdriver Logging API client library"
 name = "google-cloud-logging"
 optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
-version = "1.14.0"
+version = "1.15.0"
 
 [package.dependencies]
-google-cloud-core = ">=1.0.3,<2.0dev"
+google-cloud-core = ">=1.1.0,<2.0dev"
 
 [package.dependencies.google-api-core]
 extras = ["grpc"]
-version = ">=1.14.0,<2.0.0dev"
+version = ">=1.15.0,<2.0.0dev"
 
 [[package]]
 category = "main"
@@ -257,17 +253,6 @@ protobuf = ">=3.6.0"
 
 [package.extras]
 grpc = ["grpcio (>=1.0.0)"]
-
-[[package]]
-category = "main"
-description = "HTTP/2-based RPC framework"
-name = "grpcio"
-optional = false
-python-versions = "*"
-version = "1.27.2"
-
-[package.dependencies]
-six = ">=1.5.2"
 
 [[package]]
 category = "main"
@@ -344,7 +329,7 @@ description = "Core utilities for Python packages"
 name = "packaging"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-version = "20.1"
+version = "20.3"
 
 [package.dependencies]
 pyparsing = ">=2.0.2"
@@ -593,7 +578,7 @@ description = "Backport of pathlib-compatible object wrapper for zip files"
 name = "zipp"
 optional = false
 python-versions = ">=3.6"
-version = "3.0.0"
+version = "3.1.0"
 
 [package.extras]
 docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
@@ -617,12 +602,12 @@ attrs = [
     {file = "attrs-19.3.0.tar.gz", hash = "sha256:f7b7ce16570fe9965acd6d30101a28f62fb4a7f9e926b3bbc9b61f8b04247e72"},
 ]
 boto3 = [
-    {file = "boto3-1.12.11-py2.py3-none-any.whl", hash = "sha256:b21d781a7fb0bfa50771362c3495e30dc3cddd7e91d65c21bcb9fe37acf36b1e"},
-    {file = "boto3-1.12.11.tar.gz", hash = "sha256:41cb779ff393a9a0a3e9dccce7689ec10c383c18deb5c69059181db8c0ccecc3"},
+    {file = "boto3-1.12.16-py2.py3-none-any.whl", hash = "sha256:a01e3a373638850822c863914fa56e25fd1a651a48fb9c6323694a634c76289c"},
+    {file = "boto3-1.12.16.tar.gz", hash = "sha256:ba1229df5f1e32dee4c8bb73e774dfb7d54e293f0895d4f825294e2d46e3c7b3"},
 ]
 botocore = [
-    {file = "botocore-1.15.11-py2.py3-none-any.whl", hash = "sha256:35d553b8975a3810010fabb885e42d1bbc97bdae52c873f7640a2dd87772c455"},
-    {file = "botocore-1.15.11.tar.gz", hash = "sha256:87a53301ee9e32e776d2d805c121753091fbddc3457dfdb8d6bdf7dbd945295a"},
+    {file = "botocore-1.15.16-py2.py3-none-any.whl", hash = "sha256:1109f36e658de2097d1e466842d6634a6b66bb9d3779abe16698171360e1ae5f"},
+    {file = "botocore-1.15.16.tar.gz", hash = "sha256:39e903e1d1ae862e469b4d5f15dc6770a7c9c81da9fcffb1a40f551ea36acd35"},
 ]
 c7n = []
 cachetools = [
@@ -667,8 +652,8 @@ google-cloud-core = [
     {file = "google_cloud_core-1.3.0-py2.py3-none-any.whl", hash = "sha256:6ae5c62931e8345692241ac1939b85a10d6c38dc9e2854bdbacb7e5ac3033229"},
 ]
 google-cloud-logging = [
-    {file = "google-cloud-logging-1.14.0.tar.gz", hash = "sha256:3c12d4421df8e4e77b5e029b1341ae80d180cfda0f9cbef417f36438630cc35f"},
-    {file = "google_cloud_logging-1.14.0-py2.py3-none-any.whl", hash = "sha256:d094abf3a98462235d16f171691a9325155ae9357f683b5367dfce663162a1f6"},
+    {file = "google-cloud-logging-1.15.0.tar.gz", hash = "sha256:5f7142a28f017ace6b6031e99c26ae1510d55330c9560bd81e308ebfdadfb76a"},
+    {file = "google_cloud_logging-1.15.0-py2.py3-none-any.whl", hash = "sha256:d46f5f5c1d40f35fe42818962471f8d1735810e8e1fa5ee741355718bfdcab1d"},
 ]
 google-cloud-monitoring = [
     {file = "google-cloud-monitoring-0.34.0.tar.gz", hash = "sha256:75370af645dd815c234561e7b356fa5d99b0ee6448c0e5d013455c72af961d0b"},
@@ -676,51 +661,6 @@ google-cloud-monitoring = [
 ]
 googleapis-common-protos = [
     {file = "googleapis-common-protos-1.51.0.tar.gz", hash = "sha256:013c91704279119150e44ef770086fdbba158c1f978a6402167d47d5409e226e"},
-]
-grpcio = [
-    {file = "grpcio-1.27.2-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:dbec0a3a154dbf2eb85b38abaddf24964fa1c059ee0a4ad55d6f39211b1a4bca"},
-    {file = "grpcio-1.27.2-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:1ef949b15a1f5f30651532a9b54edf3bd7c0b699a10931505fa2c80b2d395942"},
-    {file = "grpcio-1.27.2-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:ed123037896a8db6709b8ad5acc0ed435453726ea0b63361d12de369624c2ab5"},
-    {file = "grpcio-1.27.2-cp27-cp27m-manylinux2010_i686.whl", hash = "sha256:f9d632ce9fd485119c968ec6a7a343de698c5e014d17602ae2f110f1b05925ed"},
-    {file = "grpcio-1.27.2-cp27-cp27m-manylinux2010_x86_64.whl", hash = "sha256:80c3d1ce8820dd819d1c9d6b63b6f445148480a831173b572a9174a55e7abd47"},
-    {file = "grpcio-1.27.2-cp27-cp27m-win32.whl", hash = "sha256:07f82aefb4a56c7e1e52b78afb77d446847d27120a838a1a0489260182096045"},
-    {file = "grpcio-1.27.2-cp27-cp27m-win_amd64.whl", hash = "sha256:28f27c64dd699b8b10f70da5f9320c1cffcaefca7dd76275b44571bd097f276c"},
-    {file = "grpcio-1.27.2-cp27-cp27mu-linux_armv7l.whl", hash = "sha256:a25b84e10018875a0f294a7649d07c43e8bc3e6a821714e39e5cd607a36386d7"},
-    {file = "grpcio-1.27.2-cp27-cp27mu-manylinux1_i686.whl", hash = "sha256:57949756a3ce1f096fa2b00f812755f5ab2effeccedb19feeb7d0deafa3d1de7"},
-    {file = "grpcio-1.27.2-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:f3614dabd2cc8741850597b418bcf644d4f60e73615906c3acc407b78ff720b3"},
-    {file = "grpcio-1.27.2-cp27-cp27mu-manylinux2010_i686.whl", hash = "sha256:25c77692ea8c0929d4ad400ea9c3dcbcc4936cee84e437e0ef80da58fa73d88a"},
-    {file = "grpcio-1.27.2-cp27-cp27mu-manylinux2010_x86_64.whl", hash = "sha256:5dab393ab96b2ce4012823b2f2ed4ee907150424d2f02b97bd6f8dd8f17cc866"},
-    {file = "grpcio-1.27.2-cp35-cp35m-linux_armv7l.whl", hash = "sha256:bb2987eb3af9bcf46019be39b82c120c3d35639a95bc4ee2d08f36ecdf469345"},
-    {file = "grpcio-1.27.2-cp35-cp35m-macosx_10_7_intel.whl", hash = "sha256:6f328a3faaf81a2546a3022b3dfc137cc6d50d81082dbc0c94d1678943f05df3"},
-    {file = "grpcio-1.27.2-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:5ebc13451246de82f130e8ee7e723e8d7ae1827f14b7b0218867667b1b12c88d"},
-    {file = "grpcio-1.27.2-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:355bd7d7ce5ff2917d217f0e8ddac568cb7403e1ce1639b35a924db7d13a39b6"},
-    {file = "grpcio-1.27.2-cp35-cp35m-manylinux2010_i686.whl", hash = "sha256:d1e5563e3b7f844dbc48d709c9e4a75647e11d0387cc1fa0c861d3e9d34bc844"},
-    {file = "grpcio-1.27.2-cp35-cp35m-manylinux2010_x86_64.whl", hash = "sha256:1ec8fc865d8da6d0713e2092a27eee344cd54628b2c2065a0e77fff94df4ae00"},
-    {file = "grpcio-1.27.2-cp35-cp35m-win32.whl", hash = "sha256:706e2dea3de33b0d8884c4d35ecd5911b4ff04d0697c4138096666ce983671a6"},
-    {file = "grpcio-1.27.2-cp35-cp35m-win_amd64.whl", hash = "sha256:d18b4c8cacbb141979bb44355ee5813dd4d307e9d79b3a36d66eca7e0a203df8"},
-    {file = "grpcio-1.27.2-cp36-cp36m-linux_armv7l.whl", hash = "sha256:02aef8ef1a5ac5f0836b543e462eb421df6048a7974211a906148053b8055ea6"},
-    {file = "grpcio-1.27.2-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:b78af4d42985ab3143d9882d0006f48d12f1bc4ba88e78f23762777c3ee64571"},
-    {file = "grpcio-1.27.2-cp36-cp36m-manylinux1_i686.whl", hash = "sha256:9c0669ba9aebad540fb05a33beb7e659ea6e5ca35833fc5229c20f057db760e8"},
-    {file = "grpcio-1.27.2-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:68a149a0482d0bc697aac702ec6efb9d380e0afebf9484db5b7e634146528371"},
-    {file = "grpcio-1.27.2-cp36-cp36m-manylinux2010_i686.whl", hash = "sha256:a71138366d57901597bfcc52af7f076ab61c046f409c7b429011cd68de8f9fe6"},
-    {file = "grpcio-1.27.2-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:9e9cfe55dc7ac2aa47e0fd3285ff829685f96803197042c9d2f0fb44e4b39b2c"},
-    {file = "grpcio-1.27.2-cp36-cp36m-win32.whl", hash = "sha256:d22c897b65b1408509099f1c3334bd3704f5e4eb7c0486c57d0e212f71cb8f54"},
-    {file = "grpcio-1.27.2-cp36-cp36m-win_amd64.whl", hash = "sha256:c59b9280284b791377b3524c8e39ca7b74ae2881ba1a6c51b36f4f1bb94cee49"},
-    {file = "grpcio-1.27.2-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:6e545908bcc2ae28e5b190ce3170f92d0438cf26a82b269611390114de0106eb"},
-    {file = "grpcio-1.27.2-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:6db7ded10b82592c472eeeba34b9f12d7b0ab1e2dcad12f081b08ebdea78d7d6"},
-    {file = "grpcio-1.27.2-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:4d3b6e66f32528bf43ca2297caca768280a8e068820b1c3dca0fcf9f03c7d6f1"},
-    {file = "grpcio-1.27.2-cp37-cp37m-manylinux2010_i686.whl", hash = "sha256:586d931736912865c9790c60ca2db29e8dc4eace160d5a79fec3e58df79a9386"},
-    {file = "grpcio-1.27.2-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:c03ce53690fe492845e14f4ab7e67d5a429a06db99b226b5c7caa23081c1e2bb"},
-    {file = "grpcio-1.27.2-cp37-cp37m-win32.whl", hash = "sha256:209927e65395feb449783943d62a3036982f871d7f4045fadb90b2d82b153ea8"},
-    {file = "grpcio-1.27.2-cp37-cp37m-win_amd64.whl", hash = "sha256:9713578f187fb1c4d00ac554fe1edcc6b3ddd62f5d4eb578b81261115802df8e"},
-    {file = "grpcio-1.27.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:b4efde5524579a9ce0459ca35a57a48ca878a4973514b8bb88cb80d7c9d34c85"},
-    {file = "grpcio-1.27.2-cp38-cp38-manylinux1_i686.whl", hash = "sha256:fb62996c61eeff56b59ab8abfcaa0859ec2223392c03d6085048b576b567459b"},
-    {file = "grpcio-1.27.2-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:a22daaf30037b8e59d6968c76fe0f7ff062c976c7a026e92fbefc4c4bf3fc5a4"},
-    {file = "grpcio-1.27.2-cp38-cp38-manylinux2010_i686.whl", hash = "sha256:4a0a33ada3f6f94f855f92460896ef08c798dcc5f17d9364d1735c5adc9d7e4a"},
-    {file = "grpcio-1.27.2-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:8111b61eee12d7af5c58f82f2c97c2664677a05df9225ef5cbc2f25398c8c454"},
-    {file = "grpcio-1.27.2-cp38-cp38-win32.whl", hash = "sha256:5121fa96c79fc0ec81825091d0be5c16865f834f41b31da40b08ee60552f9961"},
-    {file = "grpcio-1.27.2-cp38-cp38-win_amd64.whl", hash = "sha256:1cff47297ee614e7ef66243dc34a776883ab6da9ca129ea114a802c5e58af5c1"},
-    {file = "grpcio-1.27.2.tar.gz", hash = "sha256:5ae532b93cf9ce5a2a549b74a2c35e3b690b171ece9358519b3039c7b84c887e"},
 ]
 httplib2 = [
     {file = "httplib2-0.17.0-py3-none-any.whl", hash = "sha256:79751cc040229ec896aa01dced54de0cd0bf042f928e84d5761294422dde4454"},
@@ -747,8 +687,8 @@ more-itertools = [
     {file = "more_itertools-8.2.0-py3-none-any.whl", hash = "sha256:5dd8bcf33e5f9513ffa06d5ad33d78f31e1931ac9a18f33d37e77a180d393a7c"},
 ]
 packaging = [
-    {file = "packaging-20.1-py2.py3-none-any.whl", hash = "sha256:170748228214b70b672c581a3dd610ee51f733018650740e98c7df862a583f73"},
-    {file = "packaging-20.1.tar.gz", hash = "sha256:e665345f9eef0c621aa0bf2f8d78cf6d21904eef16a93f020240b704a57f1334"},
+    {file = "packaging-20.3-py2.py3-none-any.whl", hash = "sha256:82f77b9bee21c1bafbf35a84905d604d5d1223801d639cf3ed140bd651c08752"},
+    {file = "packaging-20.3.tar.gz", hash = "sha256:3c292b474fda1671ec57d46d739d072bfd495a4f51ad01a055121d81e952b7a3"},
 ]
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
@@ -880,6 +820,6 @@ wcwidth = [
     {file = "wcwidth-0.1.8.tar.gz", hash = "sha256:f28b3e8a6483e5d49e7f8949ac1a78314e740333ae305b4ba5defd3e74fb37a8"},
 ]
 zipp = [
-    {file = "zipp-3.0.0-py3-none-any.whl", hash = "sha256:12248a63bbdf7548f89cb4c7cda4681e537031eda29c02ea29674bc6854460c2"},
-    {file = "zipp-3.0.0.tar.gz", hash = "sha256:7c0f8e91abc0dc07a5068f315c52cb30c66bfbc581e5b50704c8a2f6ebae794a"},
+    {file = "zipp-3.1.0-py3-none-any.whl", hash = "sha256:aa36550ff0c0b7ef7fa639055d797116ee891440eac1a56f378e2d3179e0320b"},
+    {file = "zipp-3.1.0.tar.gz", hash = "sha256:c599e4d75c98f6798c509911d08a22e6c021d074469042177c8c86fb92eefd96"},
 ]
