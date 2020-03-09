@@ -301,6 +301,7 @@ class Notify(BaseNotify):
             MessageAttributes=attrs)
         return result['MessageId']
 
+    @classmethod
     def register_resource(cls, registry, resource_class):
         if 'notify' in resource_class.action_registry:
             return
