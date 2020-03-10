@@ -46,5 +46,3 @@ def test_package_metadata(package):
         'Topic :: System :: Distributed Computing']
     for k in ('readme', 'description'):
         assert k in md
-
-    
