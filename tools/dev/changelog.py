@@ -51,29 +51,38 @@ aliases = {
 skip = set(('release', 'merge'))
 
 
+def resolve_dateref(since, repo):
+    try:
+        since = repo.lookup_reference('refs/tags/%s' % since)
+    except KeyError:
+        since = parse_date(since).astimezone(tzutc())
+    else:
+        since = commit_date(since.peel())
+    return since
+
+
 @click.command()
 @click.option('--path', required=True)
 @click.option('--output', required=True)
 @click.option('--since')
+@click.option('--end')
 @click.option('--user', multiple=True)
-def main(path, output, since, user):
+def main(path, output, since, end, user):
     repo = pygit2.Repository(path)
     if since:
-        try:
-            since = repo.lookup_reference('refs/tags/%s' % since)
-        except KeyError:
-            since = parse_date(since).astimezone(tzutc())
-        else:
-            since = commit_date(since.peel())
+        since = resolve_dateref(since, repo)
+    if end:
+        end = resolve_dateref(end, repo)
 
     groups = {}
     count = 0
     for commit in repo.walk(
             repo.head.target):
         cdate = commit_date(commit)
-        if cdate <= since:
+        if since and cdate <= since:
             break
-
+        if end and cdate >= end:
+            continue
         if user and commit.author.name not in user:
             continue
 
