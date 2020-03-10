@@ -3,6 +3,7 @@ babel==2.8.0
 certifi==2019.11.28
 chardet==3.0.4
 colorama==0.4.3; sys_platform == "win32"
+commonmark==0.9.1
 docutils==0.15.2
 idna==2.9
 imagesize==1.2.0
@@ -12,6 +13,7 @@ packaging==20.3
 pygments==2.6.1
 pyparsing==2.4.6
 pytz==2019.3
+recommonmark==0.6.0
 requests==2.23.0
 six==1.14.0
 snowballstemmer==2.0.0
