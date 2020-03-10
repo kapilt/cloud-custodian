@@ -55,7 +55,8 @@ skip = set(('release', 'merge'))
 @click.option('--path', required=True)
 @click.option('--output', required=True)
 @click.option('--since')
-def main(path, output, since):
+@click.option('--user', multiple=True)
+def main(path, output, since, user):
     repo = pygit2.Repository(path)
     if since:
         try:
@@ -69,10 +70,13 @@ def main(path, output, since):
     count = 0
     for commit in repo.walk(
             repo.head.target):
-
         cdate = commit_date(commit)
         if cdate <= since:
             break
+
+        if user and commit.author.name not in user:
+            continue
+
         parts = commit.message.strip().split('-', 1)
         if not len(parts) > 1:
             print("bad commit %s %s" % (cdate, commit.message))
@@ -98,6 +102,8 @@ def main(path, output, since):
                 continue
         if found:
             continue
+        if user:
+            message = "%s - %s - %s" % (cdate.strftime("%Y/%m/%d"), commit.author.name, message)
         groups.setdefault(category, []).append(message)
         count += 1
 
