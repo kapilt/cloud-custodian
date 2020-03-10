@@ -33,19 +33,23 @@ install_requires = \
  'urllib3 (>=1.25.8,<2.0.0)',
  'zipp (>=3.1.0,<4.0.0)']
 
+entry_points = \
+{'console_scripts': ['c7n-sphinxext = c7n_sphinxext.docgen:main']}
+
 setup_kwargs = {
     'name': 'c7n-sphinxext',
     'version': '1.0',
     'description': 'Cloud Custodian - Sphinx Extensions',
     'long_description': None,
-    'author': 'Kapil Thangavelu',
-    'author_email': 'kapilt@gmail.com',
+    'author': 'Cloud Custodian Project',
+    'author_email': None,
     'maintainer': None,
     'maintainer_email': None,
     'url': None,
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
+    'entry_points': entry_points,
     'python_requires': '>=3.6,<4.0',
 }
 
