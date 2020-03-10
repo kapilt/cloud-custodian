@@ -16,8 +16,8 @@ package_data = \
 install_requires = \
 ['argcomplete (>=1.11.1,<2.0.0)',
  'attrs (>=19.3.0,<20.0.0)',
- 'boto3 (>=1.12.11,<2.0.0)',
- 'botocore (>=1.15.11,<2.0.0)',
+ 'boto3 (>=1.12.17,<2.0.0)',
+ 'botocore (>=1.15.17,<2.0.0)',
  'c7n (>=0.9.0,<0.10.0)',
  'docutils (>=0.15.2,<0.16.0)',
  'importlib-metadata (>=1.5.0,<2.0.0)',
@@ -31,18 +31,18 @@ install_requires = \
  'six (>=1.14.0,<2.0.0)',
  'tabulate (>=0.8.6,<0.9.0)',
  'urllib3 (>=1.25.8,<2.0.0)',
- 'zipp (>=3.0.0,<4.0.0)']
+ 'zipp (>=3.1.0,<4.0.0)']
 
 setup_kwargs = {
     'name': 'c7n-kube',
     'version': '0.1.1',
     'description': 'Cloud Custodian - Kubernetes Provider',
-    'long_description': None,
-    'author': 'Your Name',
-    'author_email': 'you@example.com',
+    'long_description': '# Custodian Kubernetes Support\n\n\nWork in Progress - Not Ready For Use.\n\n',
+    'author': 'Cloud Custodian Project',
+    'author_email': None,
     'maintainer': None,
     'maintainer_email': None,
-    'url': None,
+    'url': 'https://cloudcustodian.io',
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
