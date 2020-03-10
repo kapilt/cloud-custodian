@@ -2,8 +2,11 @@
 name = "c7n_trailcreator"
 version = "0.1.5"
 readme = "README.md"
+homepage = "https://cloudcustodian.io"
+repository = "https://github.com/cloud-custodian/cloud-custodian"
 description = "Cloud Custodian - Retroactive Tag Resource Creators from CloudTrail"
-authors = ["Cloud Custodian Project <https://github.com/cloud-custodian/cloud-custodian>"]
+documentation = "https://cloudcustodian.io/docs/tools/c7n-trailcreator.html"
+authors = ["Cloud Custodian Project"]
 license = "Apache-2.0"
 
 classifiers=[

@@ -2,7 +2,7 @@
 name = "c7n_mailer"
 version = "0.5.7"
 description = "Cloud Custodian - Reference Mailer"
-authors = ["Cloud Custodian Project <https://github.com/cloud-custodian/cloud-custodian>"]
+authors = ["Cloud Custodian Project"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://cloudcustodian.io"
