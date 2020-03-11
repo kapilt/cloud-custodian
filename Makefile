@@ -35,9 +35,10 @@ pkg-sdist-test:
 	rm -f dist/*
 	for pkg in $(PKG_SET); do pushd $$pkg && rm -f dist/* && popd; done
 # increment versions
-
+	poetry version patch
+	for pkg in $(PKG_SET); do pushd $$pkg && poetry version patch && popd; done
 # generate setup
-
+	@$(MAKE) pkg-gen-setup
 # generate sdist
 	python setup.py sdist
 	for pkg in $(PKG_SET); do pushd $$pkg && python setup.py sdist && popd; done
