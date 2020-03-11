@@ -40,8 +40,8 @@ pkg-sdist-test:
 # generate setup
 	@$(MAKE) pkg-gen-setup
 # generate sdist
-	python setup.py sdist
-	for pkg in $(PKG_SET); do pushd $$pkg && python setup.py sdist && popd; done
+	python setup.py bdist_wheel
+	for pkg in $(PKG_SET); do pushd $$pkg && python setup.py bdist_wheel && popd; done
 # check sdist
 	twine check dist/*
 	for pkg in $(PKG_SET); do pushd $$pkg && twine check dist/* && popd; done
