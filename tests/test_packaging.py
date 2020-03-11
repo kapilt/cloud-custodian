@@ -44,5 +44,5 @@ def test_package_metadata(package):
     assert md.get('classifiers', []) == [
         'Topic :: System :: Systems Administration',
         'Topic :: System :: Distributed Computing']
-    for k in ('readme', 'description'):
-        assert k in md
+    assert md.get('readme', '').endswith('md')
+    assert 'description' in md

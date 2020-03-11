@@ -30,6 +30,24 @@ pkg-gen-requirements:
 	poetry export --dev --without-hashes -f requirements.txt > requirements.txt
 	for pkg in $(PKG_SET); do pushd $$pkg && poetry export --without-hashes -f requirements.txt > requirements.txt && popd; done
 
+pkg-sdist-test:
+# clean up any artifacts first
+	rm -f dist/*
+	for pkg in $(PKG_SET); do pushd $$pkg && rm -f dist/* && popd; done
+# increment versions
+
+# generate setup
+
+# generate sdist
+	python setup.py sdist
+	for pkg in $(PKG_SET); do pushd $$pkg && python setup.py sdist && popd; done
+# check sdist
+	twine check dist/*
+	for pkg in $(PKG_SET); do pushd $$pkg && twine check dist/* && popd; done
+# upload to test pypi
+	twine upload -r testpypi dist/*
+	for pkg in $(PKG_SET); do pushd $$pkg && twine upload -r testpypi dist/* && popd; done
+
 test:
 	./bin/tox -e py38
 

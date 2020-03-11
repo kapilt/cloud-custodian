@@ -38,6 +38,7 @@ setup_kwargs = {
     'version': '0.1.1',
     'description': 'Cloud Custodian - Kubernetes Provider',
     'long_description': '# Custodian Kubernetes Support\n\n\nWork in Progress - Not Ready For Use.\n\n',
+    'long_description_content_type': 'text/markdown',
     'author': 'Cloud Custodian Project',
     'author_email': None,
     'maintainer': None,

@@ -1,11 +1,6 @@
 """
 Supplemental tooling for managing custodian depgraph
 
-Todo
- - [ ] check
- - [ ] ensure sanity across dependency graph
- - [ ] generate a find links directory from a wheel cache
-
 """
 import click
 import os
@@ -58,18 +53,52 @@ def gen_links(cache, link_dir):
         print('Updated %d Find Links' % wrote)
 
 
+# Override the poetry base template as all our readmes files
+# are in markdown format.
+#
+# Pull request submitted upstream to correctly autodetect
+# https://github.com/python-poetry/poetry/pull/1994
+#
+SETUP_TEMPLATE = """\
+# -*- coding: utf-8 -*-
+from setuptools import setup
+
+{before}
+setup_kwargs = {{
+    'name': {name!r},
+    'version': {version!r},
+    'description': {description!r},
+    'long_description': {long_description!r},
+    'long_description_content_type': 'text/markdown',
+    'author': {author!r},
+    'author_email': {author_email!r},
+    'maintainer': {maintainer!r},
+    'maintainer_email': {maintainer_email!r},
+    'url': {url!r},
+    {extra}
+}}
+{after}
+
+setup(**setup_kwargs)
+"""
+
+
 @cli.command()
 @click.option('-p', '--package-dir', type=click.Path())
 def gen_setup(package_dir):
     """Generate a setup suitable for dev compatibility with pip.
     """
-    from poetry.masonry.builders.sdist import SdistBuilder as BaseBuilder
+    from poetry.masonry.builders import sdist
     from poetry.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
 
-    class SourceDevBuilder(BaseBuilder):
+    # the alternative to monkey patching is carrying forward a
+    # 100 line method. See SETUP_TEMPLATE comments above.
+    sdist.SETUP = SETUP_TEMPLATE
+
+    class SourceDevBuilder(sdist.SdistBuilder):
         # to enable poetry with a monorepo, we have internal deps
         # as source path dev dependencies, when we go to generate
         # setup.py we need to ensure that the source deps are
@@ -96,13 +125,17 @@ def gen_setup(package_dir):
 def gen_frozensetup(package_dir, output):
     """Generate a frozen setup suitable for distribution.
     """
-    from poetry.masonry.builders.sdist import SdistBuilder as BaseBuilder
+    from poetry.masonry.builders import sdist
     from poetry.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
 
-    class FrozenBuilder(BaseBuilder):
+    sdist.SETUP = SETUP_TEMPLATE
+
+    # the alternative to monkey patching is carrying forward a
+    # 100 line method. See SETUP_TEMPLATE comments above.
+    class FrozenBuilder(sdist.SdistBuilder):
 
         @classmethod
         def convert_dependencies(cls, package, dependencies):
