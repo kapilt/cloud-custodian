@@ -130,6 +130,7 @@ class LoggingFilter(ValueFilter):
 class Pause(BaseAction):
 
     schema = type_schema('pause')
+    permissions = ('redshift:PauseCluster',)
 
     def process(self, resources):
         client = local_session(
@@ -147,6 +148,7 @@ class Pause(BaseAction):
 class Resume(BaseAction):
 
     schema = type_schema('resume')
+    permissions = ('redshift:ResumeCluster',)
 
     def process(self, resources):
         client = local_session(
