@@ -45,6 +45,10 @@ def get_doc_examples(resources):
             for item in itertools.chain.from_iterable(split_doc):
                 if 'policies:\n' in item:
                     policies.append((item, resource_name, cls.type))
+                elif 'resource:' in item:
+                    item = 'policies:\n' + item
+                    policies.append((item, resource_name, cls.type))
+
     return policies
 
 
@@ -59,8 +63,16 @@ def get_doc_policies(resources):
     policies = {}
     duplicate_names = set()
     for ptext, resource_name, el_name in get_doc_examples(resources):
-        data = yaml_load(ptext)
+        try:
+            data = yaml_load(ptext)
+        except Exception:
+            print('failed %s %s\n %s' % (resource_name, el_name, ptext))
+            raise
+
         for p in data.get('policies', []):
+            if not isinstance(p, dict):
+                __import__("pdb").set_trace()
+
             if p['name'] in policies:
                 if policies[p['name']] != p:
                     print('duplicate %s %s %s' % ( resource_name, el_name, p['name']))
