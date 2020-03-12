@@ -100,7 +100,7 @@ skip_condition = not (
       sys.version_info.major == 3 and
       sys.version_info.minor == 6)))
 
-print('skip condition', skip_condition)
+
 @pytest.mark.skipif(skip_condition, reason="Doc tests must be explicitly enabled with C7N_DOC_TEST")
 @pytest.mark.parametrize("provider_name", ('aws', 'azure', 'gcp', 'k8s'))
 def test_doc_examples(provider_name):
