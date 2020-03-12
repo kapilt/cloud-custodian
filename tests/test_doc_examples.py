@@ -70,9 +70,6 @@ def get_doc_policies(resources):
             raise
 
         for p in data.get('policies', []):
-            if not isinstance(p, dict):
-                __import__("pdb").set_trace()
-
             if p['name'] in policies:
                 if policies[p['name']] != p:
                     print('duplicate %s %s %s' % ( resource_name, el_name, p['name']))
