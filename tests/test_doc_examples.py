@@ -72,7 +72,8 @@ def get_doc_policies(resources):
         for p in data.get('policies', []):
             if p['name'] in policies:
                 if policies[p['name']] != p:
-                    print('duplicate %s %s %s' % ( resource_name, el_name, p['name']))
+                    print('duplicate %s %s %s' % (
+                        resource_name, el_name, p['name']))
                     duplicate_names.add(p['name'])
             else:
                 policies[p['name']] = p
