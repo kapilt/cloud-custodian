@@ -25,7 +25,7 @@ from c7n.filters import (
     ValueFilter, DefaultVpcBase, AgeFilter, CrossAccountAccessFilter)
 import c7n.filters.vpc as net_filters
 from c7n.filters.kms import KmsRelatedFilter
-
+from c7n.filters.offhours import OffHour, OnHour
 from c7n.manager import resources
 from c7n.resolver import ValuesFrom
 from c7n.query import QueryResourceManager, TypeInfo
@@ -52,6 +52,8 @@ class Redshift(QueryResourceManager):
 
 Redshift.filter_registry.register('marked-for-op', tags.TagActionFilter)
 Redshift.filter_registry.register('network-location', net_filters.NetworkLocation)
+Redshift.filter_registry.register('offhour', OffHour)
+Redshift.filter_registry.register('onhour', OnHour)
 
 
 @Redshift.filter_registry.register('default-vpc')
@@ -122,6 +124,40 @@ class LoggingFilter(ValueFilter):
             if self.match(cluster[self.annotation_key]):
                 results.append(cluster)
         return results
+
+
+@Redshift.action_registry.register('pause')
+class Pause(BaseAction):
+
+    schema = type_schema('pause')
+
+    def process(self, resources):
+        client = local_session(
+            self.manager.session_factory).client('redshift')
+        for r in resources:
+            try:
+                client.pause_cluster(
+                    ClusterIdentifier=r['ClusterIdentifier'])
+            except (client.exceptions.ClusterNotFound,
+                    client.exceptions.InvalidClusterState):
+                continue
+
+
+@Redshift.action_registry.register('resume')
+class Resume(BaseAction):
+
+    schema = type_schema('resume')
+
+    def process(self, resources):
+        client = local_session(
+            self.manager.session_factory).client('redshift')
+        for r in resources:
+            try:
+                client.resume_cluster(
+                    ClusterIdentifier=r['ClusterIdentifier'])
+            except (client.exceptions.ClusterNotFound,
+                    client.exceptions.InvalidClusterState):
+                continue
 
 
 @Redshift.action_registry.register('set-logging')
