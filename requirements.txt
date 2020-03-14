@@ -71,7 +71,7 @@ vcrpy==4.0.2
 virtualenv==20.0.10
 wcwidth==0.1.8
 webencodings==0.5.1
-wheel==0.34.2
+wheel==0.30.0
 wrapt==1.12.1
 yarl==1.4.2; python_version >= "3.6"
 zipp==3.1.0
