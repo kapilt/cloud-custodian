@@ -882,19 +882,6 @@ version = "0.5.1"
 
 [[package]]
 category = "dev"
-description = "A built-package format for Python."
-name = "wheel"
-optional = false
-python-versions = "*"
-version = "0.30.0"
-
-[package.extras]
-faster-signatures = ["ed25519ll"]
-signatures = ["keyring", "keyrings.alt", "pyxdg"]
-test = ["jsonschema", "pytest (>=3.0.0)", "pytest-cov"]
-
-[[package]]
-category = "dev"
 description = "Module for decorators, wrappers and monkey patching."
 name = "wrapt"
 optional = false
@@ -927,7 +914,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "48c59c58ecbd65a0599659c99ba0d902159a912d3d4ea4b67b60efc6c64b3e56"
+content-hash = "1f47a22f26bbaf9f3a379d2d8c6bb21dcd1ce0285e30c30ff2b756213ecd238a"
 python-versions = "^3.6"
 
 [metadata.files]
@@ -1325,10 +1312,6 @@ wcwidth = [
 webencodings = [
     {file = "webencodings-0.5.1-py2.py3-none-any.whl", hash = "sha256:a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78"},
     {file = "webencodings-0.5.1.tar.gz", hash = "sha256:b36a1c245f2d304965eb4e0a82848379241dc04b865afcc4aab16748587e1923"},
-]
-wheel = [
-    {file = "wheel-0.30.0-py2.py3-none-any.whl", hash = "sha256:e721e53864f084f956f40f96124a74da0631ac13fbbd1ba99e8e2b5e9cafdf64"},
-    {file = "wheel-0.30.0.tar.gz", hash = "sha256:9515fe0a94e823fd90b08d22de45d7bde57c90edce705b22f5e1ecf7e1b653c8"},
 ]
 wrapt = [
     {file = "wrapt-1.12.1.tar.gz", hash = "sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7"},
