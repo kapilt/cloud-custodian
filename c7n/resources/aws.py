@@ -450,7 +450,7 @@ class XrayTracer:
             context=context,
             sampling=True,
             context_missing='LOG_ERROR')
-        patch(['requests', 'boto3'])
+        patch(['boto3', 'requests'])
         logging.getLogger('aws_xray_sdk.core').setLevel(logging.ERROR)
 
     def __init__(self, ctx, config):
