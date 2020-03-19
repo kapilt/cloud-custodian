@@ -305,8 +305,7 @@ class XrayEmitter:
         self.buf = []
         for segment_set in utils.chunks(buf, 50):
             self.client.put_trace_segments(
-                TraceSegmentDocuments=[
-                    s.serialize() for s in segment_set])
+                TraceSegmentDocuments=[s.serialize() for s in segment_set])
 
 
 class XrayContext(Context):
@@ -499,6 +498,9 @@ class XrayTracer:
         xray_recorder.end_segment()
         if not self.use_daemon:
             self.emitter.flush()
+            log.info(
+                ('View XRay Trace https://console.aws.amazon.com/xray/home?region=%s#/'
+                 'traces/%s' % (self.ctx.options.region, self.segment.trace_id)))
         self.metadata.clear()
 
 
