@@ -168,9 +168,9 @@ class TracerTest(BaseTest):
         ctx = Bag(
             policy=policy,
             session_factory=session_factory,
-            options=Bag(account_id='644160558196'))
+            options=Bag(account_id='644160558196', region='us-east-1',))
         ctx.get_metadata = lambda *args: {}
-        config = Bag(region='us-east-1')
+        config = Bag()
         tracer = aws.XrayTracer(ctx, config)
 
         with tracer:
