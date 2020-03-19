@@ -27,6 +27,7 @@ import sys
 import threading
 import tempfile
 import time
+import threading
 import traceback
 
 import boto3
@@ -311,8 +312,8 @@ class XrayEmitter:
 class XrayContext(Context):
     """Specialized XRay Context for Custodian.
 
-    A context is used as a segment storage stack for
-    currently in progress segments.
+    A context is used as a segment storage stack for currently in
+    progress segments.
 
     We use a customized context for custodian as policy execution
     commonly uses a concurrent.futures threadpool pattern during
@@ -326,6 +327,7 @@ class XrayContext(Context):
     usage of threads and associates subsegments therein to the policy
     execution active subsegment.
     """
+
     def __init__(self, *args, **kw):
         super(XrayContext, self).__init__(*args, **kw)
         # We want process global semantics as policy execution
@@ -379,7 +381,6 @@ class XrayContext(Context):
                 return s
         for s in reversed(entities):
             if s.thread_id == self._main_tid:
-                print('fallback %s' % s.name)
                 return s
         return self.handle_context_missing()
 
@@ -403,7 +404,7 @@ if HAVE_XRAY:
             # skip tracing for SDK built-in sampling pollers
             if ('GetSamplingRules' in args or
                 'GetSamplingTargets' in args or
-                'PutTraceSegments' in args):
+                    'PutTraceSegments' in args):
                 return wrapped(*args, **kwargs)
         return xray_recorder.record_subsegment(
             wrapped, instance, args, kwargs,
