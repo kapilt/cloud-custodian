@@ -24,6 +24,10 @@ from c7n import output
 from .common import BaseTest
 
 
+from aws_xray_sdk.core.models.segment import Segment
+from aws_xray_sdk.core.models.subsegment import Subsegment
+
+
 class TraceDoc(Bag):
 
     def serialize(self):
@@ -139,6 +143,25 @@ class UtilTest(BaseTest):
 
 class TracerTest(BaseTest):
 
+    def test_context(self):
+        store = aws.XrayContext()
+        self.assertEqual(store.handle_context_missing(), None)
+        x = Segment('foo')
+        y = Segment('foo')
+        a = Subsegment('bar', 'boo', x)
+        b = Subsegment('bar', 'boo', x)
+        b.thread_id = '123'
+        store.put_segment(x)
+        store.put_subsegment(a)
+        store.put_subsegment(b)
+
+        self.assertEqual(store._local.entities, [x, a, b])
+        self.assertEqual(store.get_trace_entity(), a)
+        store.end_subsegment(a)
+        self.assertEqual(store.get_trace_entity(), x)
+        store.put_segment(y)
+        self.assertEqual(store._local.entities, [y])
+
     def test_tracer(self):
         session_factory = self.replay_flight_data('output-xray-trace')
         policy = Bag(name='test', resource_type='ec2')
@@ -147,7 +170,7 @@ class TracerTest(BaseTest):
             session_factory=session_factory,
             options=Bag(account_id='644160558196'))
         ctx.get_metadata = lambda *args: {}
-        config = Bag()
+        config = Bag(region='us-east-1')
         tracer = aws.XrayTracer(ctx, config)
 
         with tracer:

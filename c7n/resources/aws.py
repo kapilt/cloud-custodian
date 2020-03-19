@@ -373,8 +373,6 @@ class XrayContext(Context):
     def get_trace_entity(self):
         tid = threading.get_native_id()
         entities = self._local.get('entities', ())
-        if len(entities) == 1:
-            return entities[0]
         for s in reversed(entities):
             if s.thread_id == tid:
                 return s
