@@ -333,7 +333,7 @@ class XrayContext(Context):
         # can span threads.
         self._local = Bag()
         self._current_subsegment = None
-        self._main_tid = threading.get_native_id()
+        self._main_tid = threading.get_ident()
 
     def handle_context_missing(self):
         """Custodian has a few api calls out of band of policy execution.
@@ -348,12 +348,12 @@ class XrayContext(Context):
     # Annotate any segments/subsegments with their thread ids.
     def put_segment(self, segment):
         if getattr(segment, 'thread_id', None) is None:
-            segment.thread_id = threading.get_native_id()
+            segment.thread_id = threading.get_ident()
         super().put_segment(segment)
 
     def put_subsegment(self, subsegment):
         if getattr(subsegment, 'thread_id', None) is None:
-            subsegment.thread_id = threading.get_native_id()
+            subsegment.thread_id = threading.get_ident()
         super().put_subsegment(subsegment)
 
     # Override since we're not just popping the end of the stack, we're removing
@@ -371,7 +371,7 @@ class XrayContext(Context):
     # Override get trace identity, any worker thread will find its own subsegment
     # on the stack, else will use the main thread's sub/segment
     def get_trace_entity(self):
-        tid = threading.get_native_id()
+        tid = threading.get_ident()
         entities = self._local.get('entities', ())
         for s in reversed(entities):
             if s.thread_id == tid:
