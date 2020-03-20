@@ -329,8 +329,6 @@ class XrayContext(Context):
 
     def __init__(self, *args, **kw):
         super(XrayContext, self).__init__(*args, **kw)
-        # We want process global semantics as policy execution
-        # can span threads.
         self._local = Bag()
         self._current_subsegment = None
         self._main_tid = threading.get_ident()
@@ -357,7 +355,7 @@ class XrayContext(Context):
         super().put_subsegment(subsegment)
 
     # Override since we're not just popping the end of the stack, we're removing
-    # the thread subsegment from the array by identity.
+    # the thread subsegment fromxo the array by identity.
     def end_subsegment(self, end_time):
         subsegment = self.get_trace_entity()
         if self._is_subsegment(subsegment):
@@ -382,9 +380,7 @@ class XrayContext(Context):
         return self.handle_context_missing()
 
 
-if HAVE_XRAY:
-    import wrapt
-
+if HAVE_XRAY: # pragma: no cover
     # sigh, work around aws xray sdk issues, via monkey patch
     # https://github.com/aws/aws-xray-sdk-python/issues/207
 
@@ -392,6 +388,8 @@ if HAVE_XRAY:
     # do with function imports masking modules :-(
 
     # all of this to add a PutTraceSegments to the exempted methods list.
+    import wrapt
+
     from aws_xray_sdk.ext.boto_utils import inject_header, aws_meta_processor
     from aws_xray_sdk.ext import botocore as xray_boto3
 
