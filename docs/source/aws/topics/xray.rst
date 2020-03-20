@@ -13,7 +13,7 @@ The package comes pre-installed on the custodian docker images.
 
 The xray support can be enabled on the command line using::
 
-   custodian run --trace xray custodian.yml
+   custodian run -s out --trace xray custodian.yml
 
 
 .. image:: c7n-aws-xray.png
@@ -25,5 +25,11 @@ the AWS_XRAY_DAEMON_ADDRESS environment variable is set. Lambda policies
 should set tracing_config to enable use of the daemon.
 
 
-	   
+By default custodian XRay integration will use the account's xray sampling rules
+sampling can be turned off by setting a flag::
 
+    custodian run -s out --trace xray://?sampling=off custodian.yml
+
+
+Note XRay integration is enabled for the entire process, it cannot be configured
+per policy.

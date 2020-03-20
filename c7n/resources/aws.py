@@ -438,12 +438,13 @@ class XrayTracer:
     service_name = 'custodian'
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls, config):
         context = XrayContext()
+        sampling = config.get('sample', 'true') == 'true' and True or False
         xray_recorder.configure(
             emitter=cls.use_daemon is False and cls.emitter or None,
             context=context,
-            sampling=True,
+            sampling=sampling,
             context_missing='LOG_ERROR')
         patch(['boto3', 'requests'])
         logging.getLogger('aws_xray_sdk.core').setLevel(logging.ERROR)
@@ -623,7 +624,7 @@ class AWS(Provider):
         _default_region(options)
         _default_account_id(options)
         if options.tracer and options.tracer.startswith('xray') and HAVE_XRAY:
-            XrayTracer.initialize()
+            XrayTracer.initialize(utils.parse_url_config(options.tracer))
 
         return options
 
