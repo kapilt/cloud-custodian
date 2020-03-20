@@ -18,6 +18,7 @@ import csv
 from datetime import datetime, timedelta
 import json
 import itertools
+import ipaddress
 import logging
 import os
 import random
@@ -30,7 +31,7 @@ import six
 from six.moves.urllib import parse as urlparse
 from six.moves.urllib.request import getproxies
 
-from c7n import ipaddress, config
+from c7n import config
 from c7n.exceptions import ClientError, PolicyValidationError
 
 # Try to play nice in a serverless environment, where we don't require yaml
