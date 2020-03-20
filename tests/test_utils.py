@@ -24,7 +24,7 @@ from botocore.exceptions import ClientError
 from dateutil.parser import parse as parse_date
 import mock
 
-from c7n import ipaddress, utils
+from c7n import utils
 from c7n.config import Config
 from .common import BaseTest
 
