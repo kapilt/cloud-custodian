@@ -77,6 +77,7 @@ provider     The name of the cloud provider (aws, azure, gcp, etc)
 policy       The policy data as structure
 now          The current time
 event        In serverless, the event that triggered the policy
+account      When running in c7n-org, current account info per account config file
 ==========   ========================================================================
 
 If a policy is executing in a serverless mode the triggering ``event`` is available.

@@ -278,7 +278,7 @@ class PullMode(PolicyExecutionMode):
     schema = utils.type_schema('pull')
 
     def run(self, *args, **kw):
-        if not self.is_runnable():
+        if not self.policy.is_runnable():
             return []
 
         with self.policy.ctx:
@@ -371,9 +371,6 @@ class PullMode(PolicyExecutionMode):
             start,
             end,
         )
-
-    def is_runnable(self, event=None):
-        return self.policy.conditions.evaluate(event)
 
 
 class LambdaMode(ServerlessExecutionMode):
@@ -854,6 +851,8 @@ class PolicyConditions(object):
         self.policy = policy
         self.data = data
         self.filters = self.data.get('conditions', [])
+        # used by c7n-org to extend evaluation conditions
+        self.env_vars = {}
 
     def validate(self):
         self.filters.extend(self.convert_deprecated())
@@ -861,7 +860,8 @@ class PolicyConditions(object):
             self.filters, self.policy.resource_manager)
 
     def evaluate(self, event=None):
-        policy_vars = {
+        policy_vars = dict(self.env_vars)
+        policy_vars.update({
             'name': self.policy.name,
             'region': self.policy.options.region,
             'resource': self.policy.resource_type,
@@ -869,7 +869,7 @@ class PolicyConditions(object):
             'account_id': self.policy.options.account_id,
             'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
             'policy': self.policy.data
-        }
+        })
         # note for no filters/conditions, this uses all([]) == true property.
         state = all([f.process([policy_vars], event) for f in self.filters])
         if not state:
@@ -879,22 +879,22 @@ class PolicyConditions(object):
 
     def convert_deprecated(self):
         filters = []
-        if self.policy.region:
-            filters.append({'region': self.policy.region})
-        if self.policy.start:
+        if 'region' in self.policy.data:
+            filters.append({'region': self.policy.data['region']})
+        if 'start' in self.policy.data:
             filters.append({
                 'type': 'value',
                 'key': 'now',
                 'value_type': 'date',
                 'op': 'gte',
-                'value': self.policy.start})
-        if self.policy.end:
+                'value': self.policy.data['start']})
+        if 'end' in self.policy.data:
             filters.append({
                 'type': 'value',
                 'key': 'now',
                 'value_type': 'date',
                 'op': 'lte',
-                'value': self.policy.end})
+                'value': self.policy.data['end']})
         return filters
 
 
@@ -933,26 +933,8 @@ class Policy(object):
             provider_name = 'aws'
         return provider_name
 
-    # Preexecution Conditions
-    @property
-    def region(self):
-        return self.data.get('region')
-
-    @property
-    def tz(self):
-        return tzutil.gettz(self.data.get('tz', 'UTC'))
-
-    @property
-    def start(self):
-        if self.data.get('start'):
-            return parser.parse(self.data.get('start'), ignoretz=True).replace(tzinfo=self.tz)
-        return None
-
-    @property
-    def end(self):
-        if self.data.get('end'):
-            return parser.parse(self.data.get('end'), ignoretz=True).replace(tzinfo=self.tz)
-        return None
+    def is_runnable(self, event=None):
+        return self.conditions.evaluate(event)
 
     # Runtime circuit breakers
     @property

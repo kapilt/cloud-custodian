@@ -1026,6 +1026,19 @@ class TestPolicy(BaseTest):
 
 class PolicyConditionsTest(BaseTest):
 
+    def test_env_var_extension(self):
+        p = self.load_policy({
+            'name': 'profx',
+            'resource': 'aws.ec2',
+            'conditions': [{
+                'type': 'value',
+                'key': 'account.name',
+                'value': 'deputy'}]})
+        p.conditions.env_vars['account'] = {'name': 'deputy'}
+        self.assertTrue(p.is_runnable())
+        p.conditions.env_vars['account'] = {'name': 'mickey'}
+        self.assertFalse(p.is_runnable())
+
     def test_event_filter(self):
         p = self.load_policy({
             'name': 'profx',
@@ -1039,11 +1052,10 @@ class PolicyConditionsTest(BaseTest):
                 {'detail': {'userIdentity': {'userName': 'deputy'}}}))
 
         # event filters pass if we don't have an event.
-        self.assertTrue(p.conditions.evaluate(None))
-        self.assertFalse(p.conditions.evaluate({}))
-        self.assertFalse(
-            p.conditions.evaluate(
-                {'detail': {'userIdentity': {'userName': 'mike'}}}))
+        self.assertTrue(p.is_runnable())
+        self.assertFalse(p.is_runnable({}))
+        self.assertFalse(p.is_runnable(
+            {'detail': {'userIdentity': {'userName': 'mike'}}}))
 
     def test_boolean_or_blocks(self):
         p = self.load_policy({
@@ -1053,7 +1065,7 @@ class PolicyConditionsTest(BaseTest):
                 'or': [
                     {'region': 'us-east-1'},
                     {'region': 'us-west-2'}]}]})
-        self.assertTrue(p.conditions.evaluate(None))
+        self.assertTrue(p.is_runnable())
 
     def test_boolean_and_blocks(self):
         p = self.load_policy({
@@ -1063,7 +1075,7 @@ class PolicyConditionsTest(BaseTest):
                 'and': [
                     {'region': 'us-east-1'},
                     {'region': 'us-west-2'}]}]})
-        self.assertFalse(p.conditions.evaluate(None))
+        self.assertFalse(p.is_runnable())
 
     def test_boolean_not_blocks(self):
         p = self.load_policy({
@@ -1072,7 +1084,7 @@ class PolicyConditionsTest(BaseTest):
             'conditions': [{
                 'not': [
                     {'region': 'us-east-1'}]}]})
-        self.assertFalse(p.conditions.evaluate(None))
+        self.assertFalse(p.is_runnable())
 
 
 class PolicyExecutionModeTest(BaseTest):
@@ -1165,8 +1177,7 @@ class PullModeTest(BaseTest):
              'region': 'us-east-1'},
             config={'region': 'us-west-2', 'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), False)
+        self.assertEqual(p.is_runnable(), False)
 
     def test_is_runnable_dates(self):
         p = self.load_policy(
@@ -1176,8 +1187,7 @@ class PullModeTest(BaseTest):
              'start': '2018-3-29'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), True)
+        self.assertEqual(p.is_runnable(), True)
 
         tomorrow_date = str(datetime.date(datetime.utcnow()) + timedelta(days=1))
         p = self.load_policy(
@@ -1187,8 +1197,7 @@ class PullModeTest(BaseTest):
              'start': tomorrow_date},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), False)
+        self.assertEqual(p.is_runnable(), False)
 
         p = self.load_policy(
             {'name': 'good-end-date',
@@ -1197,8 +1206,7 @@ class PullModeTest(BaseTest):
              'end': tomorrow_date},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), True)
+        self.assertEqual(p.is_runnable(), True)
 
         p = self.load_policy(
             {'name': 'bad-end-date',
@@ -1207,8 +1215,7 @@ class PullModeTest(BaseTest):
              'end': '2018-3-29'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), False)
+        self.assertEqual(p.is_runnable(), False)
 
         p = self.load_policy(
             {'name': 'bad-start-end-date',
@@ -1218,8 +1225,7 @@ class PullModeTest(BaseTest):
              'end': '2018-3-29'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), False)
+        self.assertEqual(p.is_runnable(), False)
 
     def test_is_runnable_parse_dates(self):
         p = self.load_policy(
@@ -1229,8 +1235,7 @@ class PullModeTest(BaseTest):
              'start': 'March 3 2018'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), True)
+        self.assertEqual(p.is_runnable(), True)
 
         p = self.load_policy(
             {'name': 'parse-date-policy',
@@ -1239,8 +1244,7 @@ class PullModeTest(BaseTest):
              'start': 'March 3rd 2018'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), True)
+        self.assertEqual(p.is_runnable(), True)
 
         p = self.load_policy(
             {'name': 'parse-date-policy',
@@ -1249,8 +1253,7 @@ class PullModeTest(BaseTest):
              'start': '28 March 2018'},
             config={'validate': True},
             session_factory=None)
-        pull_mode = policy.PullMode(p)
-        self.assertEqual(pull_mode.is_runnable(), True)
+        self.assertEqual(p.is_runnable(), True)
 
 
 class PhdModeTest(BaseTest):
