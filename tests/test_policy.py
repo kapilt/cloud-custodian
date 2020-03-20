@@ -1037,6 +1037,8 @@ class PolicyConditionsTest(BaseTest):
         self.assertTrue(
             p.conditions.evaluate(
                 {'detail': {'userIdentity': {'userName': 'deputy'}}}))
+
+        # event filters pass if we don't have an event.
         self.assertTrue(p.conditions.evaluate(None))
         self.assertFalse(p.conditions.evaluate({}))
         self.assertFalse(

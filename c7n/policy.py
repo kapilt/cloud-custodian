@@ -279,7 +279,7 @@ class PullMode(PolicyExecutionMode):
 
     def run(self, *args, **kw):
         if not self.is_runnable():
-            return
+            return []
 
         with self.policy.ctx:
             self.policy.log.debug(
@@ -372,8 +372,8 @@ class PullMode(PolicyExecutionMode):
             end,
         )
 
-    def is_runnable(self):
-        return bool(self.policy.conditions.evaluate())
+    def is_runnable(self, event=None):
+        return self.policy.conditions.evaluate(event)
 
 
 class LambdaMode(ServerlessExecutionMode):
@@ -489,7 +489,7 @@ class LambdaMode(ServerlessExecutionMode):
         metrics per normal.
         """
         self.setup_exec_environment(event)
-        if not self.policy.conditions.evaluate(event):
+        if not self.policy.is_runnable(event):
             return
         resources = self.resolve_resources(event)
         if not resources:
@@ -778,6 +778,7 @@ class ConfigRuleMode(LambdaMode):
         cfg_item = self.cfg_event['configurationItem']
         evaluation = None
         resources = []
+
         # TODO config resource type matches policy check
         if event['eventLeftScope'] or cfg_item['configurationItemStatus'] in (
                 "ResourceDeleted",
@@ -869,6 +870,7 @@ class PolicyConditions(object):
             'now': datetime.utcnow().replace(tzinfo=tzutil.tzutc()),
             'policy': self.policy.data
         }
+        # note for no filters/conditions, this uses all([]) == true property.
         state = all([f.process([policy_vars], event) for f in self.filters])
         if not state:
             self.policy.log.info(
@@ -1109,6 +1111,8 @@ class Policy(object):
         mode = self.get_execution_mode()
         if self.options.dryrun:
             resources = PullMode(self).run()
+        elif not self.is_runnable():
+            resources = []
         elif isinstance(mode, ServerlessExecutionMode):
             resources = mode.provision()
         else:
