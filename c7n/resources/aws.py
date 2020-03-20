@@ -380,7 +380,7 @@ class XrayContext(Context):
         return self.handle_context_missing()
 
 
-if HAVE_XRAY: # pragma: no cover
+if HAVE_XRAY:  # pragma: no cover
     # sigh, work around aws xray sdk issues, via monkey patch
     # https://github.com/aws/aws-xray-sdk-python/issues/207
 
