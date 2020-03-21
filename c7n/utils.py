@@ -439,6 +439,23 @@ class IPv4Network(ipaddress.IPv4Network):
             return self.supernet_of(other)
         return super(IPv4Network, self).__contains__(other)
 
+    if (sys.version_info.major == 3 and sys.version_info.minor == 6):
+        @staticmethod
+        def _is_subnet_of(a, b):
+            try:
+                # Always false if one is v4 and the other is v6.
+                if a._version != b._version:
+                    raise TypeError(f"{a} and {b} are not of the same version")
+                return (b.network_address <= a.network_address and
+                        b.broadcast_address >= a.broadcast_address)
+            except AttributeError:
+                raise TypeError(f"Unable to test subnet containment "
+                                f"between {a} and {b}")
+
+        def supernet_of(self, other):
+            """Return True if this network is a supernet of other."""
+            return self._is_subnet_of(other, self)
+
 
 def reformat_schema(model):
     """ Reformat schema to be in a more displayable format. """
