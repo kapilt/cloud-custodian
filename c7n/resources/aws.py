@@ -355,7 +355,7 @@ class XrayContext(Context):
         super().put_subsegment(subsegment)
 
     # Override since we're not just popping the end of the stack, we're removing
-    # the thread subsegment fromxo the array by identity.
+    # the thread subsegment from the array by identity.
     def end_subsegment(self, end_time):
         subsegment = self.get_trace_entity()
         if self._is_subsegment(subsegment):
@@ -374,8 +374,9 @@ class XrayContext(Context):
         for s in reversed(entities):
             if s.thread_id == tid:
                 return s
-        for s in reversed(entities):
-            if s.thread_id == self._main_tid:
+            # custodian main thread won't advance (create new segment)
+            # with worker threads still doing pool work.
+            elif s.thread_id == self._main_tid:
                 return s
         return self.handle_context_missing()
 
