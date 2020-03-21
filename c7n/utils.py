@@ -439,7 +439,7 @@ class IPv4Network(ipaddress.IPv4Network):
             return self.supernet_of(other)
         return super(IPv4Network, self).__contains__(other)
 
-    if (sys.version_info.major == 3 and sys.version_info.minor == 6):
+    if (sys.version_info.major == 3 and sys.version_info.minor == 6):  # pragma: no cover
         @staticmethod
         def _is_subnet_of(a, b):
             try:
