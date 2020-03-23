@@ -31,7 +31,6 @@ import time
 import tempfile
 import zipfile
 
-from concurrent.futures import ThreadPoolExecutor
 
 # We use this for freezing dependencies for serverless environments
 # that support service side building.
