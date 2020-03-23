@@ -18,6 +18,7 @@ RUN adduser --disabled-login custodian
 RUN apt-get --yes update && apt-get --yes upgrade \
  && apt-get --yes install build-essential \
  && pip3 install -r requirements-dev.txt  . \
+ && python3 /src/tools/dev/dockerstripazure.py --remove \
  && apt-get --yes remove build-essential \
  && apt-get purge --yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  && rm -Rf /var/cache/apt/ \
