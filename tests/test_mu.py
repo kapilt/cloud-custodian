@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from datetime import datetime, timedelta
 import importlib
 import json
 import logging
@@ -37,13 +36,11 @@ from c7n.mu import (
     LambdaManager,
     PolicyLambda,
     PythonPackageArchive,
-    CloudWatchLogSubscription,
     SNSSubscription,
     SQSSubscription,
     CloudWatchEventSource
 )
 
-#from c7n.ufuncs import logsub
 from .common import (
     BaseTest, event_data, functional, Bag, ACCOUNT_ID)
 from .data import helloworld
@@ -230,39 +227,6 @@ class PolicyLambdaProvision(BaseTest):
                         'eventSource': ['ec2.amazonaws.com'],
                         'userIdentity': {'userName': [{'anything-but': 'deputy'}]}},
              'detail-type': ['AWS API Call via CloudTrail']})
-
-    def xtest_cwl_subscriber(self):
-        self.patch(CloudWatchLogSubscription, "iam_delay", 0.01)
-        session_factory = self.replay_flight_data("test_cwl_subscriber")
-        session = session_factory()
-        client = session.client("logs")
-
-        lname = "custodian-test-log-sub"
-        self.addCleanup(client.delete_log_group, logGroupName=lname)
-        client.create_log_group(logGroupName=lname)
-        linfo = client.describe_log_groups(logGroupNamePrefix=lname)["logGroups"][0]
-
-        params = dict(
-            session_factory=session_factory,
-            name="c7n-log-sub",
-            role=ROLE,
-            sns_topic="arn:",
-            log_groups=[linfo],
-        )
-
-        func = logsub.get_function(**params)
-        manager = LambdaManager(session_factory)
-        finfo = manager.publish(func)
-        self.addCleanup(manager.remove, func)
-
-        results = client.describe_subscription_filters(logGroupName=lname)
-        self.assertEqual(len(results["subscriptionFilters"]), 1)
-        self.assertEqual(
-            results["subscriptionFilters"][0]["destinationArn"], finfo["FunctionArn"]
-        )
-        # try and update
-        # params['sns_topic'] = "arn:123"
-        # manager.publish(func)
 
     @functional
     def test_sqs_subscriber(self):
