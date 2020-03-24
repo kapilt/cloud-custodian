@@ -54,7 +54,6 @@ def main(remove):
     human_size = GetHumanSize(total_size)
     print(f"removed {total_files} files {human_size} saved")
 
-    
 
 def GetHumanSize(size, precision=2):
     # interesting discussion on 1024 vs 1000 as base
@@ -69,11 +68,4 @@ def GetHumanSize(size, precision=2):
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception:
-        import sys, traceback, pdb
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
-
-        
+    main()
