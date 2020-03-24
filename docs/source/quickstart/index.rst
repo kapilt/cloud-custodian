@@ -50,7 +50,7 @@ Explore Cloud Custodian
 -----------------------
 
 Run ``custodian -h`` to see a list of available commands.
-o
+
 Run ``custodian schema`` to see the complete list of cloud resources against
 which you can run policies. To invoke command-line help with more information
 about policy schema details, run ``custodian schema -h``.
@@ -173,7 +173,7 @@ First generate use custodian to generate a jsonschema file::
   custodian schema --json > schema.json
 
 Next install
-``yaml-language-server<https://github.com/redhat-developer/yaml-language-server>``
+``yaml-language-server <https://github.com/redhat-developer/yaml-language-server>``
 into your editor of choice.
 
 You'll then configure it to use the generated `schema.json` as the
@@ -188,7 +188,7 @@ You'll now have completion and validation while authoring policies
 
 .. image:: c7n-editor.png
 
-	
+
 Note if your authoring policies in json you can also configure the
 json-language-server for the same.
 
