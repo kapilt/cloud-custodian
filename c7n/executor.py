@@ -81,4 +81,3 @@ class MainThreadFuture(object):
 
     def add_done_callback(self, fn):
         return fn(self)
-
