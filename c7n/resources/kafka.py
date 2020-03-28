@@ -71,16 +71,16 @@ class SetMonitoring(Action):
     def validate(self):
         attrs = dict(self.data.get('config', {}))
         attrs['ClusterArn'] = 'arn:'
-        attrs['ClusterVersion'] = '123'
+        attrs['CurrentVersion'] = '123'
         shape_validate(attrs, self.shape, 'kafka')
         return super(SetMonitoring, self).validate()
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('kafka')
-        for r in resources:
+        for r in self.filter_resources(resources, 'State', ('ACTIVE',)):
             params = dict(self.data.get('config', {}))
             params['ClusterArn'] =  r['ClusterArn']
-            params['ClusterVersion'] = r['CurrentVersion']
+            params['CurrentVersion'] = r['CurrentVersion']
             client.update_monitoring(**params)
 
 

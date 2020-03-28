@@ -48,9 +48,35 @@ class KafkaTest(BaseTest):
             ResourceArn=resources[0]['ClusterArn'])['Tags'] == {
                 'App': 'Custodian'}
 
-    def xtest_set_monitoring(self):
-        factory = self.record_flight_data(
-            'test_kafka_set_monitoring')
+    def test_set_monitoring(self):
+        factory = self.replay_flight_data('test_kafka_set_monitoring')
+        p = self.load_policy({
+            'name': 'kafka',
+            'resource': 'aws.kafka',
+            'filters': [
+                {'tag:App': 'Custodian'},
+                {'State': 'ACTIVE'},
+                {'EnhancedMonitoring': 'DEFAULT'},
+            ],
+            'actions': [
+                {'type': 'set-monitoring',
+                 'config': {
+                     'EnhancedMonitoring': 'PER_BROKER',
+                     'OpenMonitoring': {
+                         'Prometheus': {
+                             'JmxExporter': {
+                                 'EnabledInBroker': True}}}}}]},
+            session_factory=factory)
+        resources = p.run()
+        assert len(resources) == 1
+        assert resources[0]['ClusterName'] == 'dev'
+        if self.recording:
+            time.sleep(5)
+
+        info = factory().client('kafka').describe_cluster(
+            ClusterArn=resources[0]['ClusterArn'])['ClusterInfo']
+
+        assert info['State'] == 'UPDATING'
 
     def test_delete(self):
         factory = self.replay_flight_data('test_kafka_delete')
