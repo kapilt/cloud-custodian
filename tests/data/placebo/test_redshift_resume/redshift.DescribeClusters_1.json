@@ -5,8 +5,8 @@
       {
         "ClusterIdentifier": "redshift-cluster-1",
         "NodeType": "dc2.large",
-        "ClusterStatus": "available",
-        "ClusterAvailabilityStatus": "Available",
+        "ClusterStatus": "paused",
+        "ClusterAvailabilityStatus": "Paused",
         "MasterUsername": "awsuser",
         "DBName": "dev",
         "Endpoint": {
@@ -57,13 +57,7 @@
           "EstimatedTimeToCompletionInSeconds": 0
         },
         "ClusterPublicKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCieUHuoHl91Z1zk0Nj1NYldKeg3Tn50fN6B/L/0rkHQvBKbBB2JBH8BWGgzPcxR6nXostVy+6wkAbVLBcHHhCDnf11AhOFvVRQXKyyq31l1b6SUuryRxCk2RA8ZLuFKqVmnrsfM6hqAmtYdKvwKV3utEASVQFIHMeeGCardo/9lanBIFzzsqpspwKY0wUvGEvHKS5XEgyh3Wchasug0ss7iKsh5UdoLBGaKkeVEtjSThW2ZcVUbcOf62Qt9+ltP/i7B6V6niT1hAf0K8OU0ZqbR2o0phikKQKjutCIxfWdLhuhBeGVU95EzaBRawtp8y9VSZa1p/vqH7MVwrx2s7s1 Amazon-Redshift\n",
-        "ClusterNodes": [
-          {
-            "NodeRole": "SHARED",
-            "PrivateIPAddress": "172.31.15.193",
-            "PublicIPAddress": "18.207.29.120"
-          }
-        ],
+        "ClusterNodes": [],
         "ClusterRevisionNumber": "14104",
         "Tags": [],
         "EnhancedVpcRouting": false,
