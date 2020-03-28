@@ -38,7 +38,7 @@ class TestRedshift(BaseTest):
         assert cluster['ClusterStatus'] == 'pausing'
 
     def test_redshift_resume(self):
-        factory = self.record_flight_data('test_redshift_resume')
+        factory = self.replay_flight_data('test_redshift_resume')
         p = self.load_policy({
             'name': 'redshift-pause',
             'resource': 'redshift',
