@@ -64,7 +64,7 @@ class SetMonitoring(Action):
     schema = type_schema(
         'set-monitoring',
         config={'type': 'object', 'minProperties': 1},
-        required=('config'))
+        required=('config',))
 
     shape = 'UpdateMonitoringRequest'
     permissions = ('kafka:UpdateClusterConfiguration',)
