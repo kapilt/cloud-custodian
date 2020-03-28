@@ -67,6 +67,7 @@ class SetMonitoring(Action):
         required=('config'))
 
     shape = 'UpdateMonitoringRequest'
+    permissions = ('kafka:UpdateClusterConfiguration',)
 
     def validate(self):
         attrs = dict(self.data.get('config', {}))
@@ -79,7 +80,7 @@ class SetMonitoring(Action):
         client = local_session(self.manager.session_factory).client('kafka')
         for r in self.filter_resources(resources, 'State', ('ACTIVE',)):
             params = dict(self.data.get('config', {}))
-            params['ClusterArn'] =  r['ClusterArn']
+            params['ClusterArn'] = r['ClusterArn']
             params['CurrentVersion'] = r['CurrentVersion']
             client.update_monitoring(**params)
 
