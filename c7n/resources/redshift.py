@@ -126,8 +126,20 @@ class LoggingFilter(ValueFilter):
         return results
 
 
+class StateTransitionAction(BaseAction):
+
+    def filter_cluster_state(self, resources, states):
+        resource_count = len(resources)
+        results = [r for r in resources if r['ClusterStatus'] in states]
+        if resource_count != len(results):
+            self.log.warning(
+                '%s filtered to %d of %d clusters in states: %s',
+                self.type, len(results), resource_count, ', '.join(states))
+        return results
+
+
 @Redshift.action_registry.register('pause')
-class Pause(BaseAction):
+class Pause(StateTransitionAction):
 
     schema = type_schema('pause')
     permissions = ('redshift:PauseCluster',)
@@ -135,17 +147,17 @@ class Pause(BaseAction):
     def process(self, resources):
         client = local_session(
             self.manager.session_factory).client('redshift')
-        for r in resources:
+        for r in self.filter_cluster_state(resources, ('available',)):
             try:
                 client.pause_cluster(
                     ClusterIdentifier=r['ClusterIdentifier'])
-            except (client.exceptions.ClusterNotFound,
-                    client.exceptions.InvalidClusterState):
-                continue
+            except (client.exceptions.ClusterNotFoundFault,
+                    client.exceptions.InvalidClusterStateFault):
+                raise
 
 
 @Redshift.action_registry.register('resume')
-class Resume(BaseAction):
+class Resume(StateTransitionAction):
 
     schema = type_schema('resume')
     permissions = ('redshift:ResumeCluster',)
@@ -153,13 +165,13 @@ class Resume(BaseAction):
     def process(self, resources):
         client = local_session(
             self.manager.session_factory).client('redshift')
-        for r in resources:
+        for r in self.filter_cluster_state(resources, ('paused',)):
             try:
                 client.resume_cluster(
                     ClusterIdentifier=r['ClusterIdentifier'])
-            except (client.exceptions.ClusterNotFound,
-                    client.exceptions.InvalidClusterState):
-                continue
+            except (client.exceptions.ClusterNotFoundFault,
+                    client.exceptions.InvalidClusterStateFault):
+                raise
 
 
 @Redshift.action_registry.register('set-logging')
