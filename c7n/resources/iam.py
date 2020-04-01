@@ -148,7 +148,6 @@ class RoleRemoveTag(RemoveTag):
                 continue
 
 
-
 class SetBoundary(BaseAction):
     """Set IAM Permission boundary on an IAM Role or User.
 
