@@ -148,6 +148,54 @@ class RoleRemoveTag(RemoveTag):
                 continue
 
 
+
+class SetBoundary(BaseAction):
+    """Set IAM Permission boundary on an IAM Role or User.
+
+    A role or user can only have a single permission boundary set.
+    """
+
+    schema = type_schema(
+        'set-boundary',
+        state={'enum': ['present', 'absent']},
+        policy={'type': 'string'})
+
+    def process(self, resources):
+        state = self.data.get('state') == 'present'
+        client = self.manager.session_factory().client('iam')
+        policy = self.data.get('policy')
+        if not policy.startswith('arn'):
+            policy = 'arn:aws:aws:iam::{}:policy/{}'.format(
+                self.manager.account_id, policy)
+        for r in resources:
+            method, params = self.get_method(client, state, policy, r)
+            try:
+                self.manager.retry(method, **params)
+            except client.exceptions.NoSuchEntityException:
+                continue
+
+    def get_method(self, client, state, policy, resource):
+        raise NotImplementedError()
+
+
+@Role.action_registry.register('set-boundary')
+class RoleSetBoundary(SetBoundary):
+
+    def get_permissions(self):
+        if self.data.get('state', True):
+            return ('iam:PutRolePermissionsBoundary',)
+        return ('iam:DeleteRolePermissionsBoundary',)
+
+    def get_method(self, client, state, policy, resource):
+        if state:
+            return client.put_role_permissions_boundary, {
+                'RoleName': resource['RoleName'],
+                'PermissionsBoundary': policy}
+        else:
+            return client.delete_role_permissions_boundary, {
+                'RoleName': resource['RoleName']}
+
+
 @resources.register('iam-user')
 class User(QueryResourceManager):
 
@@ -264,6 +312,24 @@ class SetGroups(BaseAction):
                 op_map[state](GroupName=group_name, UserName=r['UserName'])
             except client.exceptions.NoSuchEntityException:
                 continue
+
+
+@User.action_registry.register('set-boundary')
+class UserSetBoundary(SetBoundary):
+
+    def get_permissions(self):
+        if self.data.get('state', True):
+            return ('iam:PutUserPermissionsBoundary',)
+        return ('iam:DeleteUserPermissionsBoundary',)
+
+    def get_method(self, client, state, policy, resource):
+        if state:
+            return client.put_user_permissions_boundary, {
+                'UserName': resource['UserName'],
+                'PermissionsBoundary': policy}
+        else:
+            return client.delete_user_permissions_boundary, {
+                'UserName': resource['UserName']}
 
 
 @resources.register('iam-policy')
