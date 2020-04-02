@@ -159,11 +159,16 @@ class SetBoundary(BaseAction):
         state={'enum': ['present', 'absent']},
         policy={'type': 'string'})
 
+    def validate(self):
+        state = self.data.get('state', 'present') == 'present'
+        if state and not self.data.get('policy'):
+            raise PolicyValidationError("set-boundary requires policy arn")
+
     def process(self, resources):
-        state = self.data.get('state') == 'present'
+        state = self.data.get('state', 'present') == 'present'
         client = self.manager.session_factory().client('iam')
         policy = self.data.get('policy')
-        if not policy.startswith('arn'):
+        if policy and not policy.startswith('arn'):
             policy = 'arn:aws:aws:iam::{}:policy/{}'.format(
                 self.manager.account_id, policy)
         for r in resources:
