@@ -51,7 +51,7 @@ def should_load_provider(name, provider_types):
     return False
 
 
-def load_available(resources=False):
+def load_available(resources=True):
     """Load available installed providers
 
     Unlike load_resources() this will catch ImportErrors on uninstalled
