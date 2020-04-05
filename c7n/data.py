@@ -11,8 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+<<<<<<< HEAD
 """Data Resource Provider implementation.
 """
+=======
+>>>>>>> 9d21e43bd... core - data provider
 import fnmatch
 import os
 
@@ -61,10 +64,13 @@ class StaticSource:
         return iter(records)
 
     def validate(self):
+<<<<<<< HEAD
         for q in self.queries:
             if not isinstance(q.get('records', ()), (list, tuple)):
                 raise PolicyValidationError(
                     "invalid static data source")
+=======
+>>>>>>> 9d21e43bd... core - data provider
         return
 
 
