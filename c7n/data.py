@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Data Resource Provider implementation.
+"""
 import fnmatch
 import os
 
@@ -59,6 +61,10 @@ class StaticSource:
         return iter(records)
 
     def validate(self):
+        for q in self.queries:
+            if not isinstance(q.get('records', ()), (list, tuple)):
+                raise PolicyValidationError(
+                    "invalid static data source")
         return
 
 
@@ -133,8 +139,11 @@ class Data(ResourceManager):
         return []
 
     def resources(self):
-        source = self.get_source()
-        resources = list(source)
+        with self.ctx.tracer.subsegment('resource-fetch'):
+            source = self.get_source()
+            resources = list(source)
+        with self.ctx.tracer.subsegment('filter'):
+            resources = self.filter_resources(resources)
         return resources
 
     def get_source(self):
