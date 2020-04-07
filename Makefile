@@ -1,3 +1,4 @@
+SELF_MAKE := $(lastword $(MAKEFILE_LIST))
 
 PKG_SET = tools/c7n_gcp tools/c7n_azure tools/c7n_kube tools/c7n_mailer tools/c7n_logexporter tools/c7n_policystream tools/c7n_trailcreator tools/c7n_org tools/c7n_sphinxext
 
@@ -8,6 +9,17 @@ install:
 install-poetry:
 	poetry install
 	for pkg in $(PKG_SET); do cd $$pkg && poetry install && cd ../..; done
+
+pkg-clean:
+	rm -f poetry.lock
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f poetry.lock && cd ../..; done
+	rm -f setup.py
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f setup.py && cd ../..; done
+	rm -f requirements.txt
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f requirements.txt && cd ../..; done
+	@$(MAKE) -f $(SELF_MAKE) pkg-update
+	@$(MAKE) -f $(SELF_MAKE) pkg-gen-setup
+	@$(MAKE) -f $(SELF_MAKE) pkg-gen-requirements
 
 pkg-update:
 	poetry update

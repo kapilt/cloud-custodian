@@ -74,7 +74,7 @@ develop = true
 name = "c7n"
 optional = false
 python-versions = "^3.6"
-version = "0.9.0"
+version = "0.9.1"
 
 [package.dependencies]
 argcomplete = "^1.11.1"
@@ -323,7 +323,6 @@ version = "0.1.9"
 [[package]]
 category = "dev"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-marker = "python_version < \"3.8\""
 name = "zipp"
 optional = false
 python-versions = ">=3.6"

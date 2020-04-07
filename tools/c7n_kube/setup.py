@@ -18,7 +18,7 @@ install_requires = \
  'attrs (>=19.3.0,<20.0.0)',
  'boto3 (>=1.12.46,<2.0.0)',
  'botocore (>=1.15.46,<2.0.0)',
- 'c7n (>=0.9.0,<0.10.0)',
+ 'c7n (>=0.9.1,<0.10.0)',
  'docutils (>=0.15.2,<0.16.0)',
  'importlib-metadata (>=1.6.0,<2.0.0)',
  'jmespath (>=0.9.5,<0.10.0)',
@@ -35,7 +35,7 @@ install_requires = \
 
 setup_kwargs = {
     'name': 'c7n-kube',
-    'version': '0.1.1',
+    'version': '0.2.0',
     'description': 'Cloud Custodian - Kubernetes Provider',
     'long_description': '# Custodian Kubernetes Support\n\n\nWork in Progress - Not Ready For Use.\n\n',
     'long_description_content_type': 'text/markdown',

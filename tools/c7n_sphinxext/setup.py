@@ -16,7 +16,7 @@ install_requires = \
  'attrs (>=19.3.0,<20.0.0)',
  'boto3 (>=1.12.46,<2.0.0)',
  'botocore (>=1.15.46,<2.0.0)',
- 'c7n (>=0.9.0,<0.10.0)',
+ 'c7n (>=0.9.1,<0.10.0)',
  'docutils (>=0.15.2,<0.16.0)',
  'importlib-metadata (>=1.6.0,<2.0.0)',
  'jmespath (>=0.9.5,<0.10.0)',
@@ -38,7 +38,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'c7n-sphinxext',
-    'version': '1.0',
+    'version': '1.1',
     'description': 'Cloud Custodian - Sphinx Extensions',
     'long_description': '# Sphinx Extensions\n\nCustom sphinx extensions for use with Cloud Custodian.\n\n',
     'long_description_content_type': 'text/markdown',
