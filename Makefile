@@ -10,16 +10,27 @@ install-poetry:
 	poetry install
 	for pkg in $(PKG_SET); do cd $$pkg && poetry install && cd ../..; done
 
-pkg-clean:
+pkg-rebase:
 	rm -f poetry.lock
 	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f poetry.lock && cd ../..; done
+
 	rm -f setup.py
 	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f setup.py && cd ../..; done
+
 	rm -f requirements.txt
 	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && rm -f requirements.txt && cd ../..; done
+
 	@$(MAKE) -f $(SELF_MAKE) pkg-update
+	git add poetry.lock
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && git add poetry.lock && cd ../..; done
+
 	@$(MAKE) -f $(SELF_MAKE) pkg-gen-setup
+	git add setup.py
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && git add setup.py && cd ../..; done
+
 	@$(MAKE) -f $(SELF_MAKE) pkg-gen-requirements
+	git add requirements.txt
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && git add requirements.txt && cd ../..; done
 
 pkg-update:
 	poetry update
