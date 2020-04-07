@@ -30,15 +30,17 @@ pkg-gen-requirements:
 	poetry export --dev --without-hashes -f requirements.txt > requirements.txt
 	for pkg in $(PKG_SET); do cd $$pkg && poetry export --without-hashes -f requirements.txt > requirements.txt && cd ../..; done
 
-pkg-publish-wheel:
-# clean up any artifacts first
-	rm -f dist/*
-	for pkg in $(PKG_SET); do cd $$pkg && rm -f dist/* && cd ../..; done
+pkg-increment:
 # increment versions
 	poetry version patch
 	for pkg in $(PKG_SET); do cd $$pkg && poetry version patch && cd ../..; done
 # generate setup
 	@$(MAKE) pkg-gen-setup
+
+pkg-publish-wheel:
+# clean up any artifacts first
+	rm -f dist/*
+	for pkg in $(PKG_SET); do cd $$pkg && rm -f dist/* && cd ../..; done
 # generate sdist
 	python setup.py bdist_wheel
 	for pkg in $(PKG_SET); do cd $$pkg && python setup.py bdist_wheel && cd ../..; done
@@ -48,6 +50,10 @@ pkg-publish-wheel:
 # upload to test pypi
 	twine upload -r testpypi dist/*
 	for pkg in $(PKG_SET); do cd $$pkg && twine upload -r testpypi dist/* && cd ../..; done
+
+test-poetry:
+	. test.env
+	poetry run pytest -n auto tests tools
 
 test:
 	./bin/tox -e py38
