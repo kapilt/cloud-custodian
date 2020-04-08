@@ -19,7 +19,7 @@
 Generate Cloud Custodian Dockerfiles
 """
 import click
-
+import sys
 from pathlib import Path
 
 
@@ -212,8 +212,18 @@ for name, image in list(ImageMap.items()):
         target=[TARGET_DISTROLESS_STAGE])
 
 
-@click.command()
-def main():
+@click.group()
+def cli():
+    """Custodian Docker Image Tool"""
+
+def build():
+    try:
+        import docker
+    except ImportError:
+        print("python docker client library required")
+        sys.exit(1)
+
+def generate():
     for df_path, image in ImageMap.items():
         p = Path(df_path)
         p.write_text(image.render())
