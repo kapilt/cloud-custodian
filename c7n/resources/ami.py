@@ -34,7 +34,7 @@ log = logging.getLogger('custodian.ami')
 class AMI(QueryResourceManager):
 
     class resource_type(TypeInfo):
-        service = 'ec2'
+        service = 'ec2' 
         arn_type = 'image'
         enum_spec = (
             'describe_images', 'Images', None)
@@ -47,6 +47,8 @@ class AMI(QueryResourceManager):
     def resources(self, query=None):
         if query is None and 'query' in self.data:
             query = merge_dicts(self.data['query'])
+        elif query is None:
+            query = {}
         if query.get('Owners') is None:
             query['Owners'] = ['self']
         return super(AMI, self).resources(query=query)
