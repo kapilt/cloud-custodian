@@ -335,6 +335,13 @@ def get_partition(region):
     return REGION_PARTITION_MAP.get(region, 'aws')
 
 
+def merge_dicts(dict_iter):
+    result = {}
+    for d in dict_iter:
+        result.update(d)
+    return result
+
+
 def generate_arn(
         service, resource, partition='aws',
         region=None, account_id=None, resource_type=None, separator='/'):
