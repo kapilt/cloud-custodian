@@ -34,7 +34,7 @@ log = logging.getLogger('custodian.ami')
 class AMI(QueryResourceManager):
 
     class resource_type(TypeInfo):
-        service = 'ec2' 
+        service = 'ec2'
         arn_type = 'image'
         enum_spec = (
             'describe_images', 'Images', None)
