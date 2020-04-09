@@ -51,6 +51,33 @@ jobs:
         run: |
           TOXENV=docs tox
 
+  Test-Windows:
+    runs-on: windows-latest
+    needs: Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Set up cache
+        uses: actions/cache@v1
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: pip-${{ 3.8 }}-${{ hashFiles('**/requirement*.txt') }}
+
+      - name: Install Test Runner
+        run: |
+          python -m pip install pip
+          pip install tox codecov
+
+      - name: Install Deps
+        run: |
+          tox -e py38 --notest
+
+      - name: Test
+        run: |
+          tox -e py38
+
   Tests:
     runs-on: "${{ matrix.os }}"
     needs: Lint
