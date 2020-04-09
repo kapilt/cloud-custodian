@@ -35,7 +35,7 @@ jobs:
       - name: Set up cache
         uses: actions/cache@v1
         with:
-          path: .tox/docs
+          path: "~/.cache/pip"
           key: docs-${{ runner.os }}-${{ 3.8 }}-${{ hashFiles('**/requirement*.txt') }}
 
       - name: Install Tox
