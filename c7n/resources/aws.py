@@ -24,7 +24,6 @@ import os
 import operator
 import shutil
 import sys
-import threading
 import tempfile
 import time
 import threading
