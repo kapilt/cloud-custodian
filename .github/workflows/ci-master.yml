@@ -89,10 +89,10 @@ jobs:
             tox-target: py36
           - python-version: 3.7
             os: ubuntu-latest
-            tox-target: py37-cov
+            tox-target: py37
           - python-version: 3.8
             os: ubuntu-latest
-            tox-target: py38
+            tox-target: py38-cov
           - python-version: 3.6
             os: macos-latest
             tox-target: py36
@@ -115,8 +115,8 @@ jobs:
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/requirement*.txt') }}
       - name: Install Test Runner
         run: |
-          python -m pip install pip
-          pip install tox codecov
+          python -m pip install --upgrade pip
+          pip install tox
       - name: Install Deps
         run: |
           tox -e ${{ matrix.tox-target }} --notest
@@ -125,7 +125,7 @@ jobs:
           tox -e ${{ matrix.tox-target }}
       - name: CodeCov
         uses: codecov/codecov-action@v1
-        if: contains(matrix.tox-target, 'py37-cov')
+        if: contains(matrix.tox-target, 'py38-cov')
         with:
           file: ./coverage.xml
           fail_ci_if_error: true

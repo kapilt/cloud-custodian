@@ -8,7 +8,6 @@ variables:
 
 jobs:
 
-
 - job: 'CustodianCask'
   displayName: 'Container Cask'
   pool:
