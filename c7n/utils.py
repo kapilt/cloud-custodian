@@ -335,13 +335,6 @@ def get_partition(region):
     return REGION_PARTITION_MAP.get(region, 'aws')
 
 
-def merge_dicts(dict_iter):
-    result = {}
-    for d in dict_iter:
-        result.update(d)
-    return result
-
-
 def generate_arn(
         service, resource, partition='aws',
         region=None, account_id=None, resource_type=None, separator='/'):
@@ -673,6 +666,17 @@ class QueryParser:
 
 def get_annotation_prefix(s):
     return 'c7n:{}'.format(s)
+
+
+def merge_dict_list(dict_iter):
+    """take an list of dictionaries and merge them.
+
+    last dict wins/overwrites on keys.
+    """
+    result = {}
+    for d in dict_iter:
+        result.update(d)
+    return result
 
 
 def merge_dict(a, b):
