@@ -122,7 +122,7 @@ jobs:
           tox -e ${{ matrix.tox-target }} --notest
       - name: Test
         run: |
-          tox -e ${{ matrix.tox-target }}
+          tox -vv -e ${{ matrix.tox-target }}
       - name: CodeCov
         uses: codecov/codecov-action@v1
         if: contains(matrix.tox-target, 'py38-cov')
