@@ -19,9 +19,14 @@
 Generate Cloud Custodian Dockerfiles
 """
 import click
+from datetime import datetime
 import sys
+import os
+import logging
+import json
 from pathlib import Path
 
+log = logging.getLogger('dockerpkg')
 
 BUILD_STAGE = """\
 # Dockerfiles are generated from tools/dev/dockerpkg.py
@@ -212,22 +217,82 @@ for name, image in list(ImageMap.items()):
         target=[TARGET_DISTROLESS_STAGE])
 
 
+def human_size(size, precision=2):
+    # interesting discussion on 1024 vs 1000 as base
+    # https://en.wikipedia.org/wiki/Binary_prefix
+    suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    suffixIndex = 0
+    while size > 1024:
+        suffixIndex += 1
+        size = size / 1024.0
+
+    return "%.*f %s" % (precision, size, suffixes[suffixIndex])
+
+
 @click.group()
 def cli():
     """Custodian Docker Image Tool"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s:%(levelname)s %(message)s")
 
-def build():
+
+@cli.command()
+@click.option('-p', '--provider', multiple=True)
+@click.option('--registry', default="")
+@click.option('--tag-date')
+@click.option('--tag-git')
+@click.option('-q', '--quiet', is_flag=True)
+@click.option('-i', '--image', multiple=True)
+def build(provider, registry, tag_date, tag_git, image, quiet):
+    """Build custodian docker images
+
+    python tools/dev/dockerpkg.py -i cli -i org -i mailer
+    """
     try:
         import docker
     except ImportError:
         print("python docker client library required")
         sys.exit(1)
 
+    client = docker.from_env()
+    date_suffix = datetime.utcnow().strftime('%Y%m%d')
+    build_args = {}
+
+    if provider:
+        build_args = {'providers': ' '.join(provider)}
+
+    image_map = {}
+    for path, image_def in ImageMap.items():
+        _, image_name = path.split('/')
+        if image and image_name not in image:
+            continue
+        log.info('building %s' % image_name)
+        tag = f"{registry}{image_name}:{date_suffix}"
+        stream = client.api.build(
+            path=os.path.abspath(os.getcwd()),
+            dockerfile=path,
+            buildargs=build_args,
+            pull=True,
+            decode=True,
+            tag=tag
+        )
+        for chunk in stream:
+            if 'stream' in chunk and not quiet:
+                log.info(chunk['stream'].strip())
+        image_map[image_name] = tag
+        log.info("Image %s built Size:%s" % (
+            tag, human_size(client.images.get(tag).attrs['Size'])))
+    print(json.dumps(image_map))
+
+
+@cli.command()
 def generate():
+    """Generate dockerfiles"""
     for df_path, image in ImageMap.items():
         p = Path(df_path)
         p.write_text(image.render())
 
 
 if __name__ == '__main__':
-    main()
+    cli()
