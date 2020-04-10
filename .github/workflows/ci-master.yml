@@ -127,5 +127,4 @@ jobs:
         uses: codecov/codecov-action@v1
         if: contains(matrix.tox-target, 'py38-cov')
         with:
-          file: ./coverage.xml
           fail_ci_if_error: true
