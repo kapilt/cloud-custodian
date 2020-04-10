@@ -26,11 +26,11 @@ TEST_DOCKER = not (docker and os.environ.get('TEST_DOCKER', 'no') == 'yes')
 CUSTODIAN_ORG_IMAGE = os.environ.get(
     'CUSTODIAN_ORG_IMAGE', 'cloudcustodian/c7n-org:latest')
 CUSTODIAN_IMAGE = os.environ.get(
-    'CUSTODIAN_IMAGE', 'cloudcustodian/c7n:latest')
+    'CUSTODIAN_CLI_IMAGE', 'cloudcustodian/c7n:latest')
 CUSTODIAN_MAILER_IMAGE = os.environ.get(
     'CUSTODIAN_MAILER_IMAGE', 'cloudcustodian/mailer:latest')
 CUSTODIAN_PSTREAM_IMAGE = os.environ.get(
-    'CUSTODIAN_PSTREAM_IMAGE', 'cloudcustodian/policystream:latest')
+    'CUSTODIAN_POLICYSTREAM_IMAGE', 'cloudcustodian/policystream:latest')
 
 
 @pytest.fixture

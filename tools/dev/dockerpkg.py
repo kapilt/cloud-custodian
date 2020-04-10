@@ -48,7 +48,7 @@ ADD c7n /src/c7n/
 RUN . /usr/local/bin/activate && $HOME/.poetry/bin/poetry install --no-dev
 RUN . /usr/local/bin/activate && pip install -q aws-xray-sdk psutil jsonpatch
 
-# Add provider packagees
+# Add provider packages
 ADD tools/c7n_gcp /src/tools/c7n_gcp
 RUN rm -R tools/c7n_gcp/tests
 ADD tools/c7n_azure /src/tools/c7n_azure
@@ -75,8 +75,6 @@ LABEL name="{name}" \\
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
-COPY --from=build-env /etc/passwd /etc/passwd
-COPY --from=build-env /etc/group /etc/group
 COPY --from=build-env /output /output
 
 RUN apt-get --yes update \\
@@ -85,6 +83,7 @@ RUN apt-get --yes update \\
         && rm -Rf /var/lib/apt/lists/* \\
         && rm -Rf /var/log/*
 
+RUN adduser --disabled-login custodian
 USER custodian
 WORKDIR /home/custodian
 ENV LC_ALL="C.UTF-8" LANG="C.UTF-8"
@@ -239,12 +238,17 @@ def cli():
 
 @cli.command()
 @click.option('-p', '--provider', multiple=True)
-@click.option('--registry', default="")
+@click.option('--registry', default="", multiple=True)
 @click.option('--tag-date')
 @click.option('--tag-git')
+@click.option('--push', is_flag=True)
+@click.option(
+    '--env-file',
+    help="Environment Variable output for testing",
+    type=click.Path())
 @click.option('-q', '--quiet', is_flag=True)
 @click.option('-i', '--image', multiple=True)
-def build(provider, registry, tag_date, tag_git, image, quiet):
+def build(provider, registry, tag_date, tag_git, image, quiet, env_file, push):
     """Build custodian docker images
 
     python tools/dev/dockerpkg.py -i cli -i org -i mailer
@@ -256,34 +260,68 @@ def build(provider, registry, tag_date, tag_git, image, quiet):
         sys.exit(1)
 
     client = docker.from_env()
+
+    # Build out some common suffixes for the image
     date_suffix = datetime.utcnow().strftime('%Y%m%d')
+    ref_suffix = os.environ.get('GITHUB_SHA', '')[:6]
+    tag_suffix = os.environ.get('GITHUB_REF')
+    if tag_suffix and tag_suffix.startswith('refs/tags'):
+        tag_suffix = tag_suffix[len('refs/tags/'):]
+    suffix = list(filter(None, [date_suffix, ref_suffix, tag_suffix]))
+
+    built_image_map = {}    
     build_args = {}
-
     if provider:
-        build_args = {'providers': ' '.join(provider)}
+        build_args = {'providers': ' '.join(sorted(provider))}
 
-    image_map = {}
     for path, image_def in ImageMap.items():
         _, image_name = path.split('/')
         if image and image_name not in image:
             continue
-        log.info('building %s' % image_name)
-        tag = f"{registry}{image_name}:{date_suffix}"
+
+        log.info('Building %s image' % image_name)
         stream = client.api.build(
             path=os.path.abspath(os.getcwd()),
             dockerfile=path,
             buildargs=build_args,
-            pull=True,
-            decode=True,
-            tag=tag
-        )
+            pull=True, decode=True)
+
+        built_image_id = None
         for chunk in stream:
             if 'stream' in chunk and not quiet:
                 log.info(chunk['stream'].strip())
-        image_map[image_name] = tag
-        log.info("Image %s built Size:%s" % (
-            tag, human_size(client.images.get(tag).attrs['Size'])))
-    print(json.dumps(image_map))
+            elif 'status' in chunk and not quiet:
+                log.info(chunk['status'].strip())
+            elif 'aux' in chunk:
+                built_image_id = chunk['aux'].get('ID')
+
+        built_image = client.images.get(built_image_id)
+        log.info("Built %s image Id:%s Size:%s" % (
+            image_name,
+            built_image.attrs['Id'][7:7+12],
+            human_size(built_image.attrs['Size'])))
+
+        built_image_map[image_name] = built_image_id
+        for r in registry:
+            for s in suffix:
+                repo = f"{r}/{image_name}"
+                target = f"{repo}:{s}".lstrip('/')
+                built_image.tag(repo, s)
+                if push:
+                    log.info('Pushing image %s' % target)
+                    for line in client.images.push(repo, s, stream=True, decode=True):
+                        if not quiet and 'status' in line:
+                            log.info("%s id:%s" % (line['status'], line.get('id')))
+                elif not quiet:
+                    log.info(f'Tagged {image_name} as {repo}:{s}')
+
+    if env_file:
+        with open(str(env_file), 'w') as fh:
+            fh.write('export TEST_DOCKER=yes\n')
+            for k, v in built_image_map.items():
+                fh.write("export CUSTODIAN_%s_IMAGE=%s\n" % (k.upper(), v))
+
+    print(json.dumps(built_image_map, indent=2))
 
 
 @cli.command()
