@@ -83,6 +83,14 @@ jobs:
           # conserve some osx builders
           - python-version: 3.6
             os: macos-latest
+          - python-version: 3.7
+            os: macos-latest
+          - python-version: 3.6
+            os: ubuntu-latest
+          - python-version: 3.7
+            os: ubuntu-latest
+          - python-version: 3.8
+            os: macos-latest
         include:
           - python-version: 3.6
             os: ubuntu-latest
@@ -123,8 +131,14 @@ jobs:
       - name: Test
         run: |
           tox -vv -e ${{ matrix.tox-target }}
+
+      - name: Coverage Generate XML
+        if: contains(matrix.tox-target, '-cov')
+        run: |
+          ./.tox/${{ matrix.tox-target }}/bin/coverage xml
+
       - name: CodeCov
         uses: codecov/codecov-action@v1
-        if: contains(matrix.tox-target, 'py38-cov')
+        if: contains(matrix.tox-target, '-cov')
         with:
           fail_ci_if_error: true
