@@ -3,13 +3,11 @@ trigger:
 
 variables:
 - group: CustodianCoreCI
-- name: WINDOWS_CACHE_DIR
-  value: $(LOCALAPPDATA)\pip\cache
 
 jobs:
 
 - job: 'CustodianCask'
-  displayName: 'Container Cask'
+  displayName: 'Tool Tests - Cask'
   pool:
     vmImage: 'Ubuntu-18.04'
 
@@ -18,6 +16,20 @@ jobs:
     inputs:
       version: '1.12.6'
 
-  - script: make release
+  - script: make test
     workingDirectory: tools/cask/
     displayName: 'Build for all platforms'
+
+
+- job: 'CustodianOmniSSM'
+  displayName: 'Tool Tests - OmniSSM'
+  pool:
+    vmImage: 'Ubuntu-18.04'
+
+  steps:
+  - task: GoTool@0
+    inputs:
+      version: '1.12.6'
+  - script: make test
+    workingDirectory: tools/omnissm/
+    displayName: 'Test'
