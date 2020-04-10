@@ -45,9 +45,6 @@ jobs:
           - python-version: 3.8
             os: ubuntu-latest
             tox-target: py38-cov
-          - python-version: 3.6
-            os: macos-latest
-            tox-target: py36
           - python-version: 3.7
             tox-target: py37
             os: macos-latest
