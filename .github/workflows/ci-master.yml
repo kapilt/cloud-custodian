@@ -133,12 +133,8 @@ jobs:
           tox -vv -e ${{ matrix.tox-target }}
 
       - name: Coverage Generate XML
-        if: contains(matrix.tox-target, '-cov')
+        if: contains(matrix.tox-target, 'py38-cov')
         run: |
-          ./.tox/${{ matrix.tox-target }}/bin/coverage xml
-
-      - name: CodeCov
-        uses: codecov/codecov-action@v1
-        if: contains(matrix.tox-target, '-cov')
-        with:
-          fail_ci_if_error: true
+          ./.tox/${{ matrix.tox-target }}/bin/coverage xml && \
+          bash <(curl -s https://codecov.io/bash) -Z \
+          -f coverage.xml
