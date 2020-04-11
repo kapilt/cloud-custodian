@@ -12,21 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# flake8: noqa
-# just want to disable E501 long lines on this file.
+"""
+Build Docker Artifacts
 
+On build this is loosely modeled after https://github.com/docker/build-push-action
+  - same in that we auto add labels from github action metadata.
+  - differs in that we use `dev` for latest.
+  - differs in thta latest refers to last tagged image.
+
+We also support running functional tests and image cve scanning before pushing.
 """
-Generate Cloud Custodian Dockerfiles
-"""
-import click
-from datetime import datetime
-import sys
-import os
+
 import logging
-import json
+import os
+import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
-log = logging.getLogger('dockerpkg')
+import click
+
+log = logging.getLogger("dockerpkg")
 
 BUILD_STAGE = """\
 # Dockerfiles are generated from tools/dev/dockerpkg.py
@@ -46,6 +52,7 @@ WORKDIR /src
 ADD pyproject.toml poetry.lock README.md /src/
 ADD c7n /src/c7n/
 RUN . /usr/local/bin/activate && $HOME/.poetry/bin/poetry install --no-dev
+RUN . /usr/local/bin/activate && pip install -q wheel
 RUN . /usr/local/bin/activate && pip install -q aws-xray-sdk psutil jsonpatch
 
 # Add provider packages
@@ -58,8 +65,9 @@ RUN rm -R tools/c7n_kube/tests
 
 # Install requested providers
 ARG providers="azure gcp kube"
-RUN . /usr/local/bin/activate && for pkg in $providers; do cd tools/c7n_$pkg && $HOME/.poetry/bin/poetry install && cd ../../; done
-
+RUN . /usr/local/bin/activate && \\
+    for pkg in $providers; do cd tools/c7n_$pkg && \\
+    $HOME/.poetry/bin/poetry install && cd ../../; done
 
 RUN mkdir /output
 """
@@ -68,10 +76,7 @@ TARGET_UBUNTU_STAGE = """\
 FROM {base_target_image}
 
 LABEL name="{name}" \\
-      description="{description}" \\
-      repository="http://github.com/cloud-custodian/cloud-custodian" \\
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \\
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
@@ -97,16 +102,14 @@ TARGET_DISTROLESS_STAGE = """\
 FROM {base_target_image}
 
 LABEL name="{name}" \\
-      description="{description}" \\
-      repository="http://github.com/cloud-custodian/cloud-custodian" \\
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \\
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
 COPY --from=build-env /etc/passwd /etc/passwd
 COPY --from=build-env /etc/group /etc/group
-COPY --from=build-env /output /output
+COPY --chown=custodian:custodian --from=build-env /output /output
+COPY --chown=custodian:custodian --from=build-env /home/custodian /home/custodian
 
 USER custodian
 WORKDIR /home/custodian
@@ -133,14 +136,14 @@ BUILD_POLICYSTREAM = """\
 # Compile libgit2
 RUN apt-get -y install wget cmake libssl-dev libffi-dev git
 RUN mkdir build && \\
-        wget -q https://github.com/libgit2/libgit2/releases/download/v1.0.0/libgit2-1.0.0.tar.gz && \\
-        cd build && \\
-        tar xzf ../libgit2-1.0.0.tar.gz && \\
-        cd libgit2-1.0.0 && \\
-        mkdir build && cd build && \\
-        cmake .. && \\
-        make install && \\
-        rm -Rf /src/build
+    wget -q https://github.com/libgit2/libgit2/releases/download/v1.0.0/libgit2-1.0.0.tar.gz && \\
+    cd build && \\
+    tar xzf ../libgit2-1.0.0.tar.gz && \\
+    cd libgit2-1.0.0 && \\
+    mkdir build && cd build && \\
+    cmake .. && \\
+    make install && \\
+    rm -Rf /src/build
 
 # Install c7n-policystream
 ADD tools/c7n_policystream /src/tools/c7n_policystream
@@ -155,14 +158,16 @@ RUN . /usr/local/bin/activate && pytest tools/c7n_policystream
 
 class Image:
 
-    defaults = dict(
-        base_build_image="ubuntu:20.04",
-        base_target_image="ubuntu:20.04")
+    defaults = dict(base_build_image="ubuntu:20.04", base_target_image="ubuntu:20.04")
 
     def __init__(self, metadata, build, target):
         self.metadata = metadata
         self.build = build
         self.target = target
+
+    @property
+    def repo(self):
+        return self.metadata.get("repo", self.metadata["name"])
 
     def render(self):
         output = []
@@ -179,47 +184,51 @@ class Image:
 
 
 ImageMap = {
-    'docker/cli': Image(
-        dict(name='custodian',
-             description='Cloud Management Rules Engine',
-             entrypoint='/usr/local/bin/custodian'),
-        build=[BUILD_STAGE],
-        target=[TARGET_UBUNTU_STAGE]),
-    'docker/org': Image(
-        dict(name='c7n-org',
-             description="Cloud Custodian Organization Runner",
-             entrypoint='/usr/local/bin/c7n-org'),
-        build=[BUILD_STAGE, BUILD_ORG],
-        target=[TARGET_UBUNTU_STAGE]),
-    'docker/mailer': Image(
-        dict(name='mailer',
-             description="Cloud Custodian Notification Delivery",
-             entrypoint='/usr/local/bin/c7n-mailer'),
-        build=[BUILD_STAGE, BUILD_MAILER],
-        target=[TARGET_UBUNTU_STAGE]
-    ),
-    'docker/policystream': Image(
-        dict(name='policystream',
-             description="Custodian policy changes streamed from Git",
-             entrypoint='/usr/local/bin/c7n-policystream'),
-        build=[BUILD_STAGE, BUILD_POLICYSTREAM],
-        target=[TARGET_UBUNTU_STAGE]
-    )
-}
-
-
-for name, image in list(ImageMap.items()):
-    ImageMap[name + '-distroless'] = image.clone(
+    "docker/cli": Image(
         dict(
-            base_build_image='debian:10-slim',
-            base_target_image='gcr.io/distroless/python3-debian10'),
-        target=[TARGET_DISTROLESS_STAGE])
+            name="cli",
+            repo="c7n",
+            description="Cloud Management Rules Engine",
+            entrypoint="/usr/local/bin/custodian",
+        ),
+        build=[BUILD_STAGE],
+        target=[TARGET_UBUNTU_STAGE],
+    ),
+    "docker/org": Image(
+        dict(
+            name="org",
+            repo="c7n-org",
+            description="Cloud Custodian Organization Runner",
+            entrypoint="/usr/local/bin/c7n-org",
+        ),
+        build=[BUILD_STAGE, BUILD_ORG],
+        target=[TARGET_UBUNTU_STAGE],
+    ),
+    "docker/mailer": Image(
+        dict(
+            name="mailer",
+            description="Cloud Custodian Notification Delivery",
+            entrypoint="/usr/local/bin/c7n-mailer",
+        ),
+        build=[BUILD_STAGE, BUILD_MAILER],
+        target=[TARGET_UBUNTU_STAGE],
+    ),
+    "docker/policystream": Image(
+        dict(
+            name="policystream",
+            description="Custodian policy changes streamed from Git",
+            entrypoint="/usr/local/bin/c7n-policystream",
+        ),
+        build=[BUILD_STAGE, BUILD_POLICYSTREAM],
+        target=[TARGET_UBUNTU_STAGE],
+    ),
+}
 
 
 def human_size(size, precision=2):
     # interesting discussion on 1024 vs 1000 as base
     # https://en.wikipedia.org/wiki/Binary_prefix
-    suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB"]
     suffixIndex = 0
     while size > 1024:
         suffixIndex += 1
@@ -230,98 +239,223 @@ def human_size(size, precision=2):
 
 @click.group()
 def cli():
-    """Custodian Docker Image Tool"""
+    """Custodian Docker Packaging Tool
+
+    slices, dices, and blends :-)
+    """
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s:%(levelname)s %(message)s")
+        level=logging.INFO, format="%(asctime)s:%(name)s%(levelname)s %(message)s"
+    )
+    logging.getLogger("docker").setLevel(logging.INFO)
+    logging.getLogger("urllib3").setLevel(logging.INFO)
+
+    for name, image in list(ImageMap.items()):
+        ImageMap[name + "-distroless"] = image.clone(
+            dict(
+                base_build_image="debian:10-slim",
+                base_target_image="gcr.io/distroless/python3-debian10",
+            ),
+            target=[TARGET_DISTROLESS_STAGE],
+        )
 
 
 @cli.command()
-@click.option('-p', '--provider', multiple=True)
-@click.option('--registry', default="", multiple=True)
-@click.option('--tag-date')
-@click.option('--tag-git')
-@click.option('--push', is_flag=True)
+@click.option("-p", "--provider", multiple=True)
 @click.option(
-    '--env-file',
-    help="Environment Variable output for testing",
-    type=click.Path())
-@click.option('-q', '--quiet', is_flag=True)
-@click.option('-i', '--image', multiple=True)
-def build(provider, registry, tag_date, tag_git, image, quiet, env_file, push):
-    """Build custodian docker images
+    "--registry",
+    multiple=True,
+    help="Registry to push to, note this is closer to a prefix",
+)
+@click.option("--tag", help="Static tag for the image")
+@click.option("--push", is_flag=True)
+@click.option(
+    "--test", help="run lightweight functional tests with image", is_flag=True
+)
+@click.option("--scan", help="scan the image for cve with trivy", is_flag=True)
+@click.option("-q", "--quiet", is_flag=True)
+@click.option("-i", "--image", multiple=True)
+@click.option("-v", "--verbose", is_flag=True)
+def build(provider, registry, tag, image, quiet, push, test, scan, verbose):
+    """Build custodian docker images...
 
-    python tools/dev/dockerpkg.py -i cli -i org -i mailer
+    python tools/dev/dockerpkg.py --test -i cli -i org -i mailer
     """
     try:
         import docker
     except ImportError:
         print("python docker client library required")
         sys.exit(1)
+    if quiet:
+        logging.getLogger().setLevel(logging.WARNING)
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     client = docker.from_env()
 
-    # Build out some common suffixes for the image
-    date_suffix = datetime.utcnow().strftime('%Y%m%d')
-    ref_suffix = os.environ.get('GITHUB_SHA', '')[:6]
-    tag_suffix = os.environ.get('GITHUB_REF')
-    if tag_suffix and tag_suffix.startswith('refs/tags'):
-        tag_suffix = tag_suffix[len('refs/tags/'):]
-    suffix = list(filter(None, [date_suffix, ref_suffix, tag_suffix]))
+    # Nomenclature wise these are the set of version tags, independent
+    # of registry / repo name, that will be applied to all images.
+    #
+    # ie. Build out some common suffixes for the image
+    image_tags = get_env_tags()
+    # If given an explicit tag, just use it
+    if tag:
+        image_tags = [tag]
 
-    built_image_map = {}    
-    build_args = {}
-    if provider:
-        build_args = {'providers': ' '.join(sorted(provider))}
+    build_args = {"providers": " ".join(sorted(provider))} if provider else []
 
     for path, image_def in ImageMap.items():
-        _, image_name = path.split('/')
+        _, image_name = path.split("/")
         if image and image_name not in image:
             continue
+        image_id = build_image(client, image_name, image_def, path, build_args)
+        image_refs = tag_image(client, image_id, image_def, registry, image_tags)
+        if test:
+            test_image(image_id, image_name, provider)
+        if scan:
+            scan_image(":".join(image_refs[0]))
+        if push:
+            push_image(client, image_id, image_refs)
 
-        log.info('Building %s image' % image_name)
-        stream = client.api.build(
-            path=os.path.abspath(os.getcwd()),
-            dockerfile=path,
-            buildargs=build_args,
-            pull=True, decode=True)
 
-        built_image_id = None
-        for chunk in stream:
-            if 'stream' in chunk and not quiet:
-                log.info(chunk['stream'].strip())
-            elif 'status' in chunk and not quiet:
-                log.info(chunk['status'].strip())
-            elif 'aux' in chunk:
-                built_image_id = chunk['aux'].get('ID')
+def get_labels(image):
+    hub_env = get_github_env()
+    # Standard Container Labels / Metadata
+    # https://github.com/opencontainers/image-spec/blob/master/annotations.md
+    labels = {
+        "org.opencontainers.image.created": datetime.utcnow().isoformat(),
+        "org.opencontainers.image.licenses": "Apache-2.0",
+        "org.opencontainers.image.documentation": "https://cloudcustodian.io/docs",
+        "org.opencontainers.image.title": image.metadata["name"],
+        "org.opencontainers.image.description": image.metadata["description"],
+    }
+    if hub_env.get("repository"):
+        labels["org.opencontainers.image.source"] = hub_env["repository"]
+    if hub_env.get("sha"):
+        labels["org.opencontainers.image.revision"] = hub_env["sha"]
+    return labels
 
-        built_image = client.images.get(built_image_id)
-        log.info("Built %s image Id:%s Size:%s" % (
-            image_name,
-            built_image.attrs['Id'][7:7+12],
-            human_size(built_image.attrs['Size'])))
 
-        built_image_map[image_name] = built_image_id
-        for r in registry:
-            for s in suffix:
-                repo = f"{r}/{image_name}"
-                target = f"{repo}:{s}".lstrip('/')
-                built_image.tag(repo, s)
-                if push:
-                    log.info('Pushing image %s' % target)
-                    for line in client.images.push(repo, s, stream=True, decode=True):
-                        if not quiet and 'status' in line:
-                            log.info("%s id:%s" % (line['status'], line.get('id')))
-                elif not quiet:
-                    log.info(f'Tagged {image_name} as {repo}:{s}')
+def get_github_env():
+    envget = os.environ.get
+    return {
+        k: v
+        for k, v in {
+            "sha": envget("GITHUB_SHA"),
+            "event": envget("GITHUB_EVENT_NAME"),
+            "repository": envget("GITHUB_REPOSITORY"),
+            "workflow": envget("GITHUB_WORKFLOW"),
+            "actions": envget("GITHUB_ACTIONS"),
+            "refs": envget("GITHUB_REF"),
+        }.items()
+        if v
+    }
 
-    if env_file:
-        with open(str(env_file), 'w') as fh:
-            fh.write('export TEST_DOCKER=yes\n')
-            for k, v in built_image_map.items():
-                fh.write("export CUSTODIAN_%s_IMAGE=%s\n" % (k.upper(), v))
 
-    print(json.dumps(built_image_map, indent=2))
+def get_image_repo_tags(image, registries, tags):
+    results = []
+    # get a local tag with name
+    if not registries:
+        registries = [""]
+    for t in tags:
+        for r in registries:
+            results.append((f"{r}/{image.repo}".lstrip("/"), t))
+    return results
+
+
+def get_env_tags():
+    image_tags = []
+    hub_env = get_github_env()
+
+    if "sha" in hub_env:
+        image_tags.append("sha-{:7}".format(hub_env["sha"]))
+
+    image_tags.append(datetime.utcnow().strftime("%Y-%m-%d"))
+
+    if "ref" in hub_env:
+        _, rtype, rvalue = hub_env["ref"].split("/", 2)
+        if rtype == "tags":
+            image_tags.append("latest")
+            image_tags.append(rvalue)
+        elif rtype == "heads" and rvalue == "master":
+            image_tags.append("dev")
+        elif rtype == "heads":
+            image_tags.append(rvalue)
+
+    return list(filter(None, image_tags))
+
+
+def tag_image(client, image_id, image_def, registries, env_tags):
+    image = client.images.get(image_id)
+    image_tags = get_image_repo_tags(image_def, registries, env_tags)
+    for repo, tag in image_tags:
+        image.tag(repo, tag)
+    return image_tags
+
+
+def scan_image(image_ref):
+    subprocess.check_call(
+        ["trivy", image_ref], stderr=subprocess.STDOUT
+    )
+
+
+def test_image(image_id, image_name, providers):
+    env = dict(os.environ)
+    env.update(
+        {
+            "TEST_DOCKER": "yes",
+            "CUSTODIAN_%s_IMAGE"
+            % image_name.upper().split("-", 1)[0]: image_id.split(":")[-1],
+        }
+    )
+    if providers is not None:
+        env["CUSTODIAN_PROVIDERS"] = " ".join(providers)
+    subprocess.check_call(
+        [Path(sys.executable).parent / "pytest", "-v", "tests/test_docker.py"],
+        env=env,
+        stderr=subprocess.STDOUT,
+    )
+
+
+def push_image(client, image_id, image_refs):
+    for (repo, tag) in image_refs:
+        log.info(f"Pushing image {repo}:{tag}")
+        for line in client.images.push(repo, tag, stream=True, decode=True):
+            if "status" in line:
+                log.debug("%s id:%s" % (line["status"], line.get("id", "n/a")))
+
+
+def build_image(client, image_name, image_def, dfile_path, build_args):
+    log.info("Building %s image (--verbose for build output)" % image_name)
+
+    labels = get_labels(image_def)
+    stream = client.api.build(
+        path=os.path.abspath(os.getcwd()),
+        dockerfile=dfile_path,
+        buildargs=build_args,
+        labels=labels,
+        pull=True,
+        decode=True,
+    )
+
+    built_image_id = None
+    for chunk in stream:
+        if "stream" in chunk:
+            log.debug(chunk["stream"].strip())
+        elif "status" in chunk:
+            log.debug(chunk["status"].strip())
+        elif "aux" in chunk:
+            built_image_id = chunk["aux"].get("ID")
+    assert built_image_id
+    if built_image_id.startswith("sha256:"):
+        built_image_id = built_image_id[7:]
+
+    built_image = client.images.get(built_image_id)
+    log.info(
+        "Built %s image Id:%s Size:%s"
+        % (image_name, built_image_id[:12], human_size(built_image.attrs["Size"]),)
+    )
+
+    return built_image_id[:12]
 
 
 @cli.command()
@@ -332,5 +466,11 @@ def generate():
         p.write_text(image.render())
 
 
-if __name__ == '__main__':
-    cli()
+if __name__ == "__main__":
+    try:
+        cli()
+    except Exception:
+        import pdb, traceback, sys
+
+        traceback.print_exc()
+        pdb.post_mortem(sys.exc_info()[-1])
