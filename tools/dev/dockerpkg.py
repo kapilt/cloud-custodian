@@ -40,7 +40,7 @@ BUILD_STAGE = """\
 FROM {base_build_image} as build-env
 
 # pre-requisite distro deps, and build env setup
-RUN adduser --disabled-login custodian
+RUN adduser --disabled-login --gecos "" custodian
 RUN apt-get --yes update
 RUN apt-get --yes install build-essential curl python3-venv python3-dev --no-install-recommends
 RUN python3 -m venv /usr/local
@@ -88,7 +88,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update \\
         && rm -Rf /var/lib/apt/lists/* \\
         && rm -Rf /var/log/*
 
-RUN adduser --disabled-login custodian
+RUN adduser --disabled-login --gecos "" custodian
 USER custodian
 WORKDIR /home/custodian
 ENV LC_ALL="C.UTF-8" LANG="C.UTF-8"

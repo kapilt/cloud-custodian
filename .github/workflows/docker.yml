@@ -10,6 +10,7 @@ on:
       - master
 
 jobs:
+
   Publish:
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +64,32 @@ jobs:
           HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream
+
+
+  PublishDistroless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Install Docker Build Env
+        # bin directory is in .dockerignore
+        run: |
+          python -m pip install --upgrade pip
+          pip install docker click pytest pyyaml
+          mkdir -p bin
+          wget -q -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
+          cd bin && tar xzf trivy.tgz
+
+      # For *lightweight* functional image tests
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.DOCKER_CI_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DOCKER_CI_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
       # Distroless variants
       - name: cli - distroless

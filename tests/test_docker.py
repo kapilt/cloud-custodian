@@ -119,7 +119,7 @@ def test_org_run_aws(custodian_org_dir, custodian_env_creds):
             "run -v -a c7n -c {dir}/accounts.json"
             " -s {dir}/output"
             " --region=all"
-            " -u {dir}/policy.json"
+            " -u {dir}/policies-aws.json"
         ).format(dir="/home/custodian/"),
         environment=custodian_env_creds,
         remove=True,
