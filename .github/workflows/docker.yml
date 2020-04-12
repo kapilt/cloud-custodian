@@ -28,13 +28,28 @@ jobs:
           cd bin && tar xzvf trivy.tgz
       - name: cli - Build, Test, Scan Docker Image
         run: |
-          python tools/dev/dockerpkg.py build --scan --test -i cli
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli
       - name: org - Build, Test, Scan Docker Image
         run: |
-          python tools/dev/dockerpkg.py build --scan --test -i org
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org
       - name: mailer - Build, Test, Scan Docker Image
         run: |
-          python tools/dev/dockerpkg.py build --scan --test -i mailer
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer
       - name: policystream - Build, Test, Scan Docker Image
         run: |
-          python tools/dev/dockerpkg.py build --scan --test -i policystream
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream
+      - name: cli - distroless - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli-distroless
+      - name: org - distroless -Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org-distroless
+      - name: mailer - distroless - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer-distroless
+      - name: policystream - distroless - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream-distroless
+      - name: docker images
+        run: |
+          docker images

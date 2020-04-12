@@ -169,6 +169,10 @@ class Image:
     def repo(self):
         return self.metadata.get("repo", self.metadata["name"])
 
+    @property
+    def tag_prefix(self):
+        return self.metadata.get('tag_prefix', '')
+
     def render(self):
         output = []
         output.extend(self.build)
@@ -252,7 +256,7 @@ def cli():
     for name, image in list(ImageMap.items()):
         ImageMap[name + "-distroless"] = image.clone(
             dict(
-                repo=image.repo + '-distroless',
+                tag_prefix="distroless-",
                 base_build_image="debian:10-slim",
                 base_target_image="gcr.io/distroless/python3-debian10",
             ),
@@ -263,7 +267,7 @@ def cli():
 @cli.command()
 @click.option("-p", "--provider", multiple=True)
 @click.option(
-    "--registry", multiple=True, help="Registries for image repo on tag and push"
+    "-r","--registry", multiple=True, help="Registries for image repo on tag and push"
 )
 @click.option("--tag", help="Static tag for the image")
 @click.option("--push", is_flag=True, help="Push images to registries")
@@ -362,7 +366,7 @@ def get_image_repo_tags(image, registries, tags):
         registries = [""]
     for t in tags:
         for r in registries:
-            results.append((f"{r}/{image.repo}".lstrip("/"), t))
+            results.append((f"{r}/{image.repo}".lstrip("/"), image.tag_prefix + t))
     return results
 
 
@@ -440,6 +444,7 @@ def build_image(client, image_name, image_def, dfile_path, build_args):
         dockerfile=dfile_path,
         buildargs=build_args,
         labels=labels,
+        rm=True,
         pull=True,
         decode=True,
     )
