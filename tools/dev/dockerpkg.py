@@ -82,7 +82,7 @@ COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
 COPY --from=build-env /output /output
 
-RUN apt-get --yes update \\
+RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update \\
         && apt-get --yes install python3 python3-venv --no-install-recommends \\
         && rm -Rf /var/cache/apt \\
         && rm -Rf /var/lib/apt/lists/* \\
@@ -134,7 +134,7 @@ RUN . /usr/local/bin/activate && cd tools/c7n_mailer && $HOME/.poetry/bin/poetry
 
 BUILD_POLICYSTREAM = """\
 # Compile libgit2
-RUN apt-get -y install wget cmake libssl-dev libffi-dev git
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wget cmake libssl-dev libffi-dev git
 RUN mkdir build && \\
     wget -q https://github.com/libgit2/libgit2/releases/download/v1.0.0/libgit2-1.0.0.tar.gz && \\
     cd build && \\
@@ -244,7 +244,7 @@ def cli():
     slices, dices, and blends :-)
     """
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s:%(name)s%(levelname)s %(message)s"
+        level=logging.INFO, format="%(asctime)s:%(levelname)s %(message)s"
     )
     logging.getLogger("docker").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.INFO)

@@ -47,7 +47,7 @@ COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
 COPY --from=build-env /output /output
 
-RUN apt-get --yes update \
+RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update \
         && apt-get --yes install python3 python3-venv --no-install-recommends \
         && rm -Rf /var/cache/apt \
         && rm -Rf /var/lib/apt/lists/* \

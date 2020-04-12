@@ -35,7 +35,7 @@ RUN . /usr/local/bin/activate && \
 RUN mkdir /output
 
 # Compile libgit2
-RUN apt-get -y install wget cmake libssl-dev libffi-dev git
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wget cmake libssl-dev libffi-dev git
 RUN mkdir build && \
     wget -q https://github.com/libgit2/libgit2/releases/download/v1.0.0/libgit2-1.0.0.tar.gz && \
     cd build && \
@@ -64,7 +64,7 @@ COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
 COPY --from=build-env /output /output
 
-RUN apt-get --yes update \
+RUN DEBIAN_FRONTEND=noninteractive apt-get --yes update \
         && apt-get --yes install python3 python3-venv --no-install-recommends \
         && rm -Rf /var/cache/apt \
         && rm -Rf /var/lib/apt/lists/* \
