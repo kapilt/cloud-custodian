@@ -375,7 +375,7 @@ def get_env_tags():
     hub_env = get_github_env()
 
     if "sha" in hub_env:
-        image_tags.append("sha-{:7}".format(hub_env["sha"]))
+        image_tags.append("sha-{}".format(hub_env["sha"][:7]))
 
     image_tags.append(datetime.utcnow().strftime("%Y-%m-%d"))
 

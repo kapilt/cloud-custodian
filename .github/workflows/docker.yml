@@ -38,18 +38,18 @@ jobs:
       - name: policystream - Build, Test, Scan Docker Image
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream
-      - name: cli - distroless - Build, Test, Scan Docker Image
-        run: |
-          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli-distroless
-      - name: org - distroless -Build, Test, Scan Docker Image
-        run: |
-          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org-distroless
-      - name: mailer - distroless - Build, Test, Scan Docker Image
-        run: |
-          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer-distroless
-      - name: policystream - distroless - Build, Test, Scan Docker Image
-        run: |
-          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream-distroless
+#      - name: cli - distroless - Build, Test, Scan Docker Image
+#        run: |
+#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli-distroless
+#      - name: org - distroless -Build, Test, Scan Docker Image
+#        run: |
+#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org-distroless
+#      - name: mailer - distroless - Build, Test, Scan Docker Image
+#        run: |
+#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer-distroless
+#      - name: policystream - distroless - Build, Test, Scan Docker Image
+#        run: |
+#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream-distroless
       - name: docker images
         run: |
           docker images
