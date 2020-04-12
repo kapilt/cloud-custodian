@@ -353,7 +353,7 @@ def get_github_env():
             "event_path": envget("GITHUB_EVENT_PATH"),
             "workspace": envget("GITHUB_WORKSPACE"),
             "actions": envget("GITHUB_ACTIONS"),
-            "refs": envget("GITHUB_REF"),
+            "ref": envget("GITHUB_REF"),
         }.items()
         if v
     }
