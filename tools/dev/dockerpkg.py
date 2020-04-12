@@ -289,7 +289,6 @@ def build(provider, registry, tag, image, quiet, push, test, scan, verbose):
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    log.info("Build Env: %r" % (dict(os.environ),))
     client = docker.from_env()
 
     # Nomenclature wise these are the set of version tags, independent
@@ -401,7 +400,7 @@ def scan_image(image_ref):
     cmd = ["trivy"]
     hub_env = get_github_env()
     if "workspace" in hub_env:
-        cmd = [os.path.join(hub_env["workspace"], hub_env["bin"], "trivy")]
+        cmd = [os.path.join(hub_env["workspace"], "bin", "trivy")]
     cmd.append(image_ref)
     subprocess.check_call(cmd, stderr=subprocess.STDOUT)
 

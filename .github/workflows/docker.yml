@@ -26,6 +26,15 @@ jobs:
           mkdir -p bin
           wget -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
           cd bin && tar xzvf trivy.tgz
-      - name: Build Docker Image
+      - name: cli - Build, Test, Scan Docker Image
         run: |
           python tools/dev/dockerpkg.py build --scan --test -i cli
+      - name: org - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -i org
+      - name: mailer - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -i mailer
+      - name: policystream - Build, Test, Scan Docker Image
+        run: |
+          python tools/dev/dockerpkg.py build --scan --test -i policystream
