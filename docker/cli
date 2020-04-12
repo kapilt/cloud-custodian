@@ -36,11 +36,8 @@ RUN mkdir /output
 
 FROM ubuntu:20.04
 
-LABEL name="custodian" \
-      description="Cloud Management Rules Engine" \
-      repository="http://github.com/cloud-custodian/cloud-custodian" \
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+LABEL name="cli" \
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local

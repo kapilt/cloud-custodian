@@ -40,11 +40,8 @@ RUN . /usr/local/bin/activate && cd tools/c7n_org && $HOME/.poetry/bin/poetry in
 
 FROM gcr.io/distroless/python3-debian10
 
-LABEL name="c7n-org" \
-      description="Cloud Custodian Organization Runner" \
-      repository="http://github.com/cloud-custodian/cloud-custodian" \
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+LABEL name="org" \
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local

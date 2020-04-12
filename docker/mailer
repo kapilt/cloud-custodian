@@ -41,10 +41,7 @@ RUN . /usr/local/bin/activate && cd tools/c7n_mailer && $HOME/.poetry/bin/poetry
 FROM ubuntu:20.04
 
 LABEL name="mailer" \
-      description="Cloud Custodian Notification Delivery" \
-      repository="http://github.com/cloud-custodian/cloud-custodian" \
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local

@@ -301,7 +301,9 @@ def build(provider, registry, tag, image, quiet, push, test, scan, verbose):
     if tag:
         image_tags = [tag]
 
-    build_args = {"providers": " ".join(sorted(provider))} if provider else []
+    build_args = None
+    if provider not in (None, ()):
+        build_args = {"providers": " ".join(sorted(provider))} if provider else []
 
     for path, image_def in ImageMap.items():
         _, image_name = path.split("/")
@@ -393,9 +395,7 @@ def tag_image(client, image_id, image_def, registries, env_tags):
 
 
 def scan_image(image_ref):
-    subprocess.check_call(
-        ["trivy", image_ref], stderr=subprocess.STDOUT
-    )
+    subprocess.check_call(["trivy", image_ref], stderr=subprocess.STDOUT)
 
 
 def test_image(image_id, image_name, providers):
@@ -407,7 +407,7 @@ def test_image(image_id, image_name, providers):
             % image_name.upper().split("-", 1)[0]: image_id.split(":")[-1],
         }
     )
-    if providers is not None:
+    if providers not in (None, ()):
         env["CUSTODIAN_PROVIDERS"] = " ".join(providers)
     subprocess.check_call(
         [Path(sys.executable).parent / "pytest", "-v", "tests/test_docker.py"],

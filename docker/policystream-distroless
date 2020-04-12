@@ -58,10 +58,7 @@ RUN . /usr/local/bin/activate && pytest tools/c7n_policystream
 FROM gcr.io/distroless/python3-debian10
 
 LABEL name="policystream" \
-      description="Custodian policy changes streamed from Git" \
-      repository="http://github.com/cloud-custodian/cloud-custodian" \
-      homepage="http://github.com/cloud-custodian/cloud-custodian" \
-      maintainer="Custodian Community <https://cloudcustodian.io>"
+      repository="http://github.com/cloud-custodian/cloud-custodian"
 
 COPY --from=build-env /src /src
 COPY --from=build-env /usr/local /usr/local
