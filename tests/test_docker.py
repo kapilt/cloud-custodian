@@ -49,7 +49,7 @@ def custodian_org_dir(tmpdir):
                         {
                             "account_id": "644160558196",
                             "name": "c7n-test",
-                            "role": "arn:aws:iam::644160558196:role/CloudCustodianRole",
+                            "role": "arn:aws:iam::644160558196:role/Github-CI",
                             "region": [
                                 "us-east-1",
                                 "us-east-2",
@@ -67,8 +67,8 @@ def custodian_org_dir(tmpdir):
             json.dumps(
                 {
                     "policies": [
-                        {"name": "ec2", "resource": "aws.ec2"},
-                        {"name": "lambda", "resource": "aws.lambda"},
+                        {"name": "dynamo", "resource": "aws.dynamodb-table"},
+                        {"name": "lambda", "resource": "aws.ecr"},
                     ]
                 }
             )

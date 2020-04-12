@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - master
-      
+
 jobs:
   Run:
     runs-on: ubuntu-latest
@@ -26,30 +26,70 @@ jobs:
           mkdir -p bin
           wget -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
           cd bin && tar xzvf trivy.tgz
-      - name: cli - Build, Test, Scan Docker Image
+
+      # For *lightweight* functional image tests
+      - name: Configure AWS credentials
+
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.DOCKER_CI_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DOCKER_CI_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Ubuntu images
+      - name: cli
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli
-      - name: org - Build, Test, Scan Docker Image
+
+      - name: org
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org
-      - name: mailer - Build, Test, Scan Docker Image
+
+      - name: mailer
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer
-      - name: policystream - Build, Test, Scan Docker Image
+
+      - name: policystream
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream
-#      - name: cli - distroless - Build, Test, Scan Docker Image
-#        run: |
-#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i cli-distroless
-#      - name: org - distroless -Build, Test, Scan Docker Image
-#        run: |
-#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i org-distroless
-#      - name: mailer - distroless - Build, Test, Scan Docker Image
-#        run: |
-#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i mailer-distroless
-#      - name: policystream - distroless - Build, Test, Scan Docker Image
-#        run: |
-#          python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream-distroless
-      - name: docker images
+
+      # Distroless variants
+      - name: cli - distroless
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
         run: |
-          docker images
+          python tools/dev/dockerpkg.py build --test --scan --publish  -r cloudcustodian -i cli-distroless
+
+      - name: org - distroless
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
+        run: |
+          python tools/dev/dockerpkg.py build --test --scan --publish -r cloudcustodian -i org-distroless
+
+      - name: mailer - distroless
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
+        run: |
+          python tools/dev/dockerpkg.py build --test --scan --publish -r cloudcustodian -i mailer-distroless
+
+      - name: policystream - distroless
+        env:
+          HUB_USER: c7nbuild
+          HUB_TOKEN: ${{ secrets.DOCKER_CI_HUB_TOKEN }}
+        run: |
+          python tools/dev/dockerpkg.py build --test --scan --publish -r cloudcustodian -i policystream-distroless

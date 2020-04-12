@@ -428,6 +428,9 @@ def test_image(image_id, image_name, providers):
 
 
 def push_image(client, image_id, image_refs):
+    if "HUB_TOKEN" in os.environ and "HUB_USER" in os.environ:
+        client.login(os.environ["HUB_USER"], os.environ["HUB_TOKEN"])
+
     for (repo, tag) in image_refs:
         log.info(f"Pushing image {repo}:{tag}")
         for line in client.images.push(repo, tag, stream=True, decode=True):
