@@ -24,4 +24,4 @@ jobs:
           pip install docker click pytest pyyaml
       - name: Build Docker Image
         run: |
-          python tools/dev/dockerpkg.py build -i cli -i org
+          python tools/dev/dockerpkg.py build --verbose -i cli -i org -i mailer -i policystream

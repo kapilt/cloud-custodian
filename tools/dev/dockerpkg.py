@@ -264,12 +264,13 @@ def cli():
 @click.option(
     "--registry",
     multiple=True,
-    help="Registry to push to, note this is closer to a prefix",
+    help="Registries for image repo on tag and push"
 )
 @click.option("--tag", help="Static tag for the image")
-@click.option("--push", is_flag=True)
+@click.option("--push", is_flag=True,
+              help="Push images to registries")
 @click.option(
-    "--test", help="run lightweight functional tests with image", is_flag=True
+    "--test", help="Run lightweight functional tests with image", is_flag=True
 )
 @click.option("--scan", help="scan the image for cve with trivy", is_flag=True)
 @click.option("-q", "--quiet", is_flag=True)
@@ -290,6 +291,7 @@ def build(provider, registry, tag, image, quiet, push, test, scan, verbose):
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    log.info("Build Env: %r" % (dict(os.environ),))
     client = docker.from_env()
 
     # Nomenclature wise these are the set of version tags, independent
@@ -467,10 +469,4 @@ def generate():
 
 
 if __name__ == "__main__":
-    try:
-        cli()
-    except Exception:
-        import pdb, traceback, sys
-
-        traceback.print_exc()
-        pdb.post_mortem(sys.exc_info()[-1])
+    cli()
