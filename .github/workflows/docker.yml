@@ -10,7 +10,7 @@ on:
       - master
 
 jobs:
-  Run:
+  Publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -24,12 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install docker click pytest pyyaml
           mkdir -p bin
-          wget -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
-          cd bin && tar xzvf trivy.tgz
+          wget -q -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
+          cd bin && tar xzf trivy.tgz
 
       # For *lightweight* functional image tests
       - name: Configure AWS credentials
-
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.DOCKER_CI_AWS_ACCESS_KEY_ID }}
