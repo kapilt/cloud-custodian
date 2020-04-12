@@ -62,7 +62,7 @@ jobs:
           python tools/dev/dockerpkg.py build --scan --test -r cloudcustodian -i policystream
 
 
-  "Publish Distroless":
+  "Publish_Distroless":
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
