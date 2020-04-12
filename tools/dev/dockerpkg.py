@@ -252,6 +252,7 @@ def cli():
     for name, image in list(ImageMap.items()):
         ImageMap[name + "-distroless"] = image.clone(
             dict(
+                repo=image.repo + '-distroless',
                 base_build_image="debian:10-slim",
                 base_target_image="gcr.io/distroless/python3-debian10",
             ),
@@ -262,13 +263,10 @@ def cli():
 @cli.command()
 @click.option("-p", "--provider", multiple=True)
 @click.option(
-    "--registry",
-    multiple=True,
-    help="Registries for image repo on tag and push"
+    "--registry", multiple=True, help="Registries for image repo on tag and push"
 )
 @click.option("--tag", help="Static tag for the image")
-@click.option("--push", is_flag=True,
-              help="Push images to registries")
+@click.option("--push", is_flag=True, help="Push images to registries")
 @click.option(
     "--test", help="Run lightweight functional tests with image", is_flag=True
 )
@@ -348,6 +346,9 @@ def get_github_env():
             "event": envget("GITHUB_EVENT_NAME"),
             "repository": envget("GITHUB_REPOSITORY"),
             "workflow": envget("GITHUB_WORKFLOW"),
+            "actor": envget("GITHUB_ACTOR"),
+            "event_path": envget("GITHUB_EVENT_PATH"),
+            "workspace": envget("GITHUB_WORKSPACE"),
             "actions": envget("GITHUB_ACTIONS"),
             "refs": envget("GITHUB_REF"),
         }.items()
@@ -397,7 +398,12 @@ def tag_image(client, image_id, image_def, registries, env_tags):
 
 
 def scan_image(image_ref):
-    subprocess.check_call(["trivy", image_ref], stderr=subprocess.STDOUT)
+    cmd = ["trivy"]
+    hub_env = get_github_env()
+    if "workspace" in hub_env:
+        cmd = [os.path.join(hub_env["workspace"], hub_env["bin"], "trivy")]
+    cmd.append(image_ref)
+    subprocess.check_call(cmd, stderr=subprocess.STDOUT)
 
 
 def test_image(image_id, image_name, providers):

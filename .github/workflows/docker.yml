@@ -19,9 +19,13 @@ jobs:
         with:
           python-version: 3.8
       - name: Install Docker Build Env
+        # bin directory is in .dockerignore
         run: |
           python -m pip install --upgrade pip
           pip install docker click pytest pyyaml
+          mkdir -p bin
+          wget -O bin/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.5.4/trivy_0.5.4_Linux-64bit.tar.gz
+          cd bin && tar xzvf trivy.tgz
       - name: Build Docker Image
         run: |
-          python tools/dev/dockerpkg.py build --verbose -i cli -i org -i mailer -i policystream
+          python tools/dev/dockerpkg.py build --scan --test -i cli
