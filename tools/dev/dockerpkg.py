@@ -171,7 +171,7 @@ class Image:
 
     @property
     def tag_prefix(self):
-        return self.metadata.get('tag_prefix', '')
+        return self.metadata.get("tag_prefix", "")
 
     def render(self):
         output = []
@@ -267,7 +267,7 @@ def cli():
 @cli.command()
 @click.option("-p", "--provider", multiple=True)
 @click.option(
-    "-r","--registry", multiple=True, help="Registries for image repo on tag and push"
+    "-r", "--registry", multiple=True, help="Registries for image repo on tag and push"
 )
 @click.option("--tag", help="Static tag for the image")
 @click.option("--push", is_flag=True, help="Push images to registries")
