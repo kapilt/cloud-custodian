@@ -15,70 +15,97 @@
 import json
 import pytest
 
-from c7n.exceptions import PolicyExecutionError
-from .common import load_data, data_path
+from c7n.exceptions import PolicyExecutionError, PolicyValidationError
+from .common import data_path
 
 
 def test_data_policy(test):
-    p = test.load_policy({
-        'name': 'data-stuff',
-        'resource': 'c7n.data',
-        'source': 'static',
-        'filters': [{'name': 'bob'}],
-        'query': [
-            {'records': [
-                {'name': 'bob'},
-                {'name': 'alice'}]}]})
+    p = test.load_policy(
+        {
+            "name": "data-stuff",
+            "resource": "c7n.data",
+            "source": "static",
+            "filters": [{"name": "bob"}],
+            "query": [{"records": [{"name": "bob"}, {"name": "alice"}]}],
+        }
+    )
     resources = p.run()
-    assert resources == [
-        {'name': 'bob', 'c7n:MatchedFilters': ['name']}]
+    assert resources == [{"name": "bob", "c7n:MatchedFilters": ["name"]}]
 
 
 def test_load_map_fails(test):
-    p = test.load_policy({
-        'name': 'data-nuff',
-        'resource': 'c7n.data',
-        'source': 'disk',
-        'query': [
-            {'path': data_path('config', 'app-elb.json')}]})
+    p = test.load_policy(
+        {
+            "name": "data-nuff",
+            "resource": "c7n.data",
+            "source": "disk",
+            "query": [{"path": data_path("config", "app-elb.json")}],
+        }
+    )
 
-    with pytest.raises(PolicyExecutionError, match='in non list format'):
+    with pytest.raises(PolicyExecutionError, match="in non list format"):
         p.run()
 
 
 def test_load_map_expression_fails(test):
-    p = test.load_policy({
-        'name': 'data-nuff',
-        'resource': 'c7n.data',
-        'source': 'disk',
-        'query': [
-            {'path': data_path('config', 'app-elb.json'),
-             'key': 'tags'}]})
+    p = test.load_policy(
+        {
+            "name": "data-nuff",
+            "resource": "c7n.data",
+            "source": "disk",
+            "query": [{"path": data_path("config", "app-elb.json"), "key": "tags"}],
+        }
+    )
 
-    with pytest.raises(PolicyExecutionError, match='in non list format'):
+    with pytest.raises(PolicyExecutionError, match="in non list format"):
         p.run()
 
 
 def test_load_array_expression(test):
-    p = test.load_policy({
-        'name': 'data-nuff',
-        'resource': 'c7n.data',
-        'source': 'disk',
-        'query': [
-            {'path': data_path('iam-actions.json'),
-             'key': 'account'}]})
-    assert p.run() == ['DisableRegion', 'EnableRegion', 'ListRegions']
+    p = test.load_policy(
+        {
+            "name": "data-nuff",
+            "resource": "c7n.data",
+            "source": "disk",
+            "query": [{"path": data_path("iam-actions.json"), "key": "account"}],
+        }
+    )
+    assert p.run() == ["DisableRegion", "EnableRegion", "ListRegions"]
+
+
+def test_disk_bad_path(tmpdir, test):
+    with pytest.raises(PolicyValidationError, match="invalid disk path"):
+        test.load_policy(
+            {
+                "name": "stuff",
+                "resource": "c7n.data",
+                "source": "disk",
+                "query": [{"path": str(tmpdir / "xyz")}],
+            }
+        )
+
+
+def test_dir_missing_glob(tmpdir, test):
+    with pytest.raises(PolicyValidationError, match="glob pattern required"):
+        test.load_policy(
+            {
+                "name": "stuff",
+                "resource": "c7n.data",
+                "source": "disk",
+                "query": [{"path": str(tmpdir)}],
+            }
+        )
 
 
 def test_load_dir_rglob(tmpdir, test):
-    (tmpdir.mkdir('xyz') / 'foo.json').write(
-        json.dumps(['a', 'b', 'c']))
-    (tmpdir.mkdir('abc') / 'bar.json').write(
-        json.dumps(['d', 'e', 'f']))
-    p = test.load_policy({
-        'name': 'stuff',
-        'resource': 'c7n.data',
-        'source': 'disk',
-        'query': [
-            {'path': str(tmpdir), 'glob': '**/*.json'}]})
-    assert sorted(p.run()) == ['a', 'b', 'c', 'd', 'e', 'f']
+    (tmpdir.mkdir("xyz") / "foo.json").write(json.dumps(["a", "b", "c"]))
+    (tmpdir.mkdir("abc") / "bar.json").write(json.dumps(["d", "e", "f"]))
+    p = test.load_policy(
+        {
+            "name": "stuff",
+            "resource": "c7n.data",
+            "source": "disk",
+            "query": [{"path": str(tmpdir), "glob": "**/*.json"}],
+        }
+    )
+    assert sorted(p.run()) == ["a", "b", "c", "d", "e", "f"]

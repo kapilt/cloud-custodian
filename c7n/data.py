@@ -13,7 +13,6 @@
 # limitations under the License.
 """Data Resource Provider implementation.
 """
-import fnmatch
 import os
 from pathlib import Path
 
@@ -63,9 +62,8 @@ class StaticSource:
 
     def validate(self):
         for q in self.queries:
-            if not isinstance(q.get('records', ()), (list, tuple)):
-                raise PolicyValidationError(
-                    "invalid static data source")
+            if not isinstance(q.get("records", ()), (list, tuple)):
+                raise PolicyValidationError("invalid static data source")
 
 
 class DiskSource:
@@ -76,8 +74,8 @@ class DiskSource:
         for q in self.queries:
             if not os.path.exists(q["path"]):
                 raise PolicyValidationError("invalid disk path %s" % q)
-            if os.path.isdir(q['path']) and not 'glob' in q:
-                raise PolicyValidationError('glob pattern required for dir')
+            if os.path.isdir(q["path"]) and not "glob" in q:
+                raise PolicyValidationError("glob pattern required for dir")
 
     def __iter__(self):
         for q in self.queries:
@@ -101,8 +99,7 @@ class DiskSource:
             data = jmespath.search(resource_key, data)
         if not isinstance(data, list):
             raise PolicyExecutionError(
-                "found disk records at %s in non list format %s" % (
-                    path, type(data))
+                "found disk records at %s in non list format %s" % (path, type(data))
             )
         return DataFile(path, resource_key, data)
 
@@ -136,10 +133,10 @@ class Data(ResourceManager):
         return []
 
     def resources(self):
-        with self.ctx.tracer.subsegment('resource-fetch'):
+        with self.ctx.tracer.subsegment("resource-fetch"):
             source = self.get_source()
             resources = list(source)
-        with self.ctx.tracer.subsegment('filter'):
+        with self.ctx.tracer.subsegment("filter"):
             resources = self.filter_resources(resources)
         return resources
 
