@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import pytest
 
-from .common import load_data
+from c7n.exceptions import PolicyExecutionError
+from .common import load_data, data_path
 
 
 def test_data_policy(test):
@@ -32,8 +35,50 @@ def test_data_policy(test):
 
 
 def test_load_map_fails(test):
-    pass
-    
+    p = test.load_policy({
+        'name': 'data-nuff',
+        'resource': 'c7n.data',
+        'source': 'disk',
+        'query': [
+            {'path': data_path('config', 'app-elb.json')}]})
+
+    with pytest.raises(PolicyExecutionError, match='in non list format'):
+        p.run()
+
 
 def test_load_map_expression_fails(test):
-    pass
+    p = test.load_policy({
+        'name': 'data-nuff',
+        'resource': 'c7n.data',
+        'source': 'disk',
+        'query': [
+            {'path': data_path('config', 'app-elb.json'),
+             'key': 'tags'}]})
+
+    with pytest.raises(PolicyExecutionError, match='in non list format'):
+        p.run()
+
+
+def test_load_array_expression(test):
+    p = test.load_policy({
+        'name': 'data-nuff',
+        'resource': 'c7n.data',
+        'source': 'disk',
+        'query': [
+            {'path': data_path('iam-actions.json'),
+             'key': 'account'}]})
+    assert p.run() == ['DisableRegion', 'EnableRegion', 'ListRegions']
+
+
+def test_load_dir_rglob(tmpdir, test):
+    (tmpdir.mkdir('xyz') / 'foo.json').write(
+        json.dumps(['a', 'b', 'c']))
+    (tmpdir.mkdir('abc') / 'bar.json').write(
+        json.dumps(['d', 'e', 'f']))
+    p = test.load_policy({
+        'name': 'stuff',
+        'resource': 'c7n.data',
+        'source': 'disk',
+        'query': [
+            {'path': str(tmpdir), 'glob': '**/*.json'}]})
+    assert sorted(p.run()) == ['a', 'b', 'c', 'd', 'e', 'f']

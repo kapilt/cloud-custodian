@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-<<<<<<< HEAD
 """Data Resource Provider implementation.
 """
-=======
->>>>>>> 9d21e43bd... core - data provider
 import fnmatch
 import os
+from pathlib import Path
 
 import jmespath
 
@@ -64,14 +62,10 @@ class StaticSource:
         return iter(records)
 
     def validate(self):
-<<<<<<< HEAD
         for q in self.queries:
             if not isinstance(q.get('records', ()), (list, tuple)):
                 raise PolicyValidationError(
                     "invalid static data source")
-=======
->>>>>>> 9d21e43bd... core - data provider
-        return
 
 
 class DiskSource:
@@ -82,6 +76,8 @@ class DiskSource:
         for q in self.queries:
             if not os.path.exists(q["path"]):
                 raise PolicyValidationError("invalid disk path %s" % q)
+            if os.path.isdir(q['path']) and not 'glob' in q:
+                raise PolicyValidationError('glob pattern required for dir')
 
     def __iter__(self):
         for q in self.queries:
@@ -95,25 +91,20 @@ class DiskSource:
         if os.path.isfile(path):
             yield self.load_file(path, resource_key)
             return
-        for root, files, dirs in os.path.walk(path):
-            if glob:
-                files = fnmatch.filter(files, glob)
-            for f in files:
-                data = self.load_file(os.path.join(root, f), resource_key)
-                yield data
+
+        for path in Path(path).glob(glob):
+            yield self.load_file(str(path), resource_key)
 
     def load_file(self, path, resource_key):
         data = load_file(path)
         if resource_key:
-            records = jmespath.search(resource_key, data)
-        elif not isinstance(data, list):
+            data = jmespath.search(resource_key, data)
+        if not isinstance(data, list):
             raise PolicyExecutionError(
-                "found disk records at %s in format %s without a resource_expr"
-                % (self.path, type(records))
+                "found disk records at %s in non list format %s" % (
+                    path, type(data))
             )
-        else:
-            records = data
-        return DataFile(path, resource_key, records)
+        return DataFile(path, resource_key, data)
 
 
 class DataFile:
