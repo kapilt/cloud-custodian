@@ -15,6 +15,7 @@
 import json
 import pytest
 
+from c7n.data import CustodianProvider
 from c7n.exceptions import PolicyExecutionError, PolicyValidationError
 from .common import data_path
 
@@ -95,6 +96,47 @@ def test_dir_missing_glob(tmpdir, test):
                 "query": [{"path": str(tmpdir)}],
             }
         )
+
+
+def test_invalid_static_record(test):
+    with pytest.raises(
+        PolicyValidationError, match="invalid static data source `records`"
+    ):
+        test.load_policy(
+            {
+                "name": "smack",
+                "resource": "c7n.data",
+                "source": "static",
+                "query": [{"records": "abc"}],
+            }
+        )
+
+
+def test_bad_source(test):
+
+    with pytest.raises(PolicyValidationError, match="invalid source dask"):
+        test.load_policy({"name": "snack", "resource": "c7n.data", "source": "dask"})
+
+
+def test_provider_initialize(test):
+    assert CustodianProvider().initialize({}) is None
+
+
+def test_provider_initialize_policies(test):
+    x = []
+    assert CustodianProvider().initialize_policies(x, {}) is x
+
+
+def test_empty_get_records(test):
+    p = test.load_policy(
+        {
+            "name": "snack",
+            "resource": "c7n.data",
+            "query": [{"records": ["a", "b"]}],
+            "source": "static",
+        }
+    )
+    assert p.resource_manager.get_resources([1, 2]) == []
 
 
 def test_load_dir_rglob(tmpdir, test):

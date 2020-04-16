@@ -62,8 +62,8 @@ class StaticSource:
 
     def validate(self):
         for q in self.queries:
-            if not isinstance(q.get("records", ()), (list, tuple)):
-                raise PolicyValidationError("invalid static data source")
+            if not isinstance(q.get("records", None), (list, tuple)):
+                raise PolicyValidationError("invalid static data source `records`")
 
 
 class DiskSource:
@@ -74,7 +74,7 @@ class DiskSource:
         for q in self.queries:
             if not os.path.exists(q["path"]):
                 raise PolicyValidationError("invalid disk path %s" % q)
-            if os.path.isdir(q["path"]) and not "glob" in q:
+            if os.path.isdir(q["path"]) and "glob" not in q:
                 raise PolicyValidationError("glob pattern required for dir")
 
     def __iter__(self):
@@ -126,7 +126,7 @@ class Data(ResourceManager):
 
     def validate(self):
         if self.data.get("source", "disk") not in self.source_mapping:
-            raise PolicyValidationError("invalid source %s")
+            raise PolicyValidationError("invalid source %s" % self.data["source"])
         self.get_source().validate()
 
     def get_resources(self, resource_ids):
