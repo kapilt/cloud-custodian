@@ -428,7 +428,7 @@ def schema_cmd(options):
     elif components[0] == 'mode':
         load_available(resources=False)
         resource_mapping = schema.resource_vocabulary()
-    else: # compatibility, aws is default for provider
+    else:  # compatibility, aws is default for provider
         components[0] = 'aws.%s' % components[0]
         load_resources((components[0],))
         resource_mapping = schema.resource_vocabulary('aws')
