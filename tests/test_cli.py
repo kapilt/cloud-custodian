@@ -22,7 +22,7 @@ from c7n import cli, version, commands
 from c7n.resolver import ValuesFrom
 from c7n.resources import aws
 from c7n.schema import ElementSchema, generate
-from c7n.utils import yaml_dump
+from c7n.utils import yaml_dump, yaml_load
 
 from .common import BaseTest, TextTestIO
 
@@ -171,7 +171,9 @@ class SchemaTest(CliTest):
     def test_schema(self):
 
         # no options
-        self.run_and_expect_success(["custodian", "schema"])
+        stdout, stderr = self.run_and_expect_success(["custodian", "schema"])
+        data = yaml_load(stdout)
+        assert data['resources']
 
         # summary option
         self.run_and_expect_success(["custodian", "schema", "--summary"])
