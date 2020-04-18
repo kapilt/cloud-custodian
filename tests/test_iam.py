@@ -376,7 +376,7 @@ class IAMMFAFilter(BaseTest):
         self.assertEqual(len(resources), 2)
 
 
-class IamRoleFilterUsage(BaseTest):
+class IamRoleTest(BaseTest):
 
     def test_iam_role_inuse(self):
         session_factory = self.replay_flight_data("test_iam_role_inuse")
@@ -417,9 +417,6 @@ class IamRoleFilterUsage(BaseTest):
         self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]['RoleId'], "AROAIGK7B2VUDZL4I73HK")
 
-
-class IamRoleTag(BaseTest):
-
     def test_iam_role_actions(self):
         factory = self.replay_flight_data('test_iam_role_tags')
         p = self.load_policy({
@@ -451,6 +448,31 @@ class IamRoleTag(BaseTest):
         self.assertNotIn(
             {'Application'},
             {t['Key'] for t in role['Tags']})
+
+    def test_iam_role_set_boundary(self):
+        factory = self.replay_flight_data('test_iam_role_set_boundary')
+        p = self.load_policy({
+            'name': 'boundary',
+            'resource': 'iam-role',
+            'filters': [
+                {'RoleName': 'accountmgr-dev'},
+                {'PermissionsBoundary': 'absent'}
+            ],
+            'actions': [{
+                'type': 'set-boundary',
+                'policy': 'arn:aws:iam::644160558196:policy/BlackListIamList'
+                }]},
+            session_factory=factory)
+        resources = p.run()
+        assert len(resources) == 1
+        assert resources[0]['RoleName'] == 'accountmgr-dev'
+        if self.recording:
+            time.sleep(2)
+        client = factory().client('iam')
+        assert client.get_role(RoleName='accountmgr-dev')['Role'].get('PermissionsBoundary', {}) == {
+            'PermissionsBoundaryType': 'Policy',
+            'PermissionsBoundaryArn': 'arn:aws:iam::644160558196:policy/BlackListIamList'
+            }
 
 
 class IamUserTest(BaseTest):
