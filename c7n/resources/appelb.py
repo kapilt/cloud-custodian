@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Application Load Balancers
+Application & Network Load Balancers
 """
 import json
 import logging
@@ -166,17 +166,17 @@ class AppElbMetrics(MetricsFilter):
     .. code-block:: yaml
 
       policies:
-        name: net-lb-underutilized
-        resource: app-elb
-        filters:
-          - Type: network
-          - type: metrics
-            name: ActiveFlowCount
-            namespace: AWS/NetworkELB
-            statistics: Sum
-            days: 14
-            value: 100
-            op: less-than
+        - name: net-lb-underutilized
+          resource: app-elb
+          filters:
+           - Type: network
+           - type: metrics
+             name: ActiveFlowCount
+             namespace: AWS/NetworkELB
+             statistics: Sum
+             days: 14
+             value: 100
+             op: less-than
     """
 
     def get_dimensions(self, resource):
