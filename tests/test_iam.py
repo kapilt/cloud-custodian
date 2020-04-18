@@ -461,7 +461,7 @@ class IamRoleTest(BaseTest):
             'actions': [{
                 'type': 'set-boundary',
                 'policy': 'arn:aws:iam::644160558196:policy/BlackListIamList'
-                }]},
+            }]},
             session_factory=factory)
         resources = p.run()
         assert len(resources) == 1
@@ -469,10 +469,11 @@ class IamRoleTest(BaseTest):
         if self.recording:
             time.sleep(2)
         client = factory().client('iam')
-        assert client.get_role(RoleName='accountmgr-dev')['Role'].get('PermissionsBoundary', {}) == {
-            'PermissionsBoundaryType': 'Policy',
-            'PermissionsBoundaryArn': 'arn:aws:iam::644160558196:policy/BlackListIamList'
-            }
+        assert client.get_role(RoleName='accountmgr-dev')[
+            'Role'].get('PermissionsBoundary', {}) == {
+                'PermissionsBoundaryType': 'Policy',
+                'PermissionsBoundaryArn': 'arn:aws:iam::644160558196:policy/BlackListIamList'
+        }
 
 
 class IamUserTest(BaseTest):
@@ -512,8 +513,7 @@ class IamUserTest(BaseTest):
                 {'UserName': 'devbot'},
                 {'PermissionsBoundary': 'present'}],
             'actions': [{
-                'type': 'set-boundary', 'state': 'absent'}]
-            },
+                'type': 'set-boundary', 'state': 'absent'}]},
             session_factory=factory)
 
         resources = p.run()
