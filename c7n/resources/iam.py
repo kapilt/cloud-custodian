@@ -38,7 +38,8 @@ from c7n.manager import resources
 from c7n.query import QueryResourceManager, DescribeSource, TypeInfo
 from c7n.resolver import ValuesFrom
 from c7n.tags import TagActionFilter, TagDelayedAction, Tag, RemoveTag
-from c7n.utils import local_session, type_schema, chunks, filter_empty, QueryParser
+from c7n.utils import (
+    get_partition, local_session, type_schema, chunks, filter_empty, QueryParser)
 
 from c7n.resources.aws import Arn
 from c7n.resources.securityhub import OtherResourcePostFinding
@@ -169,7 +170,8 @@ class SetBoundary(BaseAction):
         client = self.manager.session_factory().client('iam')
         policy = self.data.get('policy')
         if policy and not policy.startswith('arn'):
-            policy = 'arn:aws:aws:iam::{}:policy/{}'.format(
+            policy = 'arn:{}:iam::{}:policy/{}'.format(
+                get_partition(self.manager.config.region),
                 self.manager.account_id, policy)
         for r in resources:
             method, params = self.get_method(client, state, policy, r)
