@@ -25,6 +25,7 @@ from .test_offhours import mock_datetime_now
 from dateutil import parser
 
 from c7n.exceptions import PolicyValidationError
+from c7n.executor import MainThreadExecutor
 from c7n.filters.iamaccess import CrossAccountAccessFilter, PolicyChecker
 from c7n.mu import LambdaManager, LambdaFunction, PythonPackageArchive
 from botocore.exceptions import ClientError
@@ -49,8 +50,6 @@ from c7n.resources.iam import (
     NoSpecificIamRoleManagedPolicy,
     PolicyQueryParser
 )
-
-from c7n.executor import MainThreadExecutor
 
 
 class UserCredentialReportTest(BaseTest):
@@ -472,8 +471,32 @@ class IamRoleTest(BaseTest):
         assert client.get_role(RoleName='accountmgr-dev')[
             'Role'].get('PermissionsBoundary', {}) == {
                 'PermissionsBoundaryType': 'Policy',
-                'PermissionsBoundaryArn': 'arn:aws:iam::644160558196:policy/BlackListIamList'
+                'PermissionsBoundaryArn': 'BlackListIamList'
         }
+
+    def test_iam_role_remove_boundary(self):
+        factory = self.replay_flight_data('test_iam_role_remove_boundary')
+        p = self.load_policy({
+            'name': 'boundary',
+            'resource': 'iam-role',
+            'filters': [
+                {'RoleName': 'accountmgr-dev'},
+                {'PermissionsBoundary': 'present'}
+            ],
+            'actions': [{
+                'type': 'set-boundary',
+                'state': 'absent',
+            }]},
+            session_factory=factory)
+        p.resource_manager.execution_factory = MainThreadExecutor
+        resources = p.run()
+        assert len(resources) == 1
+        assert resources[0]['RoleName'] == 'accountmgr-dev'
+        if self.recording:
+            time.sleep(5)
+        client = factory().client('iam')
+        assert client.get_role(RoleName='accountmgr-dev')[
+            'Role'].get('PermissionsBoundary', {}) == {}
 
 
 class IamUserTest(BaseTest):
