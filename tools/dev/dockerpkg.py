@@ -248,7 +248,7 @@ def cli():
     slices, dices, and blends :-)
     """
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s:%(levelname)s %(message)s"
+        level=logging.INFO, format="%(asctime)s:%(name)s:%(levelname)s %(message)s"
     )
     logging.getLogger("docker").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.INFO)
@@ -333,10 +333,14 @@ def get_labels(image):
         "org.opencontainers.image.title": image.metadata["name"],
         "org.opencontainers.image.description": image.metadata["description"],
     }
+
+    git_env = get_git_env()
     if hub_env.get("repository"):
         labels["org.opencontainers.image.source"] = hub_env["repository"]
     if hub_env.get("sha"):
         labels["org.opencontainers.image.revision"] = hub_env["sha"]
+    else:
+        labels['org.opencontainers.image.revision'] = git_env['sha']
     return labels
 
 
@@ -357,6 +361,9 @@ def get_github_env():
         }.items()
         if v
     }
+
+def get_git_env():
+    return {'sha': subprocess.check_output(['git', 'rev-parse', 'head'])}
 
 
 def get_image_repo_tags(image, registries, tags):
@@ -429,13 +436,21 @@ def test_image(image_id, image_name, providers):
 
 def push_image(client, image_id, image_refs):
     if "HUB_TOKEN" in os.environ and "HUB_USER" in os.environ:
-        client.login(os.environ["HUB_USER"], os.environ["HUB_TOKEN"])
+        log.info("docker hub login %s" % os.environ['HUB_USER'])
+        result = client.login(os.environ["HUB_USER"], os.environ["HUB_TOKEN"])
+        if result['Status'] != 'Login Succeeded':
+            raise RuntimeError("Docker Login failed %s" % (result,))
 
     for (repo, tag) in image_refs:
         log.info(f"Pushing image {repo}:{tag}")
         for line in client.images.push(repo, tag, stream=True, decode=True):
             if "status" in line:
                 log.debug("%s id:%s" % (line["status"], line.get("id", "n/a")))
+            elif 'error' in line:
+                log.warning("Push error %s" % (line,))
+                raise RuntimeError("Docker Push Failed\n %s" % (line,))
+            else:
+                log.info("other %s" % (line,))
 
 
 def build_image(client, image_name, image_def, dfile_path, build_args):
