@@ -471,7 +471,7 @@ class IamRoleTest(BaseTest):
         assert client.get_role(RoleName='accountmgr-dev')[
             'Role'].get('PermissionsBoundary', {}) == {
                 'PermissionsBoundaryType': 'Policy',
-                'PermissionsBoundaryArn': 'BlackListIamList'
+                'PermissionsBoundaryArn': 'arn:aws:iam::644160558196:policy/BlackListIamList',
         }
 
     def test_iam_role_remove_boundary(self):
