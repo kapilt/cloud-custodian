@@ -248,7 +248,7 @@ def cli():
     slices, dices, and blends :-)
     """
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s:%(name)s:%(levelname)s %(message)s"
+        level=logging.INFO, format="%(asctime)s:%(levelname)s %(message)s"
     )
     logging.getLogger("docker").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.INFO)
