@@ -18,7 +18,7 @@ Build Docker Artifacts
 On build this is loosely modeled after https://github.com/docker/build-push-action
   - same in that we auto add labels from github action metadata.
   - differs in that we use `dev` for latest.
-  - differs in thta latest refers to last tagged image.
+  - differs in that latest refers to last tagged revision.
 
 We also support running functional tests and image cve scanning before pushing.
 """
@@ -334,13 +334,13 @@ def get_labels(image):
         "org.opencontainers.image.description": image.metadata["description"],
     }
 
-    git_env = get_git_env()
+    if not hub_env:
+        hub_env = get_git_env()
+
     if hub_env.get("repository"):
         labels["org.opencontainers.image.source"] = hub_env["repository"]
     if hub_env.get("sha"):
         labels["org.opencontainers.image.revision"] = hub_env["sha"]
-    else:
-        labels['org.opencontainers.image.revision'] = git_env['sha']
     return labels
 
 
@@ -364,7 +364,8 @@ def get_github_env():
 
 
 def get_git_env():
-    return {'sha': subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('utf8')}
+    return {"sha": subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8"),
+            "repository": "https://github.com/cloud-custodian/cloud-custodian"}
 
 
 def get_image_repo_tags(image, registries, tags):
@@ -437,9 +438,9 @@ def test_image(image_id, image_name, providers):
 
 def push_image(client, image_id, image_refs):
     if "HUB_TOKEN" in os.environ and "HUB_USER" in os.environ:
-        log.info("docker hub login %s" % os.environ['HUB_USER'])
+        log.info("docker hub login %s" % os.environ["HUB_USER"])
         result = client.login(os.environ["HUB_USER"], os.environ["HUB_TOKEN"])
-        if result['Status'] != 'Login Succeeded':
+        if result["Status"] != "Login Succeeded":
             raise RuntimeError("Docker Login failed %s" % (result,))
 
     for (repo, tag) in image_refs:
@@ -447,7 +448,7 @@ def push_image(client, image_id, image_refs):
         for line in client.images.push(repo, tag, stream=True, decode=True):
             if "status" in line:
                 log.debug("%s id:%s" % (line["status"], line.get("id", "n/a")))
-            elif 'error' in line:
+            elif "error" in line:
                 log.warning("Push error %s" % (line,))
                 raise RuntimeError("Docker Push Failed\n %s" % (line,))
             else:
