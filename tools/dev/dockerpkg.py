@@ -364,8 +364,10 @@ def get_github_env():
 
 
 def get_git_env():
-    return {"sha": subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8"),
-            "repository": "https://github.com/cloud-custodian/cloud-custodian"}
+    return {
+        "sha": subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8"),
+        "repository": "https://github.com/cloud-custodian/cloud-custodian",
+    }
 
 
 def get_image_repo_tags(image, registries, tags):
