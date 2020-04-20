@@ -362,8 +362,9 @@ def get_github_env():
         if v
     }
 
+
 def get_git_env():
-    return {'sha': subprocess.check_output(['git', 'rev-parse', 'head'])}
+    return {'sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'])}
 
 
 def get_image_repo_tags(image, registries, tags):
