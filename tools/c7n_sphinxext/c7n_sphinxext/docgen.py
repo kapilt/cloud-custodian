@@ -29,6 +29,7 @@ from sphinx.util.nodes import nested_parse_with_titles
 
 from c7n.schema import (
     ElementSchema, resource_vocabulary, generate as generate_schema)
+from c7n.policy import execution
 from c7n.resources import load_resources
 from c7n.provider import clouds
 
@@ -122,6 +123,23 @@ class CustodianSchema(CustodianDirective):
         return self._nodify(
             'schema.rst', '<c7n-schema>',
             dict(name=schema_path, schema_yaml=schema_yaml))
+
+
+def get_provider_modes(provider):
+    # little bit messy
+    # c7n. prefix ~ aws
+    # except pull which is common to all.
+    results = []
+    module_prefix = "c7n_%s." % provider if provider != "aws" else "c7n."
+    pull = None
+    for name, klass in execution.items():
+        if klass.type == 'pull':
+            pull = klass
+        if klass.__module__.startswith(module_prefix):
+            results.append(klass)
+    results = list(sorted(results, key=operator.attrgetter('type')))
+    results.insert(0, pull)
+    return results
 
 
 INITIALIZED = False
@@ -255,6 +273,15 @@ def _main(provider, output_dir, group_by):
         files.insert(0, os.path.basename(fpath))
 
     log.info("%s Wrote %d resources groups", provider.title(), len(files))
+
+    # Write out provider modes
+    modes = get_provider_modes(provider)
+    mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
+    with open(mode_path, 'w') as fh:
+        t = env.get_template('provider-mode.rst')
+        fh.write(t.render(
+            provider_name=provider_class.display_name,
+            modes=modes))
 
     # Write out the provider index
     provider_path = os.path.join(output_dir, 'index.rst')
