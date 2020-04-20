@@ -30,7 +30,6 @@ import threading
 import traceback
 
 import boto3
-import botocore.client
 
 from botocore.validate import ParamValidator
 
