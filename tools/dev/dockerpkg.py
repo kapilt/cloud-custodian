@@ -422,6 +422,7 @@ def get_env_tags(cli_tag):
             image_tags.append(rvalue)
 
     if cli_tag == 'nightly':
+        image_tags.append(cli_tag)
         image_tags.append(datetime.utcnow().strftime("%Y-%m-%d"))
 
     if cli_tag not in ('nightly', 'auto'):
