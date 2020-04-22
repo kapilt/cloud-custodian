@@ -411,21 +411,21 @@ def get_env_tags(cli_tag):
     image_tags = []
     hub_env = get_github_env()
 
-    if "ref" in hub_env and cli_tag == 'auto':
+    if "ref" in hub_env and cli_tag == "auto":
         _, rtype, rvalue = hub_env["ref"].split("/", 2)
         if rtype == "tags":
             image_tags.append("latest")
             image_tags.append(rvalue)
         elif rtype == "heads" and rvalue == "master":
             image_tags.append("dev")
-        elif rtype == "heads": # branch
+        elif rtype == "heads":  # branch
             image_tags.append(rvalue)
 
-    if cli_tag == 'nightly':
+    if cli_tag == "nightly":
         image_tags.append(cli_tag)
         image_tags.append(datetime.utcnow().strftime("%Y-%m-%d"))
 
-    if cli_tag not in ('nightly', 'auto'):
+    if cli_tag not in ("nightly", "auto"):
         image_tags = [cli_tag]
 
     return list(filter(None, image_tags))
