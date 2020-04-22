@@ -269,7 +269,7 @@ def cli():
 @click.option(
     "-r", "--registry", multiple=True, help="Registries for image repo on tag and push"
 )
-@click.option("--tag", help="Static tag for the image")
+@click.option("-t", "--tag", help="Static tag for the image")
 @click.option("--push", is_flag=True, help="Push images to registries")
 @click.option(
     "--test", help="Run lightweight functional tests with image", is_flag=True
