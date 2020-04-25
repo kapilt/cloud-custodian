@@ -235,6 +235,7 @@ class SecurityHub(LambdaMode):
             resources[0]['resource-arns'] = resource_arns
         return resources
 
+
 @execution.register('hub-action')
 class SecurityHubAction(SecurityHub):
     """Deploys a policy lambda as a Security Hub Console Action.
