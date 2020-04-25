@@ -197,7 +197,6 @@ def write_modified_file(fpath, content):
     if file_md5 and content_md5.hexdigest() == file_md5.hexdigest():
         return False
 
-    log.info('wrote file %s', fpath)
     with open(fpath, 'w') as fh:
         fh.write(content)
     return True
@@ -221,7 +220,7 @@ def _main(provider, output_dir, group_by):
     group_by = operator.attrgetter(group_by or "type")
 
     files = []
-
+    written = 0
     groups = {}
 
     for r in provider_class.resources.values():
@@ -235,7 +234,7 @@ def _main(provider, output_dir, group_by):
     for r in provider_class.resources.values():
         rpath = resource_file_name(output_dir, r)
         t = env.get_template('provider-resource.rst')
-        write_modified_file(
+        written += write_modified_file(
             rpath, t.render(
                 provider_name=provider,
                 resource=r))
@@ -246,7 +245,7 @@ def _main(provider, output_dir, group_by):
         rpath = os.path.join(
             output_dir, ("group-%s.rst" % key).replace(' ', '-').lower())
         t = env.get_template('provider-group.rst')
-        write_modified_file(
+        written += write_modified_file(
             rpath,
             t.render(
                 provider_name=provider,
@@ -275,7 +274,7 @@ def _main(provider, output_dir, group_by):
         ("%s-common-filters.rst" % provider_class.type.lower()))
 
     t = env.get_template('provider-common-elements.rst')
-    write_modified_file(
+    written += write_modified_file(
         fpath,
         t.render(
             provider_name=provider_class.display_name,
@@ -287,7 +286,7 @@ def _main(provider, output_dir, group_by):
         output_dir,
         ("%s-common-actions.rst" % provider_class.type.lower()))
     t = env.get_template('provider-common-elements.rst')
-    write_modified_file(
+    written += write_modified_file(
         fpath,
         t.render(
             provider_name=provider_class.display_name,
@@ -295,13 +294,11 @@ def _main(provider, output_dir, group_by):
             elements=[common_actions[k] for k in sorted(common_actions)]))
     files.insert(0, os.path.basename(fpath))
 
-    log.info("%s Wrote %d resources groups", provider.title(), len(files))
-
     # Write out provider modes
     modes = get_provider_modes(provider)
     mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
     t = env.get_template('provider-mode.rst')
-    write_modified_file(
+    written += write_modified_file(
         mode_path,
         t.render(
             provider_name=provider_class.display_name,
@@ -310,10 +307,12 @@ def _main(provider, output_dir, group_by):
 
     # Write out the provider index
     provider_path = os.path.join(output_dir, 'index.rst')
-    # log.info("Writing Provider Index to %s", provider_path)
     t = env.get_template('provider-index.rst')
-    write_modified_file(
+    written += write_modified_file(
         provider_path,
         t.render(
             provider_name=provider_class.display_name,
             files=files))
+
+    if written:
+        log.info("%s Wrote %d files", provider.title(), len(written))
