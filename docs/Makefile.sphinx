@@ -9,9 +9,9 @@ endif
 SPHINXBINS    ?= .tox/$(VIRTUALENV)/bin
 SRCDIR        ?= docs/source
 SPHINXOPTS    ?=
-SPHINXBUILD   ?= $(SPHINXBINS)/sphinx-build
+#SPHINXBUILD   ?= $(SPHINXBINS)/sphinx-build
 # use for poetry environments
-# SPHINXBUILD   ?= sphinx-build
+SPHINXBUILD   ?= sphinx-build
 PAPER         ?=
 BUILDDIR      ?= $(SRCDIR)/../build
 

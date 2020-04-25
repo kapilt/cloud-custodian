@@ -259,7 +259,7 @@ def _main(provider, output_dir, group_by):
     # Write out common provider filters & actions
     common_actions = {}
     common_filters = {}
-    for r in provider_class.resources.values():
+    for _, r in sorted(provider_class.resources.items()):
         for f in ElementSchema.elements(r.filter_registry):
             if not f.schema_alias:
                 continue
@@ -298,13 +298,15 @@ def _main(provider, output_dir, group_by):
     log.info("%s Wrote %d resources groups", provider.title(), len(files))
 
     # Write out provider modes
-    # modes = get_provider_modes(provider)
-    # mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
-    # with open(mode_path, 'w') as fh:
-    #    t = env.get_template('provider-mode.rst')
-    # fh.write(t.render(
-    # provider_name=provider_class.display_name,
-    # modes=modes))
+    modes = get_provider_modes(provider)
+    mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
+    t = env.get_template('provider-mode.rst')
+    write_modified_file(
+        mode_path,
+        t.render(
+            provider_name=provider_class.display_name,
+            modes=modes))
+    files.insert(0, os.path.basename(mode_path))
 
     # Write out the provider index
     provider_path = os.path.join(output_dir, 'index.rst')

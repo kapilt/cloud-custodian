@@ -56,6 +56,8 @@ ftest:
 	C7N_FUNCTIONAL=yes AWS_DEFAULT_REGION=us-east-2 ./bin/py.test -m functional tests
 
 sphinx:
+# check sphinx-build is on path
+	which sphinx-build
 	make -f docs/Makefile.sphinx html
 
 ghpages:
