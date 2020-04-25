@@ -11,7 +11,7 @@ install-poetry:
 
 pkg-update:
 	poetry update
-	for pkg in $(PKG_SET); do cd $$pkg && poetry update && cd ../..; done
+	for pkg in $(PKG_SET); do cd $$pkg && echo $$pkg && poetry update && cd ../..; done
 
 pkg-show-update:
 	poetry show -o
