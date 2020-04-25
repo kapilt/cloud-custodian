@@ -184,6 +184,7 @@ def main(provider, output_dir, group_by):
         traceback.print_exc()
         pdb.post_mortem(sys.exc_info()[-1])
 
+
 def write_modified_file(fpath, content):
     content_md5 = hashlib.md5(content.encode('utf8'))
 
@@ -200,6 +201,7 @@ def write_modified_file(fpath, content):
     with open(fpath, 'w') as fh:
         fh.write(content)
     return True
+
 
 def resource_file_name(output_dir, r):
     return os.path.join(
@@ -296,8 +298,8 @@ def _main(provider, output_dir, group_by):
     log.info("%s Wrote %d resources groups", provider.title(), len(files))
 
     # Write out provider modes
-    modes = get_provider_modes(provider)
-    mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
+    # modes = get_provider_modes(provider)
+    # mode_path = os.path.join(output_dir, '%s-modes.rst' % provider_class.type.lower())
     # with open(mode_path, 'w') as fh:
     #    t = env.get_template('provider-mode.rst')
     # fh.write(t.render(
@@ -306,7 +308,7 @@ def _main(provider, output_dir, group_by):
 
     # Write out the provider index
     provider_path = os.path.join(output_dir, 'index.rst')
-    #log.info("Writing Provider Index to %s", provider_path)
+    # log.info("Writing Provider Index to %s", provider_path)
     t = env.get_template('provider-index.rst')
     write_modified_file(
         provider_path,
