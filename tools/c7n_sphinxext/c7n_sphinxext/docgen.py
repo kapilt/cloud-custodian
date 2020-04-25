@@ -315,4 +315,4 @@ def _main(provider, output_dir, group_by):
             files=files))
 
     if written:
-        log.info("%s Wrote %d files", provider.title(), len(written))
+        log.info("%s Wrote %d files", provider.title(), written)
