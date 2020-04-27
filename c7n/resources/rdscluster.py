@@ -342,7 +342,6 @@ class RDSClusterSnapshot(QueryResourceManager):
     """
 
     class resource_type(TypeInfo):
-
         service = 'rds'
         arn_type = 'cluster-snapshot'
         arn_separator = ':'
