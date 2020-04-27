@@ -20,7 +20,7 @@ from c7n.filters import AgeFilter, CrossAccountAccessFilter
 from c7n.filters.offhours import OffHour, OnHour
 import c7n.filters.vpc as net_filters
 from c7n.manager import resources
-from c7n.query import QueryResourceManager, TypeInfo
+from c7n.query import QueryResourceManager, TypeInfo, DescribeSource
 from c7n import tags
 from .aws import shape_validate
 from c7n.exceptions import PolicyValidationError
@@ -352,9 +352,26 @@ class RDSClusterSnapshot(QueryResourceManager):
         name = id = 'DBClusterSnapshotIdentifier'
         date = 'SnapshotCreateTime'
         universal_tagging = object()
+        config_type = 'AWS::RDS::DBClusterSnapshot'
         permissions_enum = ('rds:DescribeDBClusterSnapshots',)
 
-    augment = tags.universal_augment
+    def get_source(self, source_type):
+        if source_type == 'describe':
+            return DescribeClusterSnapshot(self)
+        return super().get_source(source_type)
+
+
+class DescribeClusterSnapshot(DescribeSource):
+
+    def get_resources(self, resource_ids, cache=True):
+        client = local_session(self.manager.session_factory).client('rds')
+        return client.describe_db_cluster_snapshots(
+            Filters=[{
+                'Name': 'db-cluster-snapshot-id',
+                'Values': resource_ids}]).get('DBClusterSnapshots', ())
+
+    def augment(self, resources):
+        return tags.universal_augment(self.manager, resources)
 
 
 @RDSClusterSnapshot.filter_registry.register('cross-account')
@@ -371,11 +388,6 @@ class CrossAccountSnapshot(CrossAccountAccessFilter):
                 futures.append(w.submit(
                     self.process_resource_set, resource_set))
             for f in as_completed(futures):
-                if f.exception():
-                    self.log.error(
-                        "Exception checking cross account access\n %s" % (
-                            f.exception()))
-                    continue
                 results.extend(f.result())
         return results
 
@@ -385,7 +397,7 @@ class CrossAccountSnapshot(CrossAccountAccessFilter):
         for r in resource_set:
             attrs = {t['AttributeName']: t['AttributeValues']
              for t in self.manager.retry(
-                client.describe_db_snapshot_attributes,
+                client.describe_db_cluster_snapshot_attributes,
                      DBClusterSnapshotIdentifier=r['DBClusterSnapshotIdentifier'])[
                          'DBClusterSnapshotAttributesResult']['DBClusterSnapshotAttributes']}
             r['c7n:attributes'] = attrs
