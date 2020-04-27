@@ -365,7 +365,8 @@ class DescribeClusterSnapshot(DescribeSource):
 
     def get_resources(self, resource_ids, cache=True):
         client = local_session(self.manager.session_factory).client('rds')
-        return client.describe_db_cluster_snapshots(
+        return self.manager.retry(
+            client.describe_db_cluster_snapshots,
             Filters=[{
                 'Name': 'db-cluster-snapshot-id',
                 'Values': resource_ids}]).get('DBClusterSnapshots', ())
