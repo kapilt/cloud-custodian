@@ -349,7 +349,7 @@ def schema_cmd(options):
     if not options.resource:
         load_available(resources=False)
         resource_list = {'resources': sorted(itertools.chain(
-            *[clouds[p].resource_map.keys() for p in PROVIDER_NAMES]))}
+            *[clouds[p].resource_map.keys() for p in PROVIDER_NAMES if p in clouds]))}
         print(yaml_dump(resource_list))
         return
 
