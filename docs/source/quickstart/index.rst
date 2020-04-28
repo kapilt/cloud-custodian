@@ -52,7 +52,7 @@ To install via docker, just run::
   $ docker pull cloudcustodian/c7n
 
 You'll need to export cloud provider credentials to the container
-when executing. One example, If your using environment variables for provider
+when executing. One example, if your using environment variables for provider
 credentials::
 
   $ docker run -it \
