@@ -1560,6 +1560,7 @@ class NetworkTrafficMirror(ValueFilter):
     schema = type_schema(
         'traffic-mirror', state={'type': 'boolean'}, rinherit=ValueFilter.schema)
     annotation_key = 'c7n:traffic-mirrors'
+    permissions = ('ec2:DescribeTrafficMirrorSessions',)
 
     def process(self, resources):
         state = self.data.get('state', True)
@@ -1599,6 +1600,10 @@ class SetTrafficMirror(BaseAction):
         filter={'type': 'string', 'pattern': '^tmf-$'},
         tags={'type': 'object'},
     )
+
+    permissions = (
+        'ec2:CreateTrafficMirrorSession',
+        'ec2:DeleteTrafficMirrorSession')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('ec2')
