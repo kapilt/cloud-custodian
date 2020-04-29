@@ -1553,6 +1553,7 @@ class InterfaceVpcFilter(net_filters.VpcFilter):
 
     RelatedIdsExpression = "VpcId"
 
+
 @NetworkInterface.filter_registry.register('traffic-mirror')
 class NetworkTrafficMirror(ValueFilter):
     """Filter network interfaces for traffic mirror session"""
@@ -1587,7 +1588,7 @@ class NetworkTrafficMirror(ValueFilter):
 
 
 @NetworkInterface.action_registry.register('set-traffic-mirror')
-class SetTrafficMirror(Action):
+class SetTrafficMirror(BaseAction):
     """
     Create/Disable a traffic mirror session
     """
@@ -1603,7 +1604,7 @@ class SetTrafficMirror(Action):
         client = local_session(self.manager.session_factory).client('ec2')
         state = self.data.get('state', 'enabled') == 'enabled' and True or False
 
-        if state == False:
+        if state is False:
             return self.disable_traffic_mirror(client, resources)
 
         for r in resources:
