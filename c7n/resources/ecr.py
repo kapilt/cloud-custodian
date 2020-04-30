@@ -17,29 +17,9 @@ from c7n.actions import RemovePolicyBase, Action
 from c7n.exceptions import PolicyValidationError
 from c7n.filters import CrossAccountAccessFilter, Filter, ValueFilter
 from c7n.manager import resources
-from c7n.query import DescribeSource, QueryResourceManager, TypeInfo
+from c7n.query import ConfigSource, DescribeSource, QueryResourceManager, TypeInfo
 from c7n import tags
 from c7n.utils import local_session, type_schema
-
-
-@resources.register('ecr')
-class ECR(QueryResourceManager):
-
-    class resource_type(TypeInfo):
-        service = 'ecr'
-        enum_spec = ('describe_repositories', 'repositories', None)
-        name = "repositoryName"
-        arn = id = "repositoryArn"
-        arn_type = 'repository'
-        filter_name = 'repositoryNames'
-        filter_type = 'list'
-        # config_type = 'AWS::ECR::Repository'
-
-    def get_source(self, source_type):
-        source = super().get_source(source_type)
-        if source_type == 'describe':
-            source = DescribeECR(self)
-        return source
 
 
 class DescribeECR(DescribeSource):
@@ -55,6 +35,26 @@ class DescribeECR(DescribeSource):
             except client.exceptions.RepositoryNotFoundException:
                 continue
         return results
+
+
+@resources.register('ecr')
+class ECR(QueryResourceManager):
+
+    class resource_type(TypeInfo):
+        service = 'ecr'
+        enum_spec = ('describe_repositories', 'repositories', None)
+        name = "repositoryName"
+        arn = id = "repositoryArn"
+        arn_type = 'repository'
+        filter_name = 'repositoryNames'
+        filter_type = 'list'
+        # config_type = 'AWS::ECR::Repository'
+
+    source_mapping = {
+        'describe': DescribeECR,
+        'config': ConfigSource
+    }
+
 
 
 @ECR.action_registry.register('tag')
