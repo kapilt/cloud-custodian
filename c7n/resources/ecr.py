@@ -45,7 +45,7 @@ class ECR(QueryResourceManager):
 class DescribeECR(DescribeSource):
 
     def augment(self, resources):
-        client = local_session(self.session_factory).client('ecr')
+        client = local_session(self.manager.session_factory).client('ecr')
         results = []
         for r in resources:
             try:
