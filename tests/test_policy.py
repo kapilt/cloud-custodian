@@ -208,7 +208,7 @@ class PolicyMetaLint(BaseTest):
         cfn_types = set(load_data('cfn-types.json'))
         for rtype in resource_cfn_types:
             assert rtype in cfn_types, "invalid cfn %s" % rtype
-        
+
     def test_config_resource_support(self):
 
         # for several of these we express support as filter or action instead
