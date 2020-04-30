@@ -99,7 +99,7 @@ class S3(query.QueryResourceManager):
         name = id = 'Name'
         date = 'CreationDate'
         dimension = 'BucketName'
-        config_type = 'AWS::S3::Bucket'
+        cfn_type = config_type = 'AWS::S3::Bucket'
 
     filter_registry = filters
     action_registry = actions

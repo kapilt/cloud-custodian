@@ -33,6 +33,7 @@ class CodeRepository(QueryResourceManager):
         name = id = 'repositoryName'
         arn = "Arn"
         date = 'creationDate'
+        cfn_type = 'AWS::CodeCommit::Repository'
 
     def get_resources(self, ids, cache=True):
         return self.augment([{'repositoryName': i} for i in ids])
@@ -84,7 +85,7 @@ class CodeBuildProject(QueryResourceManager):
         arn = 'arn'
         date = 'created'
         dimension = 'ProjectName'
-        config_type = "AWS::CodeBuild::Project"
+        cfn_type = config_type = "AWS::CodeBuild::Project"
         arn_type = 'project'
         universal_taggable = object()
 
@@ -168,4 +169,4 @@ class CodeDeployPipeline(QueryResourceManager):
         date = 'created'
         # Note this is purposeful, codepipeline don't have a separate type specifier.
         arn_type = ""
-        config_type = "AWS::CodePipeline::Pipeline"
+        cfn_type = config_type = "AWS::CodePipeline::Pipeline"

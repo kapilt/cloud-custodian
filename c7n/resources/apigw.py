@@ -143,7 +143,7 @@ class RestApi(query.QueryResourceManager):
         name = 'name'
         date = 'createdDate'
         dimension = 'GatewayName'
-        config_type = "AWS::ApiGateway::RestApi"
+        cfn_type = config_type = "AWS::ApiGateway::RestApi"
         universal_taggable = object()
         permissions_enum = ('apigateway:GET',)
 
@@ -258,7 +258,7 @@ class RestStage(query.ChildResourceManager):
         name = id = 'stageName'
         date = 'createdDate'
         universal_taggable = True
-        config_type = "AWS::ApiGateway::Stage"
+        cfn_type = config_type = "AWS::ApiGateway::Stage"
         arn_type = 'stages'
         permissions_enum = ('apigateway:GET',)
 
@@ -386,6 +386,7 @@ class RestResource(query.ChildResourceManager):
         id = 'id'
         name = 'path'
         permissions_enum = ('apigateway:GET',)
+        cfn_type = 'AWS::ApiGateway::Resource'
 
 
 @query.sources.register('describe-rest-resource')
@@ -414,6 +415,7 @@ class RestApiVpcLink(query.QueryResourceManager):
         id = 'id'
         name = 'name'
         permissions_enum = ('apigateway:GET',)
+        cfn_type = 'AWS::ApiGateway::VpcLink'
 
 
 @RestResource.filter_registry.register('rest-integration')

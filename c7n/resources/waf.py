@@ -26,7 +26,7 @@ class WAF(QueryResourceManager):
         name = "Name"
         id = "WebACLId"
         dimension = "WebACL"
-        config_type = "AWS::WAF::WebACL"
+        cfn_type = config_type = "AWS::WAF::WebACL"
         arn_type = "webacl"
         permissions_enum = ('waf:ListWebACLs',)
         permissions_augment = ('waf:GetWebACL',)
@@ -42,7 +42,7 @@ class RegionalWAF(QueryResourceManager):
         name = "Name"
         id = "WebACLId"
         dimension = "WebACL"
-        config_type = "AWS::WAFRegional::WebACL"
+        cfn_type = config_type = "AWS::WAFRegional::WebACL"
         arn_type = "webacl"
         permissions_enum = ('waf-regional:ListWebACLs',)
         permissions_augment = ('waf-regional:GetWebACL',)

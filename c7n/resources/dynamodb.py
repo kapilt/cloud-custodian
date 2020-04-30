@@ -67,7 +67,7 @@ class Table(query.QueryResourceManager):
         name = 'TableName'
         date = 'CreationDateTime'
         dimension = 'TableName'
-        config_type = 'AWS::DynamoDB::Table'
+        cfn_type = config_type = 'AWS::DynamoDB::Table'
         universal_taggable = object()
 
     source_mapping = {
@@ -371,7 +371,7 @@ class DynamoDbAccelerator(query.QueryResourceManager):
         enum_spec = ('describe_clusters', 'Clusters', None)
         id = 'ClusterArn'
         name = 'ClusterName'
-        # config_type = 'AWS::DAX::Cluster'
+        cfn_type = 'AWS::DAX::Cluster'
 
     permissions = ('dax:ListTags',)
 

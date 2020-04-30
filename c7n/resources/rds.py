@@ -109,7 +109,7 @@ class RDS(QueryResourceManager):
         filter_type = 'scalar'
         date = 'InstanceCreateTime'
         dimension = 'DBInstanceIdentifier'
-        config_type = 'AWS::RDS::DBInstance'
+        cfn_type = config_type = 'AWS::RDS::DBInstance'
         arn = 'DBInstanceArn'
         universal_taggable = True
         default_report_fields = (
@@ -926,11 +926,11 @@ class RDSSubscription(QueryResourceManager):
     class resource_type(TypeInfo):
         service = 'rds'
         arn_type = 'rds-subscription'
+        cfn_type = 'AWS::RDS::EventSubscription'
         enum_spec = (
             'describe_event_subscriptions', 'EventSubscriptionsList', None)
         name = id = "EventSubscriptionArn"
         date = "SubscriptionCreateTime"
-        # config_type = "AWS::DB::EventSubscription"
         # SubscriptionName isn't part of describe events results?! all the
         # other subscription apis.
         # filter_name = 'SubscriptionName'
@@ -1385,7 +1385,7 @@ class RDSSubnetGroup(QueryResourceManager):
         filter_name = 'DBSubnetGroupName'
         filter_type = 'scalar'
         permissions_enum = ('rds:DescribeDBSubnetGroups',)
-        config_type = 'AWS::RDS::DBSubnetGroup'
+        cfn_type = config_type = 'AWS::RDS::DBSubnetGroup'
 
     source_mapping = {
         'config': ConfigSource,

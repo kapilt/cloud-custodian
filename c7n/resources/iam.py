@@ -54,7 +54,7 @@ class Group(QueryResourceManager):
         enum_spec = ('list_groups', 'Groups', None)
         id = name = 'GroupName'
         date = 'CreateDate'
-        config_type = "AWS::IAM::Group"
+        cfn_type = config_type = "AWS::IAM::Group"
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'
@@ -92,7 +92,7 @@ class Role(QueryResourceManager):
         detail_spec = ('get_role', 'RoleName', 'RoleName', 'Role')
         id = name = 'RoleName'
         date = 'CreateDate'
-        config_type = "AWS::IAM::Role"
+        cfn_type = config_type = "AWS::IAM::Role"
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'
@@ -212,7 +212,7 @@ class User(QueryResourceManager):
         enum_spec = ('list_users', 'Users', None)
         id = name = 'UserName'
         date = 'CreateDate'
-        config_type = "AWS::IAM::User"
+        cfn_type = config_type = "AWS::IAM::User"
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'
@@ -348,7 +348,7 @@ class Policy(QueryResourceManager):
         id = 'PolicyId'
         name = 'PolicyName'
         date = 'CreateDate'
-        config_type = "AWS::IAM::Policy"
+        cfn_type = config_type = "AWS::IAM::Policy"
         # Denotes this resource type exists across regions
         global_resource = True
         arn = 'Arn'

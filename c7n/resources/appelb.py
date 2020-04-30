@@ -52,7 +52,7 @@ class AppELB(QueryResourceManager):
         filter_type = "list"
         dimension = "LoadBalancer"
         date = 'CreatedTime'
-        config_type = 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+        cfn_type = config_type = 'AWS::ElasticLoadBalancingV2::LoadBalancer'
         arn = "LoadBalancerArn"
         # The suffix varies by type of loadbalancer (app vs net)
         arn_type = 'loadbalancer/app'
@@ -885,6 +885,7 @@ class AppELBTargetGroup(QueryResourceManager):
         name = 'TargetGroupName'
         id = 'TargetGroupArn'
         permission_prefix = 'elasticloadbalancing'
+        cfn_type = 'AWS::ElasticLoadBalancingV2::TargetGroup'
 
     filter_registry = FilterRegistry('app-elb-target-group.filters')
     action_registry = ActionRegistry('app-elb-target-group.actions')

@@ -43,7 +43,8 @@ class AWSLambda(query.QueryResourceManager):
         name = id = 'FunctionName'
         date = 'LastModified'
         dimension = 'FunctionName'
-        config_type = "AWS::Lambda::Function"
+        config_type = 'AWS::Lambda::Function'
+        cfn_type = 'AWS::Lambda::Function'
         universal_taggable = object()
 
     def get_source(self, source_type):
@@ -481,6 +482,7 @@ class LambdaLayerVersion(query.QueryResourceManager):
         date = 'CreatedDate'
         arn = "LayerVersionArn"
         arn_type = "layer"
+        cfn_type = 'AWS::Lambda::LayerVersion'
 
     def augment(self, resources):
         versions = {}

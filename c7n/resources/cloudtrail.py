@@ -36,7 +36,7 @@ class CloudTrail(QueryResourceManager):
         filter_type = 'list'
         arn = id = 'TrailARN'
         name = 'Name'
-        config_type = "AWS::CloudTrail::Trail"
+        cfn_type = config_type = "AWS::CloudTrail::Trail"
         universal_taggable = object()
 
     def get_source(self, source_type):

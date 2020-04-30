@@ -52,7 +52,7 @@ class RDSCluster(QueryResourceManager):
         dimension = 'DBClusterIdentifier'
         universal_taggable = True
         permissions_enum = ('rds:DescribeDBClusters',)
-        config_type = 'AWS::RDS::DBCluster'
+        cfn_type = config_type = 'AWS::RDS::DBCluster'
 
     source_mapping = {
         'config': ConfigSource,
