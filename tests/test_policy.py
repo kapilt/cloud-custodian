@@ -261,7 +261,6 @@ class PolicyMetaLint(BaseTest):
             raise AssertionError(
                 "Invalid config types \n %s" % ('\n'.join(bad_types)))
 
-
     def test_resource_meta_with_class(self):
         missing = set()
         for k, v in manager.resources.items():

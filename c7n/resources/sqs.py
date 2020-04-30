@@ -95,7 +95,6 @@ class SQS(QueryResourceManager):
         return super(SQS, self).get_resources(ids_normalized, cache)
 
 
-
 @SQS.filter_registry.register('metrics')
 class MetricsFilter(MetricsFilter):
 

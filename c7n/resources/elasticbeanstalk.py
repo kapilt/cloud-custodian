@@ -76,6 +76,7 @@ class ElasticBeanstalkEnvironment(QueryResourceManager):
         'config': ConfigSource
     }
 
+
 ElasticBeanstalkEnvironment.filter_registry.register(
     'tag-count', tags.TagCountFilter)
 ElasticBeanstalkEnvironment.filter_registry.register(

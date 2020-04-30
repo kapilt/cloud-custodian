@@ -56,7 +56,6 @@ class ECR(QueryResourceManager):
     }
 
 
-
 @ECR.action_registry.register('tag')
 class ECRTag(tags.Tag):
 

@@ -930,7 +930,7 @@ class RDSSubscription(QueryResourceManager):
             'describe_event_subscriptions', 'EventSubscriptionsList', None)
         name = id = "EventSubscriptionArn"
         date = "SubscriptionCreateTime"
-        #config_type = "AWS::DB::EventSubscription"
+        # config_type = "AWS::DB::EventSubscription"
         # SubscriptionName isn't part of describe events results?! all the
         # other subscription apis.
         # filter_name = 'SubscriptionName'
@@ -1367,7 +1367,8 @@ class DescribeSubnetGroup(DescribeSource):
 
     def augment(self, resources):
         _db_subnet_group_tags(
-            resources, self.manager.session_factory, self.manager.executor_factory, self.manager.retry)
+            resources, self.manager.session_factory,
+            self.manager.executor_factory, self.manager.retry)
         return resources
 
 
