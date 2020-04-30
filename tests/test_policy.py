@@ -23,7 +23,7 @@ from c7n.config import Config
 from c7n.provider import clouds
 from c7n.exceptions import ResourceLimitExceeded, PolicyValidationError
 from c7n.resources import aws, load_available
-from c7n.resources.aws import AWS
+from c7n.resources.aws import AWS, fake_session
 from c7n.resources.ec2 import EC2
 from c7n.schema import generate, JsonSchemaValidator
 from c7n.utils import dumps
@@ -196,6 +196,23 @@ class PolicyMetaLint(BaseTest):
                 names.append(k)
         if names:
             self.fail("%s dont have resource name for reporting" % (", ".join(names)))
+
+    def test_config_resource_support(self):
+        resource_map = {}
+        for k, v in manager.resources.items():
+            if not v.resource_type.config_type:
+                continue
+            resource_map[v.resource_type.config_type] = v
+        session = fake_session()._session
+        model = session.get_service_model('config')
+        shape = model.shape_for('ResourceType')
+        missing = []
+        for k in shape.enum:
+            if k not in resource_map:
+                missing.append(k)
+        if missing:
+            raise AssertionError(
+                "Missing config types \n %s" % ('\n'.join(missing)))
 
     def test_resource_meta_with_class(self):
         missing = set()
