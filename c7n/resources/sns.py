@@ -17,10 +17,26 @@ from c7n.actions import RemovePolicyBase, ModifyPolicyBase, BaseAction
 from c7n.filters import CrossAccountAccessFilter, PolicyChecker
 from c7n.filters.kms import KmsRelatedFilter
 from c7n.manager import resources
-from c7n.query import DescribeSource, QueryResourceManager, TypeInfo
+from c7n.query import ConfigSource, DescribeSource, QueryResourceManager, TypeInfo
 from c7n.resolver import ValuesFrom
 from c7n.utils import local_session, type_schema
 from c7n.tags import RemoveTag, Tag, TagDelayedAction, TagActionFilter
+
+
+class DescribeTopic(DescribeSource):
+
+    def augment(self, resources):
+        client = local_session(self.manager.session_factory).client('sns')
+
+        def _augment(r):
+            tags = self.manager.retry(client.list_tags_for_resource,
+                ResourceArn=r['TopicArn'])['Tags']
+            r['Tags'] = tags
+            return r
+
+        resources = super().augment(resources)
+        with self.manager.executor_factory(max_workers=3) as w:
+            return list(w.map(_augment, resources))
 
 
 @resources.register('sns')
@@ -45,28 +61,10 @@ class SNS(QueryResourceManager):
         )
 
     permissions = ('sns:ListTagsForResource',)
-
-    def get_source(self, source_type):
-        source = super().get_source(source_type)
-        if source_type == 'describe':
-            source = DescribeTopic(self)
-        return source
-
-
-class DescribeTopic(DescribeSource):
-
-    def augment(self, resources):
-        client = local_session(self.session_factory).client('sns')
-
-        def _augment(r):
-            tags = self.retry(client.list_tags_for_resource,
-                ResourceArn=r['TopicArn'])['Tags']
-            r['Tags'] = tags
-            return r
-
-        resources = super(SNS, self).augment(resources)
-        with self.executor_factory(max_workers=3) as w:
-            return list(w.map(_augment, resources))
+    source_mapping = {
+        'describe': DescribeTopic,
+        'config': ConfigSource
+    }
 
 
 SNS.filter_registry.register('marked-for-op', TagActionFilter)
