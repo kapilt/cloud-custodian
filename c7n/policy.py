@@ -757,11 +757,12 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
         cfg_event = json.loads(event['invokingEvent'])
         resource_type = self.policy.resource_manager.resource_type.cfn_type
         resource_id = self.policy.resource_manager.resource_type.id
-        client = local_session(self.policy.session_factory).client('config')
+        client = utils.local_session(
+            self.policy.session_factory).client('config')
 
-        matched_resources = {r[resource_id] for r in PollMode.run(self)}
+        matched_resources = {r[resource_id] for r in PullMode.run(self)}
         unmatched_resources = {
-            r[resource_id] for self.policy.manager.source.resources()
+            r[resource_id] for r in self.policy.manager.source.resources()
             if r[resource_id] not in matched_resources}
 
         evaluations = [dict(
@@ -770,12 +771,13 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
             ComplianceType='NON_COMPLIANT',
             Annotation='The resource is not compliant with policy:%s.' % (
                 self.policy.name))
-                for r in matched_resources]
-        self.policy.resource_manager.retry(
-            client.put_evaluations,
-            Evaluations=evaluations,
-            OrderingTimestamp=cfg_event['notificationCreationTime'],
-            ResultToken=event.get('resultToken', 'No token found.'))
+            for r in matched_resources]
+        if evaluations:
+            self.policy.resource_manager.retry(
+                client.put_evaluations,
+                Evaluations=evaluations,
+                OrderingTimestamp=cfg_event['notificationCreationTime'],
+                ResultToken=event.get('resultToken', 'No token found.'))
 
         evaluations = [dict(
             ComplianceResourceType=resource_type,
@@ -783,12 +785,13 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
             ComplianceType='COMPLIANT',
             Annotation='The resource is compliant with policy:%s.' % (
                 self.policy.name))
-                for r in matched_resources]
-        self.policy.resource_manager.retry(
-            client.put_evaluations,
-            Evaluations=evaluations,
-            OrderingTimestamp=cfg_event['notificationCreationTime'],
-            ResultToken=event.get('resultToken', 'No token found.'))
+            for r in unmatched_resources]
+        if evaluations:
+            self.policy.resource_manager.retry(
+                client.put_evaluations,
+                Evaluations=evaluations,
+                OrderingTimestamp=cfg_event['notificationCreationTime'],
+                ResultToken=event.get('resultToken', 'No token found.'))
 
 
 @execution.register('config-rule')
