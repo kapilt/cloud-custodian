@@ -174,14 +174,25 @@ class CodeDeployPipeline(QueryResourceManager):
         date = 'created'
         # Note this is purposeful, codepipeline don't have a separate type specifier.
         arn_type = ""
-<<<<<<< HEAD
         cfn_type = config_type = "AWS::CodePipeline::Pipeline"
-=======
-        config_type = "AWS::CodePipeline::Pipeline"
         universal_tagging = object()
 
     source_mapping = {
         'describe': DescribePipeline,
         'config': ConfigSource
     }
->>>>>>> 43b92f795... aws - code commit & pipeline tags
+
+
+@CodeDeployPipeline.action_registry.register('delete')
+class DeletePipeline(BaseAction):
+
+    schema = type_schema('delete')
+    permissions = ('codepipeline:DeletePipeline',)
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('codepipeline')
+        for r in resources:
+            try:
+                self.manager.retry(client.delete_pipeline, Name=r['name'])
+            except client.exceptions.PipelineNotFoundException:
+                continue
