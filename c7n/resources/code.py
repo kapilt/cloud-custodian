@@ -193,6 +193,6 @@ class DeletePipeline(BaseAction):
         client = local_session(self.manager.session_factory).client('codepipeline')
         for r in resources:
             try:
-                self.manager.retry(client.delete_pipeline, Name=r['name'])
+                self.manager.retry(client.delete_pipeline, name=r['name'])
             except client.exceptions.PipelineNotFoundException:
                 continue
