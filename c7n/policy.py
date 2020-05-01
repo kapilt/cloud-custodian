@@ -740,10 +740,13 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
 
     def validate(self):
         super().validate()
+<<<<<<< HEAD
         if not self.data.get('schedule'):
             raise PolicyValidationError(
                 "policy:%s config-poll-rule schedule required" % (
                     self.policy.name))
+=======
+>>>>>>> ef4307834... aws - config-poll-rule mode
         if self.policy.resource_manager.resource_type.config_type:
             raise PolicyValidationError(
                 "resource:%s fully supported by config and should use mode: config-rule" % (
@@ -761,18 +764,27 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
         cfg_event = json.loads(event['invokingEvent'])
         resource_type = self.policy.resource_manager.resource_type.cfn_type
         resource_id = self.policy.resource_manager.resource_type.id
+<<<<<<< HEAD
         client = utils.local_session(
             self.policy.session_factory).client('config')
 
         matched_resources = {r[resource_id] for r in PullMode.run(self)}
         unmatched_resources = {
             r[resource_id] for r in self.policy.manager.source.resources()
+=======
+        client = local_session(self.policy.session_factory).client('config')
+
+        matched_resources = {r[resource_id] for r in PollMode.run(self)}
+        unmatched_resources = {
+            r[resource_id] for self.policy.manager.source.resources()
+>>>>>>> ef4307834... aws - config-poll-rule mode
             if r[resource_id] not in matched_resources}
 
         evaluations = [dict(
             ComplianceResourceType=resource_type,
             ComplianceResourceId=r,
             ComplianceType='NON_COMPLIANT',
+            OrderingTimestamp=cfg_event['notificationCreationTime'],
             Annotation='The resource is not compliant with policy:%s.' % (
                 self.policy.name))
             for r in matched_resources]
@@ -782,11 +794,11 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
                 Evaluations=evaluations,
                 OrderingTimestamp=cfg_event['notificationCreationTime'],
                 ResultToken=event.get('resultToken', 'No token found.'))
-
         evaluations = [dict(
             ComplianceResourceType=resource_type,
-            ComplianceResourceId=r,
+            ComplianceResourceId=r,            
             ComplianceType='COMPLIANT',
+            OrderingTimestamp=cfg_event['notificationCreationTime'],
             Annotation='The resource is compliant with policy:%s.' % (
                 self.policy.name))
             for r in unmatched_resources]
@@ -794,8 +806,8 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
             self.policy.resource_manager.retry(
                 client.put_evaluations,
                 Evaluations=evaluations,
-                OrderingTimestamp=cfg_event['notificationCreationTime'],
                 ResultToken=event.get('resultToken', 'No token found.'))
+
 
 
 @execution.register('config-rule')
