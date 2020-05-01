@@ -740,6 +740,10 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
 
     def validate(self):
         super().validate()
+        if not self.data.get('schedule'):
+            raise PolicyValidationError(
+                "policy:%s config-poll-rule schedule required" % (
+                    self.policy.name))
         if self.policy.resource_manager.resource_type.config_type:
             raise PolicyValidationError(
                 "resource:%s fully supported by config and should use mode: config-rule" % (

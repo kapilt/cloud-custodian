@@ -886,7 +886,8 @@ class PolicyLambda(AbstractLambdaFunction):
 
     def get_events(self, session_factory):
         events = []
-        if self.policy.data['mode']['type'] == 'config-rule':
+        if self.policy.data['mode']['type'] in (
+                'config-rule', 'config-poll-rule'):
             events.append(
                 ConfigRule(self.policy.data['mode'], session_factory))
         elif self.policy.data['mode']['type'] == 'hub-action':
@@ -1605,8 +1606,11 @@ class ConfigRule:
 
         if isinstance(func, PolicyLambda):
             manager = func.policy.load_resource_manager()
-            if hasattr(manager.get_model(), 'config_type'):
+            resource_model = self.manager.get_model()
+            if resource_model.config_type:
                 config_type = manager.get_model().config_type
+            elif resource_model.cfn_type and 'schedule' in self.data:
+                pass
             else:
                 raise Exception("You may have attempted to deploy a config "
                                 "based lambda function with an unsupported config type. "
@@ -1618,6 +1622,11 @@ class ConfigRule:
         else:
             params['Scope']['ComplianceResourceTypes'] = self.data.get(
                 'resource-types', ())
+        if self.data.get('schedule'):
+            params['Source']['SourceDetails']['MessageType'] = 'ScheduledNotification'
+            params['Source']['SourceDetails'][
+                'MaximumExecutionFrequency'] = self.data['schedule']
+            params.pop('Scope')
         return params
 
     def get(self, rule_name):
