@@ -713,6 +713,84 @@ class GuardDutyMode(LambdaMode):
         return super(GuardDutyMode, self).provision()
 
 
+@execution.register('config-poll-rule')
+class ConfigPollRuleMode(LambdaMode, PullMode):
+    """This mode represents a periodic/scheduled AWS config evaluation.
+
+    The primary benefit this mode offers is to support additional resources
+    beyond what config supports natively, as it can post evaluations for
+    any resource which has a cloudformation type. If a resource is natively
+    supported by config its highly recommended to use a `config-rule`
+    mode instead.
+
+    This mode effectively receives no data from config, instead its
+    periodically executed by config and polls and evaluates all
+    resources. It is equivalent to a periodic policy, except it also
+    pushes resource evaluations to config.
+    """
+    schema = utils.type_schema(
+        'config-poll-rule',
+        schedule={'enum': [
+            "One_Hour",
+            "Three_Hours",
+            "Six_Hours",
+            "Twelve_Hours",
+            "TwentyFour_Hours"]},
+        rinherit=LambdaMode.schema)
+
+    def validate(self):
+        super().validate()
+        if self.policy.resource_manager.resource_type.config_type:
+            raise PolicyValidationError(
+                "resource:%s fully supported by config and should use mode: config-rule" % (
+                    self.policy.resource_type))
+        if self.policy.data['mode'].get('pattern'):
+            raise PolicyValidationError(
+                "policy:%s AWS Config does not support event pattern filtering" % (
+                    self.policy.name))
+        if not self.policy.resource_manager.resource_type.cfn_type:
+            raise PolicyValidationError((
+                'policy:%s resource:%s does not have a cloudformation type'
+                ' and is there-fore not supported by config-poll-rule'))
+
+    def run(self, event, lambda_context):
+        cfg_event = json.loads(event['invokingEvent'])
+        resource_type = self.policy.resource_manager.resource_type.cfn_type
+        resource_id = self.policy.resource_manager.resource_type.id
+        client = local_session(self.policy.session_factory).client('config')
+
+        matched_resources = {r[resource_id] for r in PollMode.run(self)}
+        unmatched_resources = {
+            r[resource_id] for self.policy.manager.source.resources()
+            if r[resource_id] not in matched_resources}
+
+        evaluations = [dict(
+            ComplianceResourceType=resource_type,
+            ComplianceResourceId=r,
+            ComplianceType='NON_COMPLIANT',
+            Annotation='The resource is not compliant with policy:%s.' % (
+                self.policy.name))
+                for r in matched_resources]
+        self.policy.resource_manager.retry(
+            client.put_evaluations,
+            Evaluations=evaluations,
+            OrderingTimestamp=cfg_event['notificationCreationTime'],
+            ResultToken=event.get('resultToken', 'No token found.'))
+
+        evaluations = [dict(
+            ComplianceResourceType=resource_type,
+            ComplianceResourceId=r,
+            ComplianceType='COMPLIANT',
+            Annotation='The resource is compliant with policy:%s.' % (
+                self.policy.name))
+                for r in matched_resources]
+        self.policy.resource_manager.retry(
+            client.put_evaluations,
+            Evaluations=evaluations,
+            OrderingTimestamp=cfg_event['notificationCreationTime'],
+            ResultToken=event.get('resultToken', 'No token found.'))
+
+
 @execution.register('config-rule')
 class ConfigRuleMode(LambdaMode):
     """a lambda policy that executes as a config service rule.
