@@ -16,7 +16,7 @@ import re
 from c7n.actions import BaseAction
 from c7n.filters import MetricsFilter, ShieldMetrics, Filter
 from c7n.manager import resources
-from c7n.query import QueryResourceManager, DescribeSource, TypeInfo
+from c7n.query import ConfigSource, QueryResourceManager, DescribeSource, TypeInfo
 from c7n.tags import universal_augment
 from c7n.utils import local_session, type_schema, get_retry
 from c7n.filters import ValueFilter
@@ -24,6 +24,12 @@ from .aws import shape_validate
 from c7n.exceptions import PolicyValidationError
 
 from c7n.resources.shield import IsShieldProtected, SetShieldProtection
+
+
+class DescribeDistribution(DescribeSource):
+
+    def augment(self, resources):
+        return universal_augment(self.manager, resources)
 
 
 @resources.register('distribution')
@@ -43,13 +49,13 @@ class Distribution(QueryResourceManager):
         # Denotes this resource type exists across regions
         global_resource = True
 
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeDistribution(self)
-        return super(Distribution, self).get_source(source_type)
+    source_mapping = {
+        'describe': DescribeDistribution,
+        'config': ConfigSource
+    }
 
 
-class DescribeDistribution(DescribeSource):
+class DescribeStreamingDistribution(DescribeSource):
 
     def augment(self, resources):
         return universal_augment(self.manager, resources)
@@ -72,16 +78,10 @@ class StreamingDistribution(QueryResourceManager):
         universal_taggable = True
         cfn_type = config_type = "AWS::CloudFront::StreamingDistribution"
 
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeStreamingDistribution(self)
-        return super(StreamingDistribution, self).get_source(source_type)
-
-
-class DescribeStreamingDistribution(DescribeSource):
-
-    def augment(self, resources):
-        return universal_augment(self.manager, resources)
+    source_mapping = {
+        'describe': DescribeStreamingDistribution,
+        'config': ConfigSource
+    }
 
 
 Distribution.filter_registry.register('shield-metrics', ShieldMetrics)

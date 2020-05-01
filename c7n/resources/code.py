@@ -73,6 +73,14 @@ class DeleteRepository(BaseAction):
                 "Exception deleting repo:\n %s" % e)
 
 
+class DescribeBuild(DescribeSource):
+
+    def augment(self, resources):
+        return universal_augment(
+            self.manager,
+            super(DescribeBuild, self).augment(resources))
+
+
 @resources.register('codebuild')
 class CodeBuildProject(QueryResourceManager):
 
@@ -89,21 +97,10 @@ class CodeBuildProject(QueryResourceManager):
         arn_type = 'project'
         universal_taggable = object()
 
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeBuild(self)
-        elif source_type == 'config':
-            return ConfigSource(self)
-        raise ValueError("Unsupported source: %s for %s" % (
-            source_type, self.resource_type.config_type))
-
-
-class DescribeBuild(DescribeSource):
-
-    def augment(self, resources):
-        return universal_augment(
-            self.manager,
-            super(DescribeBuild, self).augment(resources))
+    source_mapping = {
+        'describe': DescribeBuild,
+        'config': ConfigSource
+    }
 
 
 @CodeBuildProject.filter_registry.register('subnet')

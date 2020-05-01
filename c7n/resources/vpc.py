@@ -1473,6 +1473,14 @@ class SecurityGroupPostFinding(OtherResourcePostFinding):
         return fr
 
 
+class DescribeENI(query.DescribeSource):
+
+    def augment(self, resources):
+        for r in resources:
+            r['Tags'] = r.pop('TagSet', [])
+        return resources
+
+
 @resources.register('eni')
 class NetworkInterface(query.QueryResourceManager):
 
@@ -1486,20 +1494,10 @@ class NetworkInterface(query.QueryResourceManager):
         cfn_type = config_type = "AWS::EC2::NetworkInterface"
         id_prefix = "eni-"
 
-    def get_source(self, source_type):
-        if source_type == 'describe':
-            return DescribeENI(self)
-        elif source_type == 'config':
-            return query.ConfigSource(self)
-        raise ValueError("invalid source %s" % source_type)
-
-
-class DescribeENI(query.DescribeSource):
-
-    def augment(self, resources):
-        for r in resources:
-            r['Tags'] = r.pop('TagSet', [])
-        return resources
+    source_mapping = {
+        'describe': DescribeENI,
+        'config': query.ConfigSource
+    }
 
 
 NetworkInterface.filter_registry.register('flow-logs', FlowLogFilter)
