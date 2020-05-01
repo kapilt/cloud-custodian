@@ -1606,7 +1606,7 @@ class ConfigRule:
 
         if isinstance(func, PolicyLambda):
             manager = func.policy.load_resource_manager()
-            resource_model = self.manager.get_model()
+            resource_model = manager.get_model()
             if resource_model.config_type:
                 config_type = manager.get_model().config_type
             elif resource_model.cfn_type and 'schedule' in self.data:
