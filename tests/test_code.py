@@ -131,4 +131,3 @@ class CodePipeline(BaseTest):
         if self.recording:
             time.sleep(2)
         self.assertFalse(client.list_pipelines().get('pipelines'))
-
