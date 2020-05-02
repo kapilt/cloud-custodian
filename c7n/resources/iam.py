@@ -119,7 +119,7 @@ class Role(QueryResourceManager):
 
 
 @Role.action_registry.register('post-finding')
-class RolePostFinding(PostFinding):
+class RolePostFinding(OtherResourcePostFinding):
 
     resource_type = 'AwsIamRole'
 

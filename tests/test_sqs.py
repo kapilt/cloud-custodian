@@ -93,7 +93,7 @@ class TestSqs:
         test.assertEqual(check_master_key, key_id)
 
 
-class TestSqsAction(BaseTest):
+class QueueTests(BaseTest):
 
     @functional
     def test_sqs_remove_matched(self):
@@ -621,3 +621,29 @@ class TestSqsAction(BaseTest):
                 u'arn:aws:sqs:us-east-1:644160558196:sqs-test-alias',
                 u'arn:aws:sqs:us-east-1:644160558196:sqs-test-id'
             ])
+
+    def test_sqs_post_finding(self):
+        factory = self.record_flight_data('test_sqs_post_finding')
+
+        p = self.load_policy({
+            'name': 'sqs',
+            'resource': 'aws.sqs',
+            'actions': [
+                {'type': 'post-finding',
+                 'types': [
+                     'Software and Configuration Checks/OrgStandard/abc-123']}]},
+                session_factory=factory, config={'region': 'us-west-2'})
+        queues = p.resource_manager.get_resources([
+            'test_sqs_modify_policy_add_remove_statements'])
+        post_finding = p.resource_manager.actions[0]
+        self.assertEqual(
+            post_finding.format_resource(queues[0]),
+            {'Details': {
+                'AwsSqsQueue': {
+                    'KmsDataKeyReusePeriodSeconds': '300',
+                    'KmsMasterKeyId': 'alias/aws/sqs',
+                    'QueueName': 'test_sqs_modify_policy_add_remove_statements'}},
+             'Id': 'arn:aws:sqs:us-west-2:644160558196:test_sqs_modify_policy_add_remove_statements',
+             'Partition': 'aws',
+             'Region': 'us-west-2',
+             'Type': 'AwsSqsQueue'})

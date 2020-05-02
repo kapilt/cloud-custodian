@@ -547,7 +547,7 @@ class PostFinding(Action):
     def format_envelope(self, r):
         details = {}
         envelope = filter_empty({
-            'Id': self.get_arns([r])[0],
+            'Id': self.manager.get_arns([r])[0],
             'Region': self.manager.config.region,
             'Tags': {t['Key']: t['Value'] for t in r.get('Tags', [])},
             'Partition': get_partition(self.manager.config.region),
