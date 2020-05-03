@@ -792,7 +792,7 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
 
         evaluations = [dict(
             ComplianceResourceType=resource_type,
-            ComplianceResourceId=r,            
+            ComplianceResourceId=r,
             ComplianceType='COMPLIANT',
             OrderingTimestamp=cfg_event['notificationCreationTime'],
             Annotation='The resource is compliant with policy:%s.' % (
