@@ -1608,9 +1608,9 @@ class ConfigRule:
             manager = func.policy.load_resource_manager()
             resource_model = manager.get_model()
             if resource_model.config_type:
-                config_type = manager.get_model().config_type
+                config_type = resource_model.config_type
             elif resource_model.cfn_type and 'schedule' in self.data:
-                pass
+                config_type = resource_model.cfn_type
             else:
                 raise Exception("You may have attempted to deploy a config "
                                 "based lambda function with an unsupported config type. "
@@ -1626,7 +1626,6 @@ class ConfigRule:
             params['Source']['SourceDetails']['MessageType'] = 'ScheduledNotification'
             params['Source']['SourceDetails'][
                 'MaximumExecutionFrequency'] = self.data['schedule']
-            params.pop('Scope')
         return params
 
     def get(self, rule_name):
