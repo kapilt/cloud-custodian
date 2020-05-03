@@ -148,21 +148,29 @@ class PolicyLambdaProvision(BaseTest):
         self.addCleanup(mgr.remove, pl)
 
     def test_config_poll_rule_evaluation(self):
-        factory = self.record_flight_data('test_mu_config_poll_rule')
         p = self.load_policy({
             'name': 'configx',
             'resource': 'aws.kinesis',
             'mode': {
                 'schedule': 'Three_Hours',
-                'type': 'config-poll-rule'}},
-            session_factory=factory)
+                'type': 'config-poll-rule'}})
         mu_policy = PolicyLambda(p)
         events = mu_policy.get_events(factory)
+        mu_policy.arn = "arn:aws:lambda:us-east-1:644160558196:function:CloudCustodian"
         self.assertEqual(len(events), 1)
         config_rule = events.pop()
         self.assertEqual(
             config_rule.get_rule_params(mu_policy),
-            {})
+
+            {'ConfigRuleName': 'custodian-configx',
+             'Description': 'cloud-custodian lambda policy',
+             'MaximumExecutionFrequency': 'Three_Hours',
+             'Scope': {'ComplianceResourceTypes': ['AWS::Kinesis::Stream']},
+             'Source': {
+                 'Owner': 'CUSTOM_LAMBDA',
+                 'SourceDetails': [{'EventSource': 'aws.config',
+                                    'MessageType': 'ScheduledNotification'}],
+                 'SourceIdentifier': 'arn:aws:lambda:us-east-1:644160558196:function:CloudCustodian'} # noqa
 
     def test_config_rule_evaluation(self):
         session_factory = self.replay_flight_data("test_config_rule_evaluate")

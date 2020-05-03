@@ -758,7 +758,8 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
                 ' and is there-fore not supported by config-poll-rule'))
 
     def _get_client(self):
-        return utils.local_session(self.policy.session_factory).client('config')
+        return utils.local_session(
+            self.policy.session_factory).client('config')
 
     def run(self, event, lambda_context):
         cfg_event = json.loads(event['invokingEvent'])
@@ -771,7 +772,7 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
             matched_resources.add(r[resource_id])
         unmatched_resources = set()
         for r in self.policy.resource_manager.get_resource_manager(
-            self.policy.resource_type).resources():
+                self.policy.resource_type).resources():
             if r[resource_id] not in matched_resources:
                 unmatched_resources.add(r[resource_id])
 
@@ -802,6 +803,7 @@ class ConfigPollRuleMode(LambdaMode, PullMode):
                 client.put_evaluations,
                 Evaluations=evaluations,
                 ResultToken=event.get('resultToken', 'No token found.'))
+        return list(matched_resources)
 
 
 @execution.register('config-rule')

@@ -1623,9 +1623,11 @@ class ConfigRule:
             params['Scope']['ComplianceResourceTypes'] = self.data.get(
                 'resource-types', ())
         if self.data.get('schedule'):
-            params['Source']['SourceDetails']['MessageType'] = 'ScheduledNotification'
-            params['Source']['SourceDetails'][
-                'MaximumExecutionFrequency'] = self.data['schedule']
+            params['Source']['SourceDetails'] = [{
+                'EventSource': 'aws.config',
+                'MessageType': 'ScheduledNotification'
+            }]
+            params['MaximumExecutionFrequency'] = self.data['schedule']
         return params
 
     def get(self, rule_name):
