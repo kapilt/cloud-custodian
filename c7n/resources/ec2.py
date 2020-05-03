@@ -1058,12 +1058,13 @@ class MonitorInstances(BaseAction):
 
 @EC2.action_registry.register("post-finding")
 class InstanceFinding(PostFinding):
+
+    resource_type = 'AwsEc2Instance'
+
     def format_resource(self, r):
         ip_addresses = jmespath.search(
-            "NetworkInterfaces[].Association.PublicIp", r)
-        ip_addresses.extend(jmespath.search(
-            "NetworkInterfaces[].PrivateIpAddresses[].PrivateIpAddress", r))
-        ip_addresses = list(filter(None, ip_addresses))
+            "NetworkInterfaces[].PrivateIpAddresses[].PrivateIpAddress", r)
+
         # limit to max 10 ip addresses, per security hub service limits
         ip_addresses = ip_addresses and ip_addresses[:10] or ip_addresses
         details = {
@@ -1081,9 +1082,20 @@ class InstanceFinding(PostFinding):
         if "IamInstanceProfile" in r:
             details["IamInstanceProfileArn"] = r["IamInstanceProfile"]["Arn"]
 
-        envelope, payload = self.format_envelope(r)
-        payload.update(filter_empty(details))
-        return envelope
+        instance = {
+            "Type": self.resource_type,
+            "Id": "arn:{}:ec2:{}:{}:instance/{}".format(
+                utils.REGION_PARTITION_MAP.get(self.manager.config.region, 'aws'),
+                self.manager.config.region,
+                self.manager.config.account_id,
+                r["InstanceId"]),
+            "Region": self.manager.config.region,
+            "Tags": {t["Key"]: t["Value"] for t in r.get("Tags", [])},
+            "Details": {self.resource_type: filter_empty(details)},
+        }
+
+        instance = filter_empty(instance)
+        return instance
 
 
 @actions.register('start')

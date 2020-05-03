@@ -565,6 +565,7 @@ class PostFinding(Action):
 class OtherResourcePostFinding(PostFinding):
 
     fields = ()
+    resource_type = 'Other'
 
     def format_resource(self, r):
         details = {}
@@ -592,12 +593,12 @@ class OtherResourcePostFinding(PostFinding):
 
         details['c7n:resource-type'] = self.manager.type
         other = {
-            'Type': 'Other',
+            'Type': self.resource_type,
             'Id': self.manager.get_arns([r])[0],
             'Region': self.manager.config.region,
             'Partition': get_partition(self.manager.config.region),
             'Tags': {t['Key']: t['Value'] for t in r['Tags']},
-            'Details': {'Other': filter_empty(details)}
+            'Details': {self.resource_type: filter_empty(details)}
         }
         tags = {t['Key']: t['Value'] for t in r.get('Tags', [])}
         if tags:

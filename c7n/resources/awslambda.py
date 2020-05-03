@@ -26,7 +26,9 @@ from c7n.manager import resources
 from c7n import query
 from c7n.resources.iam import CheckPermissions
 from c7n.tags import universal_augment
-from c7n.utils import local_session, type_schema
+from c7n.utils import local_session, type_schema, select_keys
+
+from .securityhub import PostFinding
 
 ErrAccessDenied = "AccessDeniedException"
 
@@ -47,6 +49,9 @@ class DescribeLambda(query.DescribeSource):
                 continue
             config = func.pop('Configuration')
             config.update(func)
+            if 'Tags' in config:
+                config['Tags'] = [
+                    {'Key': k, 'Value': v} for k, v in config['Tags'].items()]
             resources.append(config)
         return resources
 
@@ -276,6 +281,41 @@ class KmsFilter(KmsRelatedFilter):
     """
     RelatedIdsExpression = 'KMSKeyArn'
 
+
+@AWSLambda.action_registry.register('post-finding')
+class LambdaPostFinding(PostFinding):
+
+    resource_type = 'AwsLambdaFunction'
+
+    def format_resource(self, r):
+        envelope, payload = self.format_envelope(r)
+        # security hub formatting beggars belief
+        details = self.filter_empty(select_keys(r,
+            ['CodeSha256',
+             'DeadLetterConfig',
+             'Environment',
+             'Handler',
+             'KMSKeyArn',
+             'LastModified',
+             'MemorySize'
+             'MasterArn',
+             'RevisionId',
+             'Role',
+             'Runtime',
+             'TracingConfig',
+             'Timeout',
+             'Version',
+             'VpcConfig']))
+        # do the brain dead parts Layers, Code, TracingConfig
+        if 'Layers' in r:
+            r['Layers'] = {
+                'Arn': r['Layers'][0]['Arn'],
+                'CodeSize': r['Layers'][0]['CodeSize']}
+        details.get('VpcConfig', {}).pop('VpcId', None)
+        if 'Code' in r:
+            details['Code'] = {'ZipFile': r['Code']['Location']}
+        payload.update(details)
+        return envelope
 
 @AWSLambda.action_registry.register('remove-statements')
 class RemovePolicyStatement(RemovePolicyBase):
@@ -594,3 +634,15 @@ class DeleteLayerVersion(BaseAction):
                     VersionNumber=r['Version'])
             except client.exceptions.ResourceNotFound:
                 continue
+
+
+@LambdaLayerVersion.action_registry.register('post-finding')
+class LayerPostFinding(PostFinding):
+
+    resource_type = 'AwsLambdaLayerVersion'
+
+    def format_resource(self, r):
+        envelope, payload = self.format_envelope(r)
+        payload.update(self.filter_empty(
+            select_keys(r, ['Version', 'CreatedDate', 'CompatibleRuntimes'])))
+        return envelope

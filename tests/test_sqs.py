@@ -17,6 +17,8 @@ from botocore.exceptions import ClientError
 import json
 import time
 
+from c7n.resources.aws import shape_validate
+
 
 class TestSqs:
 
@@ -623,8 +625,7 @@ class QueueTests(BaseTest):
             ])
 
     def test_sqs_post_finding(self):
-        factory = self.record_flight_data('test_sqs_post_finding')
-
+        factory = self.replay_flight_data('test_sqs_post_finding')
         p = self.load_policy({
             'name': 'sqs',
             'resource': 'aws.sqs',
@@ -636,14 +637,19 @@ class QueueTests(BaseTest):
         queues = p.resource_manager.get_resources([
             'test_sqs_modify_policy_add_remove_statements'])
         post_finding = p.resource_manager.actions[0]
-        self.assertEqual(
-            post_finding.format_resource(queues[0]),
-            {'Details': {
-                'AwsSqsQueue': {
-                    'KmsDataKeyReusePeriodSeconds': '300',
-                    'KmsMasterKeyId': 'alias/aws/sqs',
-                    'QueueName': 'test_sqs_modify_policy_add_remove_statements'}},
-             'Id': 'arn:aws:sqs:us-west-2:644160558196:test_sqs_modify_policy_add_remove_statements',
-             'Partition': 'aws',
-             'Region': 'us-west-2',
-             'Type': 'AwsSqsQueue'})
+        rfinding = post_finding.format_resource(queues[0])
+
+        assert rfinding == {'Details': {
+            'AwsSqsQueue': {
+                'KmsDataKeyReusePeriodSeconds': 300,
+                'KmsMasterKeyId': 'alias/aws/sqs',
+                'QueueName': 'test_sqs_modify_policy_add_remove_statements'}},
+            'Id': 'arn:aws:sqs:us-west-2:644160558196:test_sqs_modify_policy_add_remove_statements',
+            'Partition': 'aws',
+            'Region': 'us-west-2',
+            'Type': 'AwsSqsQueue'}
+        shape_validate(
+            rfinding['Details']['AwsSqsQueue'],
+            'AwsSqsQueueDetails',
+            'securityhub',
+        )

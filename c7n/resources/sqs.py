@@ -164,6 +164,9 @@ class SQSPostFinding(PostFinding):
             'QueueName': r['QueueArn'].split(':')[-1],
             'DeadLetterTargetArn': r.get('DeadLetterTargetArn')
         }))
+        if 'KmsDataKeyReusePeriodSeconds' in payload:
+            payload['KmsDataKeyReusePeriodSeconds'] = int(
+                payload['KmsDataKeyReusePeriodSeconds'])
         return envelope
 
 

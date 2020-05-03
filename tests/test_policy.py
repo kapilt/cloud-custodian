@@ -209,6 +209,19 @@ class PolicyMetaLint(BaseTest):
         for rtype in resource_cfn_types:
             assert rtype in cfn_types, "invalid cfn %s" % rtype
 
+    def test_securityhub_resource_support(self):
+        session = fake_session()._session
+        model = session.get_service_model('securityhub')
+        shape = model.shape_for('ResourceDetails')
+        mangled_hub_types = set(shape.members.keys())
+        resource_hub_types = set()
+        for k, v in manager.resources.items():
+            finding = v.action_registry.get('post-finding')
+            if finding:
+                resource_hub_types.add(finding.resource_type)
+        __import__("pdb").set_trace()
+        assert mangled_hub_types.difference(resource_hub_types) == set()
+
     def test_config_resource_support(self):
 
         # for several of these we express support as filter or action instead

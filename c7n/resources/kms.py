@@ -20,8 +20,10 @@ from c7n.filters import Filter, CrossAccountAccessFilter, ValueFilter
 from c7n.manager import resources
 from c7n.query import (
     ConfigSource, DescribeSource, QueryResourceManager, RetryPageIterator, TypeInfo)
-from c7n.utils import local_session, type_schema
+from c7n.utils import local_session, type_schema, select_keys
 from c7n.tags import universal_augment
+
+from .securityhub import PostFinding
 
 
 @resources.register('kms')
@@ -41,15 +43,30 @@ class KeyAlias(QueryResourceManager):
 
 class DescribeKey(DescribeSource):
 
+    def get_resources(self, ids, cache=True):
+#        if len(ids) < 5:
+#            client = local_session(self.manager.session_factory).client('kms')
+#            results = []
+#            for rid in ids:
+#                try:
+#                    results.append(
+#                        self.manager.retry(
+#                            client.describe_key,
+#                            KeyId=rid)['KeyMetadata'])
+#                except client.exceptions.NotFoundException:
+#                    continue
+#            return results
+        return super().get_resources(ids, cache)
+
     def augment(self, resources):
         client = local_session(self.manager.session_factory).client('kms')
 
         for r in resources:
             try:
-                key_id = r.get('KeyArn')
+                key_id = r.get('KeyArn', r.get('KeyId'))
                 info = client.describe_key(KeyId=key_id)['KeyMetadata']
+                __import__("pdb").set_trace()
                 r.update(info)
-
             except ClientError as e:
                 if e.response['Error']['Code'] == 'AccessDeniedException':
                     self.log.warning(
@@ -69,7 +86,8 @@ class Key(QueryResourceManager):
         arn_type = "key"
         enum_spec = ('list_keys', 'Keys', None)
         name = "KeyId"
-        id = "KeyArn"
+        id = "KeyId"
+        arn = 'Arn'
         universal_taggable = True
         cfn_type = config_type = 'AWS::KMS::Key'
 
@@ -329,3 +347,26 @@ class KmsKeyRotation(BaseAction):
                 client.enable_key_rotation(KeyId=k['KeyId'])
                 continue
             client.disable_key_rotation(KeyId=k['KeyId'])
+
+
+@KeyAlias.action_registry.register('post-finding')
+@Key.action_registry.register('post-finding')
+class KmsPostFinding(PostFinding):
+
+    resource_type = 'AwsKmsKey'
+
+    def format_resource(self, r):
+        if 'TargetKeyId' in r:
+            __import__("pdb").set_trace()
+            resolved = self.manager.get_resource_manager(
+                'kms-key').get_resources([r['TargetKeyId']])
+            if not resolved:
+                return
+            r = resolved[0]
+            r[self.manager.resource_type.id] = r['KeyId']
+        envelope, payload = self.format_envelope(r)
+        payload.update(self.filter_empty(
+            select_keys(r, [
+                'AWSAccount', 'CreationDate', 'KeyId',
+                'KeyManager', 'Origin', 'KeyState'])))
+        return envelope

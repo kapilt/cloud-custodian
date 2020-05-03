@@ -75,6 +75,8 @@ SNS.filter_registry.register('marked-for-op', TagActionFilter)
 @SNS.action_registry.register('post-finding')
 class SNSPostFinding(PostFinding):
 
+    resource_type = 'AwsSnsTopic'
+
     def format_resource(self, r):
         envelope, payload = self.format_envelope(r)
         payload.update(
