@@ -112,6 +112,9 @@ jobs:
     # todo, figure out how to fast cache the tox directory here.
     runs-on: ubuntu-latest
     needs: Lint
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
