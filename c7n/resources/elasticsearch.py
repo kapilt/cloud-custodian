@@ -136,8 +136,8 @@ class ElasticSearchPostFinding(PostFinding):
                     'VPCOptions.SecurityGroupIds', r),
                 'SubnetIds': jmespath.search('VPCOptions.SubnetIds', r),
                 'VPCId': jmespath.search('VPCOptions.VPCId', r)
-                })
-            }))
+            })
+        }))
         return envelope
 
 

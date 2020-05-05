@@ -95,8 +95,8 @@ class ElasticSearch(BaseTest):
             'actions': [
                 {'type': 'post-finding',
                  'types': [
-                     'Software and Configuration Checks/OrgStandard/abc-123']}]
-            }, session_factory=factory, config={'region': 'us-west-2'})
+                     'Software and Configuration Checks/OrgStandard/abc-123']}]},
+            session_factory=factory, config={'region': 'us-west-2'})
         resources = p.resource_manager.resources()
         self.maxDiff = None
         self.assertEqual(len(resources), 1)
@@ -114,7 +114,8 @@ class ElasticSearch(BaseTest):
              'ElasticsearchVersion': '7.4',
              'EncryptionAtRestOptions': {
                  'Enabled': True,
-                 'KmsKeyId': 'arn:aws:kms:us-west-2:644160558196:key/9b776c6e-0a40-45d0-996b-707018677fe9'},
+                 'KmsKeyId': 'arn:aws:kms:us-west-2:644160558196:key/9b776c6e-0a40-45d0-996b-707018677fe9'  # noqa
+             },
              'NodeToNodeEncryptionOptions': {'Enabled': True},
              'VPCOptions': {'AvailabilityZones': ['us-west-2b'],
                             'SecurityGroupIds': ['sg-0eecc076'],

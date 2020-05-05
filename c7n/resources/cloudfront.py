@@ -290,7 +290,7 @@ class DistributionPostFinding(PostFinding):
             'Origins': [
                 dict(Id=o['Id'], OriginPath=o['OriginPath'], DomainName=o['DomainName'])
                 for o in origins]
-            }))
+        }))
 
         return envelope
 

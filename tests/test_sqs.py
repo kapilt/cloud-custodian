@@ -633,7 +633,7 @@ class QueueTests(BaseTest):
                 {'type': 'post-finding',
                  'types': [
                      'Software and Configuration Checks/OrgStandard/abc-123']}]},
-                session_factory=factory, config={'region': 'us-west-2'})
+            session_factory=factory, config={'region': 'us-west-2'})
         queues = p.resource_manager.get_resources([
             'test_sqs_modify_policy_add_remove_statements'])
         post_finding = p.resource_manager.actions[0]

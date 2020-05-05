@@ -127,7 +127,7 @@ class CodeBuild(BaseTest):
                     'Environment': {'ImagePullCredentialsType': 'CODEBUILD',
                                     'Type': 'LINUX_CONTAINER'},
                     'Name': 'custodian',
-                    'ServiceRole': 'arn:aws:iam::644160558196:role/service-role/codebuild-test-service-role',
+                    'ServiceRole': 'arn:aws:iam::644160558196:role/service-role/codebuild-test-service-role',  # noqa
                     'Source': {'Location': 'https://github.com/kapilt/cloud-custodian',
                                'Type': 'GITHUB'}}},
              'Id': 'arn:aws:codebuild:us-east-2:644160558196:project/custodian',

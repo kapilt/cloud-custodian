@@ -307,7 +307,7 @@ class KMSTagging(BaseTest):
                 {'type': 'post-finding',
                  'types': [
                      'Software and Configuration Checks/OrgStandard/abc-123']}]},
-                session_factory=factory, config={'region': 'us-west-2'})
+            session_factory=factory, config={'region': 'us-west-2'})
 
         resources = p.resource_manager.get_resources([
             'arn:aws:kms:us-west-2:644160558196:alias/c7n-test'])

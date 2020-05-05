@@ -146,7 +146,7 @@ class BuildPostFinding(OtherResourcePostFinding):
                 }),
                 'ImagePullCredentialsType': r['environment'].get(
                     'imagePullCredentialsType')
-                }),
+            }),
             'ServiceRole': r['serviceRole'],
             'VpcConfig': self.filter_empty({
                 'VpcId': jmespath.search('vpcConfig.vpcId', r),

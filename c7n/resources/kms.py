@@ -44,18 +44,18 @@ class KeyAlias(QueryResourceManager):
 class DescribeKey(DescribeSource):
 
     def get_resources(self, ids, cache=True):
-#        if len(ids) < 5:
-#            client = local_session(self.manager.session_factory).client('kms')
-#            results = []
-#            for rid in ids:
-#                try:
-#                    results.append(
-#                        self.manager.retry(
-#                            client.describe_key,
-#                            KeyId=rid)['KeyMetadata'])
-#                except client.exceptions.NotFoundException:
-#                    continue
-#            return results
+        # if len(ids) < 5:
+        #     client = local_session(self.manager.session_factory).client('kms')
+        #     results = []
+        #     for rid in ids:
+        #         try:
+        #             results.append(
+        #                 self.manager.retry(
+        #                     client.describe_key,
+        #                     KeyId=rid)['KeyMetadata'])
+        #         except client.exceptions.NotFoundException:
+        #             continue
+        #     return results
         return super().get_resources(ids, cache)
 
     def augment(self, resources):

@@ -317,6 +317,7 @@ class LambdaPostFinding(PostFinding):
         payload.update(details)
         return envelope
 
+
 @AWSLambda.action_registry.register('remove-statements')
 class RemovePolicyStatement(RemovePolicyBase):
     """Action to remove policy/permission statements from lambda functions.
