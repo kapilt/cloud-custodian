@@ -314,10 +314,10 @@ class KMSTagging(BaseTest):
         rfinding = p.resource_manager.actions[0].format_resource(
             resources[0])
         self.maxDiff = None
+        rfinding['Details']['AwsKmsKey'].pop('CreationDate')
         self.assertEqual(
             rfinding,
             {'Details': {'AwsKmsKey': {
-                'CreationDate': datetime.datetime(2017, 5, 5, 6, 56, 38, 394000),
                 'KeyId': '44d25a5c-7efa-44ed-8436-b9511ea921b3',
                 'KeyManager': 'CUSTOMER',
                 'KeyState': 'Enabled',
@@ -328,5 +328,4 @@ class KMSTagging(BaseTest):
              'Type': 'AwsKmsKey'})
 
         shape_validate(
-            rfinding['Details']['AwsKmsKey'],
-            'AwsKmsKey', 'securityhub')
+            rfinding['Details']['AwsKmsKey'], 'AwsKmsKeyDetails', 'securityhub')

@@ -215,11 +215,20 @@ class PolicyMetaLint(BaseTest):
         shape = model.shape_for('ResourceDetails')
         mangled_hub_types = set(shape.members.keys())
         resource_hub_types = set()
+
+        whitelist = set(('AwsS3Object', 'Container'))
+        todo = set((
+            'AwsRdsDbInstance',
+            'AwsElbv2LoadBalancer',
+            'AwsEc2SecurityGroup',
+            'AwsIamAccessKey',
+            'AwsEc2NetworkInterface',
+            'AwsWafWebAcl'))
+        mangled_hub_types = mangled_hub_types.difference(whitelist).difference(todo)
         for k, v in manager.resources.items():
             finding = v.action_registry.get('post-finding')
             if finding:
                 resource_hub_types.add(finding.resource_type)
-        __import__("pdb").set_trace()
         assert mangled_hub_types.difference(resource_hub_types) == set()
 
     def test_config_resource_support(self):

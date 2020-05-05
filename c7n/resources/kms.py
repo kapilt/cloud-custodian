@@ -65,7 +65,6 @@ class DescribeKey(DescribeSource):
             try:
                 key_id = r.get('KeyArn', r.get('KeyId'))
                 info = client.describe_key(KeyId=key_id)['KeyMetadata']
-                __import__("pdb").set_trace()
                 r.update(info)
             except ClientError as e:
                 if e.response['Error']['Code'] == 'AccessDeniedException':
@@ -357,7 +356,6 @@ class KmsPostFinding(PostFinding):
 
     def format_resource(self, r):
         if 'TargetKeyId' in r:
-            __import__("pdb").set_trace()
             resolved = self.manager.get_resource_manager(
                 'kms-key').get_resources([r['TargetKeyId']])
             if not resolved:
