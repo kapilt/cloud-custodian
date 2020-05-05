@@ -43,8 +43,11 @@ class KeyAlias(QueryResourceManager):
 
 class DescribeKey(DescribeSource):
 
+    
     def get_resources(self, ids, cache=True):
-        # if len(ids) < 5:
+        # this forms a threshold beyond which we'll fetch individual keys of interest.
+        # else we'll need to fetch through the full set and client side filter.
+        # if len(ids) < 10:
         #     client = local_session(self.manager.session_factory).client('kms')
         #     results = []
         #     for rid in ids:
@@ -84,8 +87,7 @@ class Key(QueryResourceManager):
         service = 'kms'
         arn_type = "key"
         enum_spec = ('list_keys', 'Keys', None)
-        name = "KeyId"
-        id = "KeyId"
+        name = id = "KeyId"
         arn = 'Arn'
         universal_taggable = True
         cfn_type = config_type = 'AWS::KMS::Key'
@@ -236,7 +238,6 @@ class ResourceKmsKeyAlias(ValueFilter):
         return KeyAlias(self.manager.ctx, {}).get_permissions()
 
     def get_matching_aliases(self, resources, event=None):
-
         key_aliases = KeyAlias(self.manager.ctx, {}).resources()
         key_aliases_dict = {a['TargetKeyId']: a for a in key_aliases}
 

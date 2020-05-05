@@ -38,7 +38,9 @@ from c7n.query import ConfigSource, QueryResourceManager, DescribeSource, TypeIn
 from c7n.resolver import ValuesFrom
 from c7n.tags import TagActionFilter, TagDelayedAction, Tag, RemoveTag
 from c7n.utils import (
-    get_partition, local_session, type_schema, chunks, filter_empty, QueryParser)
+    get_partition, local_session, type_schema, chunks, filter_empty, QueryParser,
+    select_keys
+)
 
 from c7n.resources.aws import Arn
 from c7n.resources.securityhub import OtherResourcePostFinding
@@ -122,6 +124,17 @@ class Role(QueryResourceManager):
 class RolePostFinding(OtherResourcePostFinding):
 
     resource_type = 'AwsIamRole'
+
+    def format_resource(self, r):
+        envelope, payload = self.format_envelope(r)
+        payload.update(self.filter_empty(
+            select_keys(r, ['AssumeRolePolicyDocument', 'CreateDate',
+                            'MaxSessionDuration', 'Path', 'RoleId',
+                            'RoleName'])))
+        payload['AssumeRolePolicyDocument'] = json.dumps(
+            payload['AssumeRolePolicyDocument'])
+        payload['CreateDate'] = payload['CreateDate'].isoformat()
+        return envelope
 
 
 @Role.action_registry.register('tag')

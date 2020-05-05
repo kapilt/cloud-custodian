@@ -3199,6 +3199,7 @@ class BucketEncryption(KMSKeyResolverMixin, Filter):
         return results
 
     def process_bucket(self, b):
+        __import__("pdb").set_trace()
         client = bucket_client(local_session(self.manager.session_factory), b)
         rules = []
         if self.annotation_key not in b:

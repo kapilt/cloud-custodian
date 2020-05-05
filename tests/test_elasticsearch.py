@@ -102,7 +102,7 @@ class ElasticSearch(BaseTest):
         self.assertEqual(len(resources), 1)
         fresource = p.resource_manager.actions[0].format_resource(resources[0])
         self.assertEqual(
-            fresource,
+            fresource['Details']['AwsElasticsearchDomain'],
             {'AccessPolicies': '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-west-2:644160558196:domain/devx/*"}]}',  # noqa
              'DomainEndpointOptions': {
                  'EnforceHTTPS': True,
@@ -122,7 +122,7 @@ class ElasticSearch(BaseTest):
                             'SubnetIds': ['subnet-63c97615'],
                             'VPCId': 'vpc-4a9ff72e'}})
         shape_validate(
-            fresource['Details']['AwsElasticSearchDomain'],
+            fresource['Details']['AwsElasticsearchDomain'],
             'AwsElasticsearchDomainDetails',
             'securityhub')
 
