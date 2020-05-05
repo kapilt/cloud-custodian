@@ -21,7 +21,8 @@ install_requires = \
  'sendgrid>=6.1.1,<7.0.0']
 
 entry_points = \
-{'console_scripts': ['c7n-mailer = c7n_mailer.cli:main']}
+{'console_scripts': ['c7n-mailer = c7n_mailer.cli:main',
+                     'c7n-mailer-replay = c7n_mailer.replay:main']}
 
 setup_kwargs = {
     'name': 'c7n-mailer',
