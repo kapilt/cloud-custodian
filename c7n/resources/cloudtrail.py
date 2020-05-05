@@ -111,7 +111,7 @@ class Status(ValueFilter):
 
             if (r.get('IsOrganizationTrail') and
                     self.manager.config.account_id != trail_arn.account_id):
-                non_account_trails.add(r['TrailArn'])
+                non_account_trails.add(r['TrailARN'])
                 continue
             if r.get('HomeRegion') and r['HomeRegion'] != region:
                 region = trail_arn.region
