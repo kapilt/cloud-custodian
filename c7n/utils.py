@@ -694,16 +694,9 @@ def merge_dict(a, b):
             d[k] = v
     return d
 
-def select_keys(d, keys, remove=()):
+
+def select_keys(d, keys):
     result = {}
     for k in keys:
         result[k] = d.get(k)
-    for r in remove:
-        cur = result
-        parts = r.split('.')
-        last = parts.pop(-1)
-        for p in parts:
-            cur = cur[p]
-        if last in cur:
-            cur.pop(last)
     return result
