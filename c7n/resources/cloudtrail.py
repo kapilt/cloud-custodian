@@ -124,7 +124,9 @@ class Status(ValueFilter):
             r[self.annotation_key] = status
 
         if non_account_trails:
-            self.log.warning('found org trail different account that cant be processed')
+            self.log.warning(
+                'found %d org cloud trail from different account that cant be processed',
+                len(non_account_trails))
         return super(Status, self).process([
             r for r in resources if r['TrailARN'] not in non_account_trails])
 
