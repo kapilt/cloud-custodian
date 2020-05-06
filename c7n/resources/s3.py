@@ -3199,21 +3199,22 @@ class BucketEncryption(KMSKeyResolverMixin, Filter):
         return results
 
     def process_bucket(self, b):
-        __import__("pdb").set_trace()
+
         client = bucket_client(local_session(self.manager.session_factory), b)
         rules = []
         if self.annotation_key not in b:
             try:
                 be = client.get_bucket_encryption(Bucket=b['Name'])
+                be.pop('ResponseMetadata', None)
             except ClientError as e:
                 if e.response['Error']['Code'] != 'ServerSideEncryptionConfigurationNotFoundError':
                     raise
-                return
+                be = {}
             b[self.annotation_key] = be
         else:
             be = [self.annotation_key]
 
-        rules = be.get('ServerSideEncryptionConfiguration', []).get('Rules', [])
+        rules = be.get('ServerSideEncryptionConfiguration', {}).get('Rules', [])
         # default `state` to True as previous impl assumed state == True
         # to preserve backwards compatibility
         if self.data.get('state', True):
