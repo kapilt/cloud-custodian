@@ -43,7 +43,6 @@ class KeyAlias(QueryResourceManager):
 
 class DescribeKey(DescribeSource):
 
-    
     def get_resources(self, ids, cache=True):
         # this forms a threshold beyond which we'll fetch individual keys of interest.
         # else we'll need to fetch through the full set and client side filter.

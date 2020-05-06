@@ -106,7 +106,7 @@ class CodeBuild(BaseTest):
         self.assertNotIn("test-delete-codebuild", remainder)
 
     def test_post_finding_build(self):
-        factory = self.record_flight_data('test_codebuild_post_finding')
+        factory = self.replay_flight_data('test_codebuild_post_finding')
         p = self.load_policy({
             'name': 'codebuild',
             'resource': 'aws.codebuild',

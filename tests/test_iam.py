@@ -405,7 +405,7 @@ class IamRoleTest(BaseTest):
         rfinding = policy.resource_manager.actions[0].format_resource(
             resources[0])
         self.maxDiff = None
-        self.assertIn('AssumeRolePolicyDocument',  rfinding['Details']['AwsIamRole'])
+        self.assertIn('AssumeRolePolicyDocument', rfinding['Details']['AwsIamRole'])
         rfinding['Details']['AwsIamRole'].pop('AssumeRolePolicyDocument')
         self.assertEqual(rfinding, {
             'Details': {'AwsIamRole': {
@@ -414,10 +414,10 @@ class IamRoleTest(BaseTest):
                 'Path': '/',
                 'RoleId': 'AROAIGK7B2VUDZL4I73HK',
                 'RoleName': 'app1'}},
-             'Id': 'arn:aws:iam::101010101111:role/app1',
-             'Partition': 'aws',
-             'Region': 'us-east-1',
-             'Type': 'AwsIamRole'})
+            'Id': 'arn:aws:iam::101010101111:role/app1',
+            'Partition': 'aws',
+            'Region': 'us-east-1',
+            'Type': 'AwsIamRole'})
         shape_validate(rfinding['Details']['AwsIamRole'], 'AwsIamRoleDetails', 'securityhub')
 
     def test_iam_role_inuse(self):
