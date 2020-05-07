@@ -140,11 +140,11 @@ class FilterRegistry(PluginRegistry):
         if isinstance(data, dict) and len(data) == 1 and 'type' not in data:
             op = list(data.keys())[0]
             if op == 'or':
-                return Or(data, self, manager)
+                return self['or'](data, self, manager)
             elif op == 'and':
-                return And(data, self, manager)
+                return self['and'](data, self, manager)
             elif op == 'not':
-                return Not(data, self, manager)
+                return self['not'](data, self, manager)
             return ValueFilter(data, manager)
         if isinstance(data, str):
             filter_type = data
