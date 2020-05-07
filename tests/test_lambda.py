@@ -208,11 +208,14 @@ class LambdaTest(BaseTest):
             'custodian-ec2-ssm-query'])
         rfinding = p.resource_manager.actions[0].format_resource(functions[0])
         self.maxDiff = None
-        code = rfinding['Details']['AwsLambdaFunction'].pop('Code', None)
         self.assertEqual(
             rfinding,
             {'Details': {'AwsLambdaFunction': {
                 'CodeSha256': 'Pq32lM46RbVovW/Abh14XfrFHIeUM/cAEC51fwkf+tk=',
+                'Code': {
+                    'S3Bucket': 'awslambda-us-west-2-tasks',
+                    'S3Key': 'snapshots/644160558196/custodian-ec2-ssm-query-c3bed681-aa99-4bb2-a155-2f5897de20d2',  # noqa
+                    'S3ObjectVersion': 'Nupr9wOmyG9eZbta8NGFUV9lslQ5NI7m'},
                 'Handler': 'custodian_policy.run',
                 'LastModified': '2019-07-29T22:37:20.844+0000',
                 'RevisionId': '8bbaf510-0ae1-40a5-8980-084bebd3f9c6',
@@ -228,7 +231,6 @@ class LambdaTest(BaseTest):
              'Region': 'us-west-2',
              'Tags': {'custodian-info': 'mode=config-rule:version=0.8.44.2'},
              'Type': 'AwsLambdaFunction'})
-        rfinding['Details']['AwsLambdaFunction']['Code'] = code
         shape_validate(
             rfinding['Details']['AwsLambdaFunction'],
             'AwsLambdaFunctionDetails', 'securityhub')

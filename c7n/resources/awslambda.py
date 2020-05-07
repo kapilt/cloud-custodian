@@ -13,6 +13,7 @@
 # limitations under the License.
 import jmespath
 import json
+from urllib.parse import urlparse, parse_qs
 
 from botocore.exceptions import ClientError
 from botocore.paginate import Paginator
@@ -312,8 +313,15 @@ class LambdaPostFinding(PostFinding):
                 'Arn': r['Layers'][0]['Arn'],
                 'CodeSize': r['Layers'][0]['CodeSize']}
         details.get('VpcConfig', {}).pop('VpcId', None)
-        if 'Code' in r:
-            details['Code'] = {'ZipFile': r['Code']['Location']}
+
+        if 'Code' in r and r['Code'].get('RepositoryType') == "S3":
+            parsed = urlparse(r['Code']['Location'])
+            details['Code'] = {
+                'S3Bucket': parsed.netloc.split('.', 1)[0],
+                'S3Key': parsed.path[1:]}
+            params = parse_qs(parsed.query)
+            if params['versionId']:
+                details['Code']['S3ObjectVersion'] = params['versionId'][0]
         payload.update(details)
         return envelope
 
