@@ -43,7 +43,6 @@ class KeyAlias(QueryResourceManager):
 
 class DescribeKey(DescribeSource):
 
-
     FetchThreshold = 10  # ie should we describe all keys or just fetch them directly
 
     def get_resources(self, ids, cache=True):
