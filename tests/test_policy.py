@@ -21,6 +21,7 @@ import tempfile
 from c7n import policy, manager
 from c7n.config import Config
 from c7n.provider import clouds
+from c7n.policy import PolicyStage
 from c7n.exceptions import ResourceLimitExceeded, PolicyValidationError
 from c7n.resources import aws, load_available
 from c7n.resources.aws import AWS, fake_session
@@ -1045,6 +1046,22 @@ class PolicyConditionsTest(BaseTest):
                 'not': [
                     {'region': 'us-east-1'}]}]})
         self.assertFalse(p.is_runnable())
+
+    def test_boolean_not_event(self):
+        # event is bound to execution evaluation
+        # p = self.load_policy({
+        pdata = {
+            'name': 'manga',
+            'resource': 'aws.ec2',
+            'conditions': [{
+                'or': [
+                    {'not': [
+                        {'type': 'event'}]}]}]}
+        p = self.load_policy(pdata)
+
+        self.assertTrue(p.is_runnable(stage=PolicyStage.Provision))
+        self.assertFalse(p.conditions.filters)
+        self.assertEqual(p.data, pdata)
 
 
 class PolicyExecutionModeTest(BaseTest):

@@ -35,6 +35,7 @@ from c7n.executor import ThreadPoolExecutor
 from c7n.registry import PluginRegistry
 from c7n.resolver import ValuesFrom
 from c7n.utils import set_annotation, type_schema, parse_cidr
+from c7n.manager import iter_filters
 
 
 class FilterValidationError(Exception):
@@ -164,6 +165,24 @@ class FilterRegistry(PluginRegistry):
                     self.plugin_type, data))
 
 
+def trim_runtime(filters):
+    # some filters can only be effectively evaluated at policy
+    # execution, ie. event filters.
+    #
+    # when evaluating conditions or dryrun we eliminate them
+    # entirely.
+    #
+    def remove_filter(f):
+        block = f.get_block_parent()
+        block.filters.remove(f)
+        if isinstance(block, BooleanGroupFilter) and not len(block):
+            remove_filter(block)
+
+    for f in iter_filters(filters):
+        if isinstance(f, EventFilter):
+            remove_filter(f)
+
+
 # Really should be an abstract base class (abc) or
 # zope.interface
 
@@ -198,16 +217,21 @@ class Filter(Element):
     def get_block_operator(self):
         """Determine the immediate parent boolean operator for a filter"""
         # Top level operator is `and`
-        block_stack = ['and']
+        block = self.get_block_parent()
+        if block.type in ('and', 'or', 'not'):
+            return block.type
+        return 'and'
+
+    def get_block_parent(self):
+        """Get the block parent for a filter"""
+        block_stack = [self.manager]
         for f in self.manager.iter_filters(block_end=True):
             if f is None:
                 block_stack.pop()
-                continue
-            if f.type in ('and', 'or', 'not'):
-                block_stack.append(f.type)
-            if f == self:
-                break
-        return block_stack[-1]
+            elif f == self:
+                return block_stack[-1]
+            elif f.type in ('and', 'or', 'not'):
+                block_stack.append(f)
 
     def merge_annotation(self, r, annotation_key, values):
         block_op = self.get_block_operator()
@@ -248,6 +272,9 @@ class BooleanGroupFilter(Filter):
     def get_resource_type_id(self):
         resource_type = self.manager.get_model()
         return resource_type.id
+
+    def __len__(self):
+        return len(self.filters)
 
 
 class Or(BooleanGroupFilter):
@@ -577,7 +604,7 @@ class ValueFilter(Filter):
         return False
 
     def process_value_type(self, sentinel, value, resource):
-        if self.vtype == 'normalize':
+        if self.vtype == 'normalize' and isinstance(value, str):
             return sentinel, value.strip().lower()
 
         elif self.vtype == 'expr':
