@@ -3,89 +3,9 @@
     "data": {
         "Aliases": [
             {
-                "AliasName": "alias/BlockStoreKeyWest",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/BlockStoreKeyWest",
-                "TargetKeyId": "d21dba12-ec3d-4115-a600-5779ae051580"
-            },
-            {
-                "AliasName": "alias/app-logs",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/app-logs",
-                "TargetKeyId": "6f13fc53-8da0-46f2-9c69-c1f9fbf471d7"
-            },
-            {
-                "AliasName": "alias/aws/dynamodb",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/dynamodb"
-            },
-            {
-                "AliasName": "alias/aws/ebs",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/ebs",
-                "TargetKeyId": "68425528-9938-4a15-90f2-f1755263b836"
-            },
-            {
-                "AliasName": "alias/aws/elasticfilesystem",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/elasticfilesystem"
-            },
-            {
-                "AliasName": "alias/aws/es",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/es",
-                "TargetKeyId": "9b776c6e-0a40-45d0-996b-707018677fe9"
-            },
-            {
-                "AliasName": "alias/aws/glue",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/glue",
-                "TargetKeyId": "1475da61-2aa9-4b33-96c4-987a5da3da82"
-            },
-            {
-                "AliasName": "alias/aws/kinesisvideo",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/kinesisvideo"
-            },
-            {
-                "AliasName": "alias/aws/lambda",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/lambda",
-                "TargetKeyId": "e636823c-b0a4-4d14-8d54-f380d9d10f86"
-            },
-            {
-                "AliasName": "alias/aws/lightsail",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/lightsail",
-                "TargetKeyId": "94943493-7eb7-407d-afbd-d4a3af2e9c51"
-            },
-            {
-                "AliasName": "alias/aws/rds",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/rds",
-                "TargetKeyId": "1ec621db-4406-4cb9-8e85-644160558196"
-            },
-            {
-                "AliasName": "alias/aws/redshift",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/redshift",
-                "TargetKeyId": "dd09e3af-48eb-484f-b783-0801786e6239"
-            },
-            {
-                "AliasName": "alias/aws/s3",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/s3",
-                "TargetKeyId": "8e06426a-fdf9-4670-bbec-d6c49dacfa53"
-            },
-            {
-                "AliasName": "alias/aws/sqs",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/sqs",
-                "TargetKeyId": "c5002f91-eab9-4a57-a017-07e9960675c5"
-            },
-            {
-                "AliasName": "alias/aws/ssm",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/ssm"
-            },
-            {
-                "AliasName": "alias/aws/xray",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/aws/xray"
-            },
-            {
                 "AliasName": "alias/c7n-test",
                 "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/c7n-test",
                 "TargetKeyId": "44d25a5c-7efa-44ed-8436-b9511ea921b3"
-            },
-            {
-                "AliasName": "alias/test-key-4",
-                "AliasArn": "arn:aws:kms:us-west-2:644160558196:alias/test-key-4",
-                "TargetKeyId": "09893686-eeda-4bbb-aa45-c0f7560fa6ff"
             }
         ],
         "Truncated": false,

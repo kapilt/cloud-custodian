@@ -43,21 +43,24 @@ class KeyAlias(QueryResourceManager):
 
 class DescribeKey(DescribeSource):
 
+
+    FetchThreshold = 10  # ie should we describe all keys or just fetch them directly
+
     def get_resources(self, ids, cache=True):
         # this forms a threshold beyond which we'll fetch individual keys of interest.
         # else we'll need to fetch through the full set and client side filter.
-        # if len(ids) < 10:
-        #     client = local_session(self.manager.session_factory).client('kms')
-        #     results = []
-        #     for rid in ids:
-        #         try:
-        #             results.append(
-        #                 self.manager.retry(
-        #                     client.describe_key,
-        #                     KeyId=rid)['KeyMetadata'])
-        #         except client.exceptions.NotFoundException:
-        #             continue
-        #     return results
+        if len(ids) < self.FetchThreshold:
+            client = local_session(self.manager.session_factory).client('kms')
+            results = []
+            for rid in ids:
+                try:
+                    results.append(
+                        self.manager.retry(
+                            client.describe_key,
+                            KeyId=rid)['KeyMetadata'])
+                except client.exceptions.NotFoundException:
+                    continue
+            return results
         return super().get_resources(ids, cache)
 
     def augment(self, resources):
