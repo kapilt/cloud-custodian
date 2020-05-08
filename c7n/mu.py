@@ -1648,7 +1648,8 @@ class ConfigRule:
             return True
         if rule['Source'] != params['Source']:
             return True
-        if rule['MaximumExecutionFrequency'] != params['MaximumExecutionFrequency']:
+        if ('MaximumExecutionFrequency' in params and
+                rule['MaximumExecutionFrequency'] != params['MaximumExecutionFrequency']):
             return True
         if rule.get('Description', '') != rule.get('Description', ''):
             return True
