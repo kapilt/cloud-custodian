@@ -195,6 +195,7 @@ class LoadBalancingSslCertificate(QueryResourceManager):
         default_report_fields = [
             "name", "description", "creationTimestamp", "type", "region", "expireTime"
         ]
+        asset_type = "compute.googleapis.com/SslCertificate"
 
         @staticmethod
         def get(client, resource_info):
@@ -364,6 +365,7 @@ class LoadBalancingTargetHttpProxy(QueryResourceManager):
         name = id = 'name'
         default_report_fields = [
             "name", "description", "creationTimestamp", "region", "urlMap"]
+        asset_type = "compute.googleapis.com/TargetHttpProxy"
 
         @staticmethod
         def get(client, resource_info):
