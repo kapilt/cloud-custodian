@@ -32,6 +32,7 @@ class KmsKeyRing(QueryResourceManager):
         name = id = 'name'
         default_report_fields = [
             "name", "createTime"]
+        asset_type = "cloudkms.googleapis.com/KeyRing"
 
         @staticmethod
         def get(client, resource_info):
@@ -97,6 +98,7 @@ class KmsCryptoKey(ChildResourceManager):
             ],
             'use_child_query': True
         }
+        asset_type = "cloudkms.googleapis.com/CryptoKey"
 
         @staticmethod
         def get(client, resource_info):
