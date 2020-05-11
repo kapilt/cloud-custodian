@@ -14,6 +14,7 @@
 from collections import Counter, defaultdict
 from datetime import timedelta, datetime
 from functools import wraps
+import json
 import itertools
 import logging
 import os
@@ -317,6 +318,16 @@ def logs(options, policies):
 def schema_cmd(options):
     """ Print info about the resources, actions and filters available. """
     from c7n import schema
+
+    if options.outline:
+        load_available()
+        outline = schema.resource_outline(options.resource.lower().split('.')[0])
+        if options.json:
+            print(json.dumps(outline, indent=2))
+            return
+        print(yaml_dump(outline))
+        return
+
     if options.json:
         schema.json_dump(options.resource)
         return
