@@ -55,7 +55,7 @@ class TestEC2Manager(BaseTest):
                     'type': 'event',
                     'key': 'xyz',
                     'value': 'bar'}]},
-            {'key': 'value'}]}
+                {'key': 'value'}]}
         ]
 
         p = self.load_policy({
