@@ -166,12 +166,14 @@ class FilterRegistry(PluginRegistry):
 
 
 def trim_runtime(filters):
-    # some filters can only be effectively evaluated at policy
-    # execution, ie. event filters.
-    #
-    # when evaluating conditions or dryrun we eliminate them
-    # entirely.
-    #
+    """Remove runtime filters.
+
+    Some filters can only be effectively evaluated at policy
+    execution, ie. event filters.
+
+    When evaluating conditions for dryrun or provisioning stages we
+    remove them.
+    """
     def remove_filter(f):
         block = f.get_block_parent()
         block.filters.remove(f)
@@ -275,6 +277,9 @@ class BooleanGroupFilter(Filter):
 
     def __len__(self):
         return len(self.filters)
+
+    def __bool__(self):
+        return True
 
 
 class Or(BooleanGroupFilter):
