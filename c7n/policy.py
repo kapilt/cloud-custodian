@@ -600,6 +600,8 @@ class CloudTrailMode(LambdaMode):
 
     schema = utils.type_schema(
         'cloudtrail',
+        delay={'type': 'integer',
+               'description': 'sleep for delay seconds before processing an event'},
         events={'type': 'array', 'items': {
             'oneOf': [
                 {'type': 'string'},
@@ -628,6 +630,12 @@ class CloudTrailMode(LambdaMode):
                 raise ValueError(
                     "resource:%s does not support cloudtrail mode policies" % (
                         self.policy.resource_type))
+
+    def run(self, event, lambda_context):
+        delay = self.policy.data.get('mode', {}).get('delay')
+        if delay:
+            time.sleep(delay)
+        return super().run(event, lambda_context)
 
 
 @execution.register('ec2-instance-state')
