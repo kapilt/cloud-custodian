@@ -169,7 +169,8 @@ class ValidateTest(CliTest):
 class SchemaTest(CliTest):
 
     def test_schema_outline(self):
-        stdout, stderr = self.run_and_expect_success(["custodian", "schema", "--outline", "--json", "aws"])
+        stdout, stderr = self.run_and_expect_success([
+            "custodian", "schema", "--outline", "--json", "aws"])
         data = json.loads(stdout)
         self.assertEqual(list(data.keys()), ["aws"])
         self.assertTrue(len(data['aws']) > 100)
