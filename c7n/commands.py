@@ -320,8 +320,9 @@ def schema_cmd(options):
     from c7n import schema
 
     if options.outline:
+        provider = options.resource and options.resource.lower().split('.')[0] or None
         load_available()
-        outline = schema.resource_outline(options.resource.lower().split('.')[0])
+        outline = schema.resource_outline(provider)
         if options.json:
             print(json.dumps(outline, indent=2))
             return
