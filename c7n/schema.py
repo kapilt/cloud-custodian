@@ -433,8 +433,8 @@ def resource_outline(provider=None):
         cresources = outline[cname] = {}
         for rname, rtype in sorted(ctype.resources.items()):
             cresources['%s.%s' % (cname, rname)] = rinfo = {}
-            rinfo['filters'] = list(sorted(rtype.filter_registry.keys()))
-            rinfo['actions'] = list(sorted(rtype.action_registry.keys()))
+            rinfo['filters'] = sorted(rtype.filter_registry.keys())
+            rinfo['actions'] = sorted(rtype.action_registry.keys())
     return outline
 
 
