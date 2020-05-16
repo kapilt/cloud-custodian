@@ -1061,12 +1061,12 @@ class PolicyConditionsTest(BaseTest):
                 ]
             }]
         }
+        self.patch(PullMode, 'run', lambda self: [True])
         p = self.load_policy(
             deepcopy(pdata), config={'dryrun': True})
-
-        p.run()
+        results = p.run()
+        self.assertEqual(results, [True])
         self.assertTrue(p.is_runnable())
-        self.assertFalse(p.resource_manager.filters)
         self.assertEqual(pdata, p.data)
 
     def test_boolean_not_event(self):
