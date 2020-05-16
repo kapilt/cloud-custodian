@@ -903,12 +903,6 @@ class PolicyConditionNot(Not):
         return 'name'
 
 
-class PolicyStage(Enum):
-    Execution = 1
-    Provision = 2
-    DryRun = 3
-
-
 class PolicyConditions:
 
     filter_registry = FilterRegistry('c7n.policy.filters')
@@ -927,7 +921,7 @@ class PolicyConditions:
         self.filters.extend(self.convert_deprecated())
         self.filters = self.filter_registry.parse(self.filters, self)
 
-    def evaluate(self, event=None, stage=PolicyStage.Execution):
+    def evaluate(self, event=None):
         policy_vars = dict(self.env_vars)
         policy_vars.update({
             'name': self.policy.name,
@@ -939,19 +933,12 @@ class PolicyConditions:
             'policy': self.policy.data
         })
 
-        if stage == PolicyStage.Provision:
-            self.trim_runtime(self.filters)
-
         # note for no filters/conditions, this uses all([]) == true property.
         state = all([f.process([policy_vars], event) for f in self.filters])
         if not state:
             self.policy.log.info(
                 'Skipping policy:%s due to execution conditions', self.policy.name)
         return state
-
-    def trim_runtime(self, filters):
-        from c7n.filters.core import trim_runtime
-        trim_runtime(filters)
 
     def iter_filters(self, block_end=False):
         return iter_filters(self.filters, block_end=block_end)
@@ -1012,8 +999,8 @@ class Policy:
             provider_name = 'aws'
         return provider_name
 
-    def is_runnable(self, event=None, stage=PolicyStage.Execution):
-        return self.conditions.evaluate(event, stage)
+    def is_runnable(self, event=None):
+        return self.conditions.evaluate(event)
 
     # Runtime circuit breakers
     @property
@@ -1159,9 +1146,18 @@ class Policy:
             permissions.update(a.get_permissions())
         return permissions
 
+    def _trim_runtime_filters(self):
+        from c7n.filters.core import trim_runtime
+        trim_runtime(self.conditions.filters)
+        trim_runtime(self.resource_manager.filters)
+
     def __call__(self):
         """Run policy in default mode"""
         mode = self.get_execution_mode()
+        if (isinstance(mode, ServerlessExecutionMode) or
+                self.options.dryrun):
+            self._trim_runtime_filters()
+
         if self.options.dryrun:
             resources = PullMode(self).run()
         elif not self.is_runnable():

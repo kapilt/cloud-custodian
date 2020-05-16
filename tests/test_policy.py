@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from copy import deepcopy
 from datetime import datetime, timedelta
 import json
 import logging
@@ -21,12 +22,11 @@ import tempfile
 from c7n import policy, manager
 from c7n.config import Config
 from c7n.provider import clouds
-from c7n.policy import PolicyStage
 from c7n.exceptions import ResourceLimitExceeded, PolicyValidationError
 from c7n.resources import aws, load_available
 from c7n.resources.aws import AWS, fake_session
 from c7n.resources.ec2 import EC2
-from c7n.policy import ConfigPollRuleMode
+from c7n.policy import ConfigPollRuleMode, PullMode
 from c7n.schema import generate, JsonSchemaValidator
 from c7n.utils import dumps
 from c7n.query import ConfigSource, TypeInfo
@@ -1047,9 +1047,32 @@ class PolicyConditionsTest(BaseTest):
                     {'region': 'us-east-1'}]}]})
         self.assertFalse(p.is_runnable())
 
+    def test_dryrun_event_filter(self):
+        pdata = {
+            'name': 'manga',
+            'resource': 'aws.ec2',
+            'mode': {
+                'type': 'config-rule',
+                'role': 'something'
+            },
+            'filters': [{
+                'not': [
+                    {'type': 'event'}
+                ]
+            }]
+        }
+        p = self.load_policy(
+            deepcopy(pdata), config={'dryrun': True})
+
+        p.run()
+        self.assertTrue(p.is_runnable())
+        self.assertFalse(p.resource_manager.filters)
+        self.assertEqual(pdata, p.data)
+
     def test_boolean_not_event(self):
-        # event is bound to execution evaluation
-        # p = self.load_policy({
+        # event is bound to execution evaluation, when
+        # evaluating conditions for provisioning we
+        # strip any event filters.
         pdata = {
             'name': 'manga',
             'resource': 'aws.ec2',
@@ -1058,8 +1081,8 @@ class PolicyConditionsTest(BaseTest):
                     {'not': [
                         {'type': 'event'}]}]}]}
         p = self.load_policy(pdata)
-
-        self.assertTrue(p.is_runnable(stage=PolicyStage.Provision))
+        p._trim_runtime_filters()
+        self.assertTrue(p.is_runnable())
         self.assertFalse(p.conditions.filters)
         self.assertEqual(p.data, pdata)
 
