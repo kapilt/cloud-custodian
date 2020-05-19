@@ -103,10 +103,10 @@ jobs:
           pip install tox codecov
       - name: Install Deps
         run: |
-          tox -e py38 --notest
+          tox -e py37 --notest
       - name: Test
         run: |
-          tox -e py38
+          tox -e py37
 
   Docs:
     # todo, figure out how to fast cache the tox directory here.
