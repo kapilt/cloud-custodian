@@ -5,8 +5,8 @@ atomicwrites==1.4.0; sys_platform == "win32"
 attrs==19.3.0
 aws-xray-sdk==2.5.0
 bleach==3.1.5
-boto3==1.13.13
-botocore==1.16.13
+boto3==1.13.14
+botocore==1.16.14
 certifi==2020.4.5.1
 cffi==1.14.0; sys_platform == "linux"
 chardet==3.0.4
@@ -62,12 +62,12 @@ six==1.14.0
 tabulate==0.8.7
 termcolor==1.1.0
 toml==0.10.1
-tox==3.15.0
+tox==3.15.1
 tqdm==4.46.0
 twine==3.1.1
 urllib3==1.25.9
 vcrpy==4.0.2
-virtualenv==20.0.20
+virtualenv==20.0.21
 wcwidth==0.1.9
 webencodings==0.5.1
 wrapt==1.12.1
