@@ -1312,7 +1312,8 @@ class RDSSnapshotDelete(BaseAction):
 
     def process(self, snapshots):
         log.info("Deleting %d rds snapshots", len(snapshots))
-        with self.executor_factory(max_workers=3) as w:
+        error = None
+        with self.executor_factory(max_workers=2) as w:
             futures = []
             for snapshot_set in chunks(reversed(snapshots), size=50):
                 futures.append(
@@ -1322,12 +1323,16 @@ class RDSSnapshotDelete(BaseAction):
                     self.log.error(
                         "Exception deleting snapshot set \n %s",
                         f.exception())
+                    error = f.exception()
+        if error:
+            raise error
         return snapshots
 
     def process_snapshot_set(self, snapshots_set):
         c = local_session(self.manager.session_factory).client('rds')
         for s in snapshots_set:
-            c.delete_db_snapshot(
+            self.manager.retry(
+                c.delete_db_snapshot,
                 DBSnapshotIdentifier=s['DBSnapshotIdentifier'])
 
 
