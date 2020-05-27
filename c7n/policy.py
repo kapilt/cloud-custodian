@@ -631,11 +631,12 @@ class CloudTrailMode(LambdaMode):
                     "resource:%s does not support cloudtrail mode policies" % (
                         self.policy.resource_type))
 
-    def run(self, event, lambda_context):
+    def resolve_resources(self, event):
+        # override to enable delay before fetching resources
         delay = self.policy.data.get('mode', {}).get('delay')
         if delay:
             time.sleep(delay)
-        return super().run(event, lambda_context)
+        return super().resolve_resources(event)
 
 
 @execution.register('ec2-instance-state')
