@@ -14,6 +14,8 @@
 import logging
 
 from concurrent.futures import as_completed
+from datetime import datetime
+from dateutil.tz import tzutc
 
 from c7n.actions import BaseAction
 from c7n.filters import AgeFilter, CrossAccountAccessFilter
@@ -365,7 +367,7 @@ class ConfigClusterSnapshot(ConfigSource):
     def load_resource(self, item):
 
         resource = super(ConfigClusterSnapshot, self).load_resource(item)
-        # db cluster snapshots are particularly broken on keys
+        # db cluster snapshots are particularly mangled on keys
         for k, v in list(resource.items()):
             if k.startswith('Dbcl'):
                 resource.pop(k)
@@ -376,7 +378,12 @@ class ConfigClusterSnapshot(ConfigSource):
                 k = 'IAMD%s' % k[4:]
                 resource[k] = v
         resource['Tags'] = [{'Key': k, 'Value': v} for k, v in item['tags'].items()]
-        # TODO: Load DBSnapshotAttributes into annotation
+
+        utc = tzutc()
+        resource['SnapshotCreateTime'] = datetime.fromtimestamp(
+            resource['SnapshotCreateTime'] / 1000, tz=utc)
+        resource['ClusterCreateTime'] = datetime.fromtimestamp(
+            resource['ClusterCreateTime'] / 1000, tz=utc)
         return resource
 
 
