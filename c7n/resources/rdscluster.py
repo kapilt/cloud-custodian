@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 
 from concurrent.futures import as_completed
@@ -360,6 +361,26 @@ class DescribeClusterSnapshot(DescribeSource):
         return tags.universal_augment(self.manager, resources)
 
 
+class ConfigClusterSnapshot(ConfigSource):
+
+    def load_resource(self, item):
+
+        resource = super(ConfigClusterSnapshot, self).load_resource(item)
+        # db cluster snapshots are particularly broken on keys
+        for k, v in list(resource.items()):
+            if k.startswith('Dbcl'):
+                resource.pop(k)
+                k = 'DBCl%s' % k[4:]
+                resource[k] = v
+            elif k.startswith('Iamd'):
+                resource.pop(k)
+                k = 'IAMD%s' % k[4:]
+                resource[k] = v
+        resource['Tags'] = [{'Key': k, 'Value': v} for k, v in item['tags'].items()]
+        # TODO: Load DBSnapshotAttributes into annotation
+        return resource
+
+
 @resources.register('rds-cluster-snapshot')
 class RDSClusterSnapshot(QueryResourceManager):
     """Resource manager for RDS cluster snapshots.
@@ -380,7 +401,7 @@ class RDSClusterSnapshot(QueryResourceManager):
 
     source_mapping = {
         'describe': DescribeClusterSnapshot,
-        'config': ConfigSource
+        'config': ConfigClusterSnapshot
     }
 
 
