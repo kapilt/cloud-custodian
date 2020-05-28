@@ -29,13 +29,12 @@ jobs:
     needs: Lint
     strategy:
       matrix:
-#        os: [macos-latest, ubuntu-latest]
-        os: [ubuntu-latest]
+        os: [macos-latest, ubuntu-latest]
         python-version: [3.6, 3.7, 3.8]
-#        exclude:
-#          # conserve some osx builders
-#          - python-version: 3.6
-#            os: macos-latest
+        exclude:
+          # conserve some osx builders
+          - python-version: 3.6
+            os: macos-latest
         include:
           - python-version: 3.6
             os: ubuntu-latest
@@ -46,12 +45,12 @@ jobs:
           - python-version: 3.8
             os: ubuntu-latest
             tox-target: py38-cov
-#          - python-version: 3.7
-#            tox-target: py37
-#            os: macos-latest
-#          - python-version: 3.8
-#            tox-target: py38
-#            os: macos-latest
+          - python-version: 3.7
+            tox-target: py37
+            os: macos-latest
+          - python-version: 3.8
+            tox-target: py38
+            os: macos-latest
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
