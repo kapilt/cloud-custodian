@@ -29,12 +29,13 @@ jobs:
     needs: Lint
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+#        os: [macos-latest, ubuntu-latest]
+        os: [ubuntu-latest]
         python-version: [3.6, 3.7, 3.8]
-        exclude:
-          # conserve some osx builders
-          - python-version: 3.6
-            os: macos-latest
+#        exclude:
+#          # conserve some osx builders
+#          - python-version: 3.6
+#            os: macos-latest
         include:
           - python-version: 3.6
             os: ubuntu-latest
