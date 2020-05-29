@@ -366,14 +366,17 @@ def get_retry(codes=(), max_attempts=8, min_delay=1, log_retries=False):
     """
     max_delay = max(min_delay, 2) ** max_attempts
 
-    def _retry(func, *args, **kw):
+    def _retry(func, ignore_err_codes=None, *args, **kw):
         for idx, delay in enumerate(
                 backoff_delays(min_delay, max_delay, jitter=True)):
             try:
                 return func(*args, **kw)
             except ClientError as e:
+
                 if e.response['Error']['Code'] not in codes:
                     raise
+                elif e.response['Error']['Code'] in ignore_err_codes:
+                    return
                 elif idx == max_attempts - 1:
                     raise
                 if log_retries:
