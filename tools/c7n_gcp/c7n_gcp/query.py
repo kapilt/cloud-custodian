@@ -14,6 +14,7 @@
 
 import jmespath
 import json
+import itertools
 import logging
 
 from googleapiclient.errors import HttpError
@@ -104,7 +105,7 @@ class AssetInventory:
         if query is None:
             query = {}
         if 'scope' not in query:
-            query['scope'] = 'project/%s' % session.get_default_project()
+            query['scope'] = 'projects/%s' % session.get_default_project()
         if 'assetTypes' not in query:
             query['assetTypes'] = [self.manager.resource_type.asset_type]
 
@@ -113,12 +114,17 @@ class AssetInventory:
         resources = []
 
         results = list(search_client.execute_paged_query('searchAll', query))
-        for resource_set in chunks(results, 100):
+        for resource_set in chunks(itertools.chain(*[rs['results'] for rs in results]), 100):
+            rquery = {
+                'parent': query['scope'],
+                'contentType': 'RESOURCE',
+                'assetNames': [r['name'] for r in resource_set]}
             for history_result in resource_client.execute_query(
-                scope=query['scope'],
-                assetNames=[r['name'] for r in resource_set]):
-                resource = history_result['asset'].pop('resource', {})
-                resource['c7n:history'] = history_result
+                    'batchGetAssetsHistory', rquery).get('assets', ()):
+                resource = history_result['asset']['resource']['data']
+                resource['c7n:history'] = {
+                    'window': history_result['window'],
+                    'ancestors': history_result['asset']['ancestors']}
                 resources.append(resource)
         return resources
 
