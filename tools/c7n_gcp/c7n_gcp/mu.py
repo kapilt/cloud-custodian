@@ -724,6 +724,8 @@ class ApiSubscriber(EventSource):
         return {
             'topic': '{}audit-{}'.format(self.prefix, func.name),
             'name': '{}audit-{}'.format(self.prefix, func.name),
+            'scope': self.data.get('scope', 'log'),
+            'scope_id': self.data.get('scope_id'),
             'log': log_name,
             'filter': log_filter}
 

@@ -122,6 +122,11 @@ class ApiAuditMode(FunctionMode):
     schema = type_schema(
         'gcp-audit',
         methods={'type': 'array', 'items': {'type': 'string'}},
+        scope={
+            'default': 'project',
+            'enum': ['project', 'folder', 'organization', 'billing'],
+        },
+        scope_id={'type': 'string'},
         required=['methods'],
         rinherit=FunctionMode.schema)
 
@@ -152,6 +157,11 @@ class ApiAuditMode(FunctionMode):
             raise PolicyValidationError(
                 "Resource:%s does not implement retrieval method" % (
                     self.policy.resource_type))
+        mode_data = self.policy.data['mode']
+        if mode_data.get('scope', 'project') != 'project' and 'scope_id' not in mode_data:
+            raise PolicyValidationError(
+                "Policy:%s scope:%s requires a scope_id value" % (
+                    self.policy.name, mode_data['scope']))
 
     def run(self, event, context):
         """Execute a gcp serverless model"""
