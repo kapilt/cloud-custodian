@@ -95,7 +95,8 @@ class DescribeSource:
 @sources.register('inventory')
 class AssetInventory:
 
-    permissions = ("cloudasset.assets.searchAllResources",)
+    permissions = ("cloudasset.assets.searchAllResources",
+                   "cloudasset.assets.exportResource")
 
     def __init__(self, manager):
         self.manager = manager
