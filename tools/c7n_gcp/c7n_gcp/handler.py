@@ -18,7 +18,6 @@ import os
 import uuid
 
 from c7n.config import Config
-from c7n.policy import PolicyCollection
 from c7n.loader import PolicyLoader
 # Load resource plugins
 from c7n_gcp.entry import initialize_gcp
