@@ -653,3 +653,17 @@ class QueueTests(BaseTest):
             'AwsSqsQueueDetails',
             'securityhub',
         )
+
+    def test_sqs_access_analyzer(self):
+        factory = self.record_flight_data('test_sqs_analyzer_finding')
+        p = self.load_policy({
+            'name': 'check-sqs',
+            'resource': 'aws.sqs',
+            'filters': [
+                {'QueueUrl': 'https://queue.amazonaws.com/644160558196/public-test'},
+                {'type': 'iam-analyzer'}
+            ]
+        }, session_factory=factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertIn('c7n:AccessAnalysis', resources[0])
