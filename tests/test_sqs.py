@@ -655,7 +655,7 @@ class QueueTests(BaseTest):
         )
 
     def test_sqs_access_analyzer(self):
-        factory = self.record_flight_data('test_sqs_analyzer_finding')
+        factory = self.replay_flight_data('test_sqs_analyzer_finding')
         p = self.load_policy({
             'name': 'check-sqs',
             'resource': 'aws.sqs',
