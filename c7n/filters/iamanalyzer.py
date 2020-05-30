@@ -41,7 +41,7 @@ class AccessAnalyzer(ValueFilter):
     schema = type_schema('iam-analyzer',
         analyzer={'type': 'string'}, rinherit=ValueFilter.schema)
     schema_alias = True
-
+    permissions = ('access-analyzer:ListFindings', 'access-analyzer:ListAnalyzers')
     supported_types = (
         'AWS::IAM::Role',
         'AWS::KMS::Key',
