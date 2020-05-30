@@ -196,6 +196,18 @@ class TestSSM(BaseTest):
                 Filters=[{'Key': 'Name', 'Values': [resources[0]['Name']]}])['Parameters'],
             [])
 
+    def test_ssm_parameter_delete_non_existant(self):
+        session_factory = self.replay_flight_data("test_ssm_parameter_delete_non_existant")
+        p = self.load_policy({
+            'name': 'ssm-param-tags',
+            'resource': 'ssm-parameter',
+            'actions': ['delete']},
+            session_factory=session_factory)
+
+        # if it raises the test fails
+        p.resource_manager.actions[0].process(
+            [{'Name': 'unicorn'}])
+        
     def test_ssm_parameter_tag_arn(self):
         session_factory = self.replay_flight_data("test_ssm_parameter_tag_arn")
         p = self.load_policy({
