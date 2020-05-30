@@ -51,7 +51,7 @@ class SSMParameter(QueryResourceManager):
 class DeleteParameter(Action):
 
     schema = type_schema('delete')
-    permissions = "ssm:DeleteParameter"
+    permissions = ("ssm:DeleteParameter",)
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('ssm')
