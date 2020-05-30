@@ -207,7 +207,7 @@ class TestSSM(BaseTest):
         # if it raises the test fails
         p.resource_manager.actions[0].process(
             [{'Name': 'unicorn'}])
-        
+
     def test_ssm_parameter_tag_arn(self):
         session_factory = self.replay_flight_data("test_ssm_parameter_tag_arn")
         p = self.load_policy({
