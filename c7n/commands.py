@@ -289,7 +289,7 @@ def run(options, policies):
                 "Error while executing policy %s, continuing" % (
                     policy.name))
     if exit_code != 0:
-        log.error("The following policies had errors while executing%s" % (
+        log.error("The following policies had errors while executing\n - %s" % (
             "\n - ".join(errored_policies)))
         sys.exit(exit_code)
 
