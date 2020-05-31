@@ -165,7 +165,7 @@ class StackDriverLogging(LogOutput):
         # gcp has three different python sdks all independently maintained .. hmmm...
         # and random monkey shims on top of those :-(
         log_group = self.config.netloc
-        if log_group:gi
+        if log_group:
             log_group = "custodian-%s-%s" % (log_group, self.ctx.policy.name)
         else:
             log_group = "custodian-%s" % self.ctx.policy.name
