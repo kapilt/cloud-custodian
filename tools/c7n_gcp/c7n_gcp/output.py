@@ -22,9 +22,25 @@ import logging
 import os
 import tempfile
 import time
+import shutil
+
+
+try:
+    from google.cloud.storage import Bucket, Client as StorageClient
+except ImportError:
+    StorageClient = None
+
+try:
+    from google.cloud.logging import Client as LogClient
+    from google.cloud.logging.handlers import CloudLoggingHandler
+    from google.cloud.logging.resource import Resource
+except ImportError:
+    LogClient = None
+
 
 from c7n.output import (
     blob_outputs,
+    log_outputs,
     metrics_outputs,
     DirectoryOutput,
     Metrics,
@@ -137,6 +153,7 @@ class StackDriverMetrics(Metrics):
         client.execute_command('create', params)
 
 
+@log_outputs.register('gcp', condition=bool(LogClient))
 class StackDriverLogging(LogOutput):
 
     def get_handler(self):
@@ -147,14 +164,11 @@ class StackDriverLogging(LogOutput):
         # protobuf/grpc deps, and also so we can record tests..
         # gcp has three different python sdks all independently maintained .. hmmm...
         # and random monkey shims on top of those :-(
-
-        from google.cloud.logging import Client as LogClient
-        from google.cloud.logging.handlers import CloudLoggingHandler
-        from google.cloud.logging.resource import Resource
-
-        log_group = self.ctx.options.log_group
-        if log_group.endswith('*'):
-            log_group = "%s%s" % (log_group[:-1], self.ctx.policy.name)
+        log_group = self.config.netloc
+        if log_group:gi
+            log_group = "custodian-%s-%s" % (log_group, self.ctx.policy.name)
+        else:
+            log_group = "custodian-%s" % self.ctx.policy.name
 
         project_id = local_session(self.ctx.session_factory).get_default_project()
         client = LogClient(project_id)
@@ -162,6 +176,9 @@ class StackDriverLogging(LogOutput):
         return CloudLoggingHandler(
             client,
             log_group,
+            labels={
+                'policy': self.ctx.policy.name,
+                'resource': self.ctx.policy.resource_type},
             resource=Resource(type='project', labels={'project_id': project_id}))
 
     def leave_log(self):
@@ -171,15 +188,23 @@ class StackDriverLogging(LogOutput):
         self.handler.transport.worker.stop()
 
 
-@blob_outputs.register('gs')
+@blob_outputs.register('gs', condition=bool(StorageClient))
 class GCPStorageOutput(DirectoryOutput):
 
+    log = logging.getLogger('c7n_gcp.output')
+
     def __init__(self, ctx, config=None):
-        super(GCPStorageOutput, self).__init__(ctx, config)
-        self.date_path = datetime.datetime.now().strftime('%Y/%m/%d/%H')
+        self.ctx = ctx
+        self.config = config
+        self.output_path = self.get_output_path(self.config['url'])
         self.gs_path, self.bucket, self.key_prefix = parse_gs(
-            self.ctx.output_path)
+            self.output_path)
         self.root_dir = tempfile.mkdtemp()
+        self.bucket = Bucket(StorageClient(), self.bucket)
+
+    @staticmethod
+    def join(*parts):
+        return "/".join([s.strip('/') for s in parts])
 
     def __repr__(self):
         return "<%s to bucket:%s prefix:%s>" % (
@@ -187,19 +212,26 @@ class GCPStorageOutput(DirectoryOutput):
             self.bucket,
             "%s/%s" % (self.key_prefix, self.date_path))
 
+    def get_output_path(self, output_url):
+        if '{' not in output_url:
+            date_path = datetime.datetime.utcnow().strftime('%Y/%m/%d/%H')
+            return self.join(
+                output_url, self.ctx.policy.name, date_path)
+        return output_url.format(**self.get_output_vars())
+
     def upload(self):
         for root, dirs, files in os.walk(self.root_dir):
             for f in files:
-                key = "%s/%s%s" % (
-                    self.key_prefix,
-                    self.date_path,
-                    "%s/%s" % (
-                        root[len(self.root_dir):], f))
-                key = key.strip('/')
-                self.transfer.upload_file(
-                    os.path.join(root, f), self.bucket, key,
-                    extra_args={
-                        'ServerSideEncryption': 'AES256'})
+                key = "/".join(filter(None, [self.key_prefix, root[len(self.root_dir)+1:], f]))
+                blob = self.bucket.blob(key)
+                blob.upload_from_filename(os.path.join(root, f))
+
+    def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
+        self.log.debug("Uploading policy logs")
+        self.compress()
+        self.upload()
+        shutil.rmtree(self.root_dir)
+        self.log.debug("Policy Logs uploaded")
 
 
 def parse_gs(gs_path):
