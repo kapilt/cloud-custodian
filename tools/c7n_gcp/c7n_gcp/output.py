@@ -222,7 +222,7 @@ class GCPStorageOutput(DirectoryOutput):
     def upload(self):
         for root, dirs, files in os.walk(self.root_dir):
             for f in files:
-                key = "/".join(filter(None, [self.key_prefix, root[len(self.root_dir)+1:], f]))
+                key = "/".join(filter(None, [self.key_prefix, root[len(self.root_dir):], f]))
                 blob = self.bucket.blob(key)
                 blob.upload_from_filename(os.path.join(root, f))
 
