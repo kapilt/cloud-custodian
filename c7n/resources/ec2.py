@@ -1056,6 +1056,26 @@ class MonitorInstances(BaseAction):
                 raise
 
 
+@EC2.action_registry.register('set-instance-metadata')
+class SetInstanceMetadata(Action):
+
+    schema = type('set-instance-metadata',
+                  HttpsTokens= {'enum': ['optional', 'required']},
+                  HttpPutResponseHopLimit={'type': 'integer', 'min': 1, 'max': 64},
+                  HttpEndpoint={'enum': ['enabled', 'disabled']})
+
+    def process(self, resources):
+        client = local_session(self.manager.session_factory).client('ec2')
+        params = dict(self.data)
+        params.pop('type')
+
+        for r in resources:
+            self.manager.retry(
+                client,
+                InstanceId=r['InstanceId'],
+                **params)
+
+
 @EC2.action_registry.register("post-finding")
 class InstanceFinding(PostFinding):
 
