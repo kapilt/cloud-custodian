@@ -1488,7 +1488,7 @@ class ParameterFilter(ValueFilter):
 
     schema = type_schema('db-parameter', rinherit=ValueFilter.schema)
     schema_alias = False
-    permissions = ('rds:DescribeDBInstances', 'rds:DescribeDBParameters', )
+    permissions = ('rds:DescribeDBParameters', )
 
     @staticmethod
     def recast(val, datatype):

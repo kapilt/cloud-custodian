@@ -29,6 +29,9 @@ from c7n.exceptions import PolicyValidationError
 from c7n.utils import (
     type_schema, local_session, snapshot_identifier, chunks)
 
+from .rds import ParameterFilter
+
+
 log = logging.getLogger('custodian.rds-cluster')
 
 
@@ -64,6 +67,7 @@ class RDSCluster(QueryResourceManager):
 
 RDSCluster.filter_registry.register('offhour', OffHour)
 RDSCluster.filter_registry.register('onhour', OnHour)
+RDSCluster.filter_registry.register('db-parameter', ParameterFilter)
 
 
 @RDSCluster.filter_registry.register('security-group')
