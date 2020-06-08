@@ -60,7 +60,7 @@ class AccessAnalyzer(ValueFilter):
         self.annotate = False
         self.get_finding(
             client, analyzer_arn,
-            [r for r in resources if not self.analysis_annotation in r])
+            [r for r in resources if self.analysis_annotation not in r])
         for r in resources:
             findings = r[self.analysis_annotation]
             if not findings:
