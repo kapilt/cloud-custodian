@@ -58,25 +58,40 @@ class AccessAnalyzer(ValueFilter):
         analyzer_arn = self.get_analyzer(client)
         results = []
         self.annotate = False
+        self.get_finding(
+            client, analyzer_arn,
+            [r for r in resources if not self.analysis_annotation in r])
+        for r in resources:
+            findings = r[self.analysis_annotation]
+            if not findings:
+                continue
+            elif not len(self.data) > 1:
+                results.append(r)
+                continue
+            found = False
+            for f in findings:
+                if self(f):
+                    found = True
+                    break
+            if found:
+                results.append(r)
+        return results
 
-        for resource_set in chunks(zip(self.manager.get_arns(resources), resources), 20):
+    def get_findings(self, client, analyzer_arn, resources):
+        for resource_set in chunks(
+                zip(self.manager.get_arns(resources), resources),
+                20):
             resource_set = dict(resource_set)
             filters = {
                 'status': {'eq': ['ACTIVE']},
                 'resource': {'contains': list(resource_set)},
                 'resourceType': {'eq': [self.manager.resource_type.cfn_type]}
             }
-            found = set()
             for finding in self.manager.retry(
                     client.list_findings,
                     analyzerArn=analyzer_arn, filter=filters).get('findings', ()):
-                if len(self.data) > 1 and self(finding):
-                    continue
                 r = resource_set[finding['resource']]
                 r.setdefault(self.analysis_annotation, []).append(finding)
-                found.add(finding['resource'])
-            results.extend([v for k, v in resource_set.items() if k in found])
-        return results
 
     def get_analyzer(self, client):
         if self.data.get('analyzer'):
