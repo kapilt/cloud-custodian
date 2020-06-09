@@ -116,8 +116,6 @@ class TestSetMetadata(BaseTest):
         policy = self.load_policy({
             'name': 'ec2-imds-access',
             'resource': 'aws.ec2',
-#            'filters': [
-#                {'MetadataOptions.HttpTokens': 'optional'}],
             'actions': [
                 {'type': 'set-metadata-access',
                  'tokens': 'required'},
