@@ -1101,11 +1101,14 @@ class SetMetadataServerAccess(BaseAction):
 
     schema = type_schema(
         'set-metadata-access',
-        required={'anyOf': ['endpoint', 'tokens', 'hop-limit']},
+        anyOf=[{'required': ['endpoint']},
+               {'required': ['tokens']},
+               {'required': ['hop-limit']}],
         **{'endpoint': {'enum': AllowedValues['HttpEndpoint']},
            'tokens': {'enum': AllowedValues['HttpTokens']},
-           'hop-limit': {'enum': AllowedValues['HttpPutResponseHopLimit']}}
+           'hop-limit': {'type': 'integer', 'minimum': 1, 'maximum': 64}}
     )
+    permissions = ('ec2:ModifyInstanceMetadataOptions',)
 
     def get_params(self):
         return filter_empty({
