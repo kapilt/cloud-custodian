@@ -480,6 +480,8 @@ class DirectoryOutput:
 
 class BlobOutput(DirectoryOutput):
 
+    log = logging.getLogger('custodian.output.blob')
+
     def __init__(self, ctx, config):
         self.ctx = ctx
         # we allow format strings in output urls so reparse config
@@ -503,11 +505,11 @@ class BlobOutput(DirectoryOutput):
         return output_url.format(**self.get_output_vars())
 
     def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
-        self.log.debug("Uploading policy logs")
+        self.log.debug("%s: uploading policy logs", self.type)
         self.compress()
         self.upload()
         shutil.rmtree(self.root_dir)
-        self.log.debug("Policy Logs uploaded")
+        self.log.debug("%s: policy logs uploaded", self.type)
 
     def upload(self):
         for root, dirs, files in os.walk(self.root_dir):

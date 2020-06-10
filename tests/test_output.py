@@ -64,7 +64,7 @@ class S3OutputTest(TestUtils):
 
         self.assertEqual(S3Output.join("s3://xyz/xyz/", "/bar/"), "s3://xyz/xyz/bar")
 
-    def get_s3_output(self):
+    def get_s3_output(self, cleanup=True):
         output_dir = "s3://cloud-custodian/policies"
         output = S3Output(
             ExecutionContext(
@@ -73,7 +73,8 @@ class S3OutputTest(TestUtils):
                 Config.empty(output_dir=output_dir)),
             {'url': output_dir})
 
-        self.addCleanup(shutil.rmtree, output.root_dir)
+        if cleanup:
+            self.addCleanup(shutil.rmtree, output.root_dir)
 
         return output
 
@@ -84,6 +85,16 @@ class S3OutputTest(TestUtils):
         # Make sure __repr__ is defined
         name = str(output)
         self.assertIn("bucket:cloud-custodian", name)
+
+    def test_s3_context_manager(self):
+        log_output = self.capture_logging(
+            'custodian.output.blob', level=logging.DEBUG)
+        output = self.get_s3_output(cleanup=False)
+        with output:
+            pass
+        self.assertEqual(log_output.getvalue(), (
+            's3: uploading policy logs\n'
+            's3: policy logs uploaded\n'))
 
     def test_join_leave_log(self):
         temp_dir = self.get_temp_dir()

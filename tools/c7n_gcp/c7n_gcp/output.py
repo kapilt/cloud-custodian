@@ -187,8 +187,6 @@ class StackDriverLogging(LogOutput):
 @blob_outputs.register('gs', condition=bool(StorageClient))
 class GCPStorageOutput(BlobOutput):
 
-    log = logging.getLogger('c7n_gcp.output')
-
     def __init__(self, ctx, config=None):
         super().__init__(ctx, config)
         self.bucket = Bucket(StorageClient(), self.bucket)
