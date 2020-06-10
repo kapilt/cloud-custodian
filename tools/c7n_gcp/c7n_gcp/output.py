@@ -19,11 +19,7 @@ TODO: provider policy execution initialization for outputs
 """
 import datetime
 import logging
-import os
-import tempfile
 import time
-import shutil
-
 
 try:
     from google.cloud.storage import Bucket, Client as StorageClient
@@ -42,7 +38,7 @@ from c7n.output import (
     blob_outputs,
     log_outputs,
     metrics_outputs,
-    DirectoryOutput,
+    BlobOutput,
     Metrics,
     LogOutput)
 from c7n.utils import local_session
@@ -189,61 +185,14 @@ class StackDriverLogging(LogOutput):
 
 
 @blob_outputs.register('gs', condition=bool(StorageClient))
-class GCPStorageOutput(DirectoryOutput):
+class GCPStorageOutput(BlobOutput):
 
     log = logging.getLogger('c7n_gcp.output')
 
     def __init__(self, ctx, config=None):
-        self.ctx = ctx
-        self.config = config
-        self.output_path = self.get_output_path(self.config['url'])
-        self.gs_path, self.bucket, self.key_prefix = parse_gs(
-            self.output_path)
-        self.root_dir = tempfile.mkdtemp()
+        super().__init__(ctx, config)
         self.bucket = Bucket(StorageClient(), self.bucket)
 
-    @staticmethod
-    def join(*parts):
-        return "/".join([s.strip('/') for s in parts])
-
-    def __repr__(self):
-        return "<%s to bucket:%s prefix:%s>" % (
-            self.__class__.__name__,
-            self.bucket,
-            "%s/%s" % (self.key_prefix, self.date_path))
-
-    def get_output_path(self, output_url):
-        if '{' not in output_url:
-            date_path = datetime.datetime.utcnow().strftime('%Y/%m/%d/%H')
-            return self.join(
-                output_url, self.ctx.policy.name, date_path)
-        return output_url.format(**self.get_output_vars())
-
-    def upload(self):
-        for root, dirs, files in os.walk(self.root_dir):
-            for f in files:
-                key = "/".join(filter(None, [self.key_prefix, root[len(self.root_dir):], f]))
-                blob = self.bucket.blob(key)
-                blob.upload_from_filename(os.path.join(root, f))
-
-    def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
-        self.log.debug("Uploading policy logs")
-        self.compress()
-        self.upload()
-        shutil.rmtree(self.root_dir)
-        self.log.debug("Policy Logs uploaded")
-
-
-def parse_gs(gs_path):
-    if not gs_path.startswith('gs://'):
-        raise ValueError("Invalid gs path")
-    ridx = gs_path.find('/', 5)
-    if ridx == -1:
-        ridx = None
-    bucket = gs_path[5:ridx]
-    gs_path = gs_path.rstrip('/')
-    if ridx is None:
-        key_prefix = ""
-    else:
-        key_prefix = gs_path[gs_path.find('/', 5):]
-    return gs_path, bucket, key_prefix
+    def upload_file(self, path, key):
+        blob = self.bucket.blob(key)
+        blob.upload_from_filename(path)

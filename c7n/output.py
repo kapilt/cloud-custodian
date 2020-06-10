@@ -19,12 +19,13 @@ See docs/usage/outputs.rst
 
 """
 import contextlib
-from datetime import datetime
+import datetime
 import json
 import gzip
 import logging
 import os
 import shutil
+import tempfile
 import time
 import uuid
 
@@ -302,7 +303,7 @@ class LogMetrics(Metrics):
     def _format_metric(self, key, value, unit, dimensions):
         d = {
             "MetricName": key,
-            "Timestamp": datetime.now(),
+            "Timestamp": datetime.datetime.now(),
             "Value": value,
             "Unit": unit}
         d["Dimensions"] = [
@@ -458,7 +459,7 @@ class DirectoryOutput:
             'account_id': self.ctx.options.account_id,
             'region': self.ctx.options.region,
             'policy_name': self.ctx.policy.name,
-            'now': datetime.utcnow(),
+            'now': datetime.datetime.utcnow(),
             'uuid': str(uuid.uuid4())}
         return data
 
@@ -468,10 +469,51 @@ class DirectoryOutput:
         if not os.path.exists(record_path):
             return []
 
-        mdate = datetime.fromtimestamp(
+        mdate = datetime.datetime.fromtimestamp(
             os.stat(record_path).st_ctime)
 
         with open(record_path) as fh:
             records = json.load(fh)
             [r.__setitem__('CustodianDate', mdate) for r in records]
             return records
+
+
+class BlobOutput(DirectoryOutput):
+
+    def __init__(self, ctx, config):
+        self.ctx = ctx
+        # we allow format strings in output urls so reparse config
+        # post interpolation.
+        self.config = parse_url_config(self.get_output_path(config['url']))
+        self.bucket = self.config.netloc
+        self.key_prefix = self.config.path.strip('/')
+        self.root_dir = tempfile.mkdtemp()
+
+    def __repr__(self):
+        return "<output:%s to bucket:%s prefix:%s>" % (
+            self.type,
+            self.bucket,
+            self.key_prefix)
+
+    def get_output_path(self, output_url):
+        if '{' not in output_url:
+            date_path = datetime.datetime.utcnow().strftime('%Y/%m/%d/%H')
+            return "/".join([s.strip('/') for s in [
+                output_url, self.ctx.policy.name, date_path]])
+        return output_url.format(**self.get_output_vars())
+
+    def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
+        self.log.debug("Uploading policy logs")
+        self.compress()
+        self.upload()
+        shutil.rmtree(self.root_dir)
+        self.log.debug("Policy Logs uploaded")
+
+    def upload(self):
+        for root, dirs, files in os.walk(self.root_dir):
+            for f in files:
+                key = "/".join(filter(None, [self.key_prefix, root[len(self.root_dir):], f]))
+                self.upload_file(os.path.join(root, f), key)
+
+    def upload_file(self, path, key):
+        raise NotImplementedError("subclass responsibility")
