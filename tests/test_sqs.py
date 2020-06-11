@@ -665,8 +665,7 @@ class QueueTests(BaseTest):
                  'key': 'analyzedAt',
                  'value_type': 'age',
                  'value': 5,
-                 'op': 'gt',
-                }
+                 'op': 'gt'},
             ]
         }, session_factory=factory)
         resources = p.run()
