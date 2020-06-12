@@ -22,7 +22,7 @@ from c7n.ctx import ExecutionContext
 from c7n.config import Bag, Config
 from c7n.testing import mock_datetime_now
 from c7n.output import metrics_outputs
-from c7n.utils import parse_url_config
+from c7n.utils import parse_url_config, reset_session_cache
 
 from c7n_gcp.output import (
     GCPStorageOutput, StackDriverLogging, StackDriverMetrics)
@@ -92,7 +92,7 @@ class MetricsOutputTest(BaseTest):
         metrics.flush()
 
 
-def get_log_output(output_url):
+def get_log_output(request, output_url):
     log = StackDriverLogging(
         ExecutionContext(
             lambda assume=False: mock.MagicMock(),
@@ -100,6 +100,7 @@ def get_log_output(output_url):
             Config.empty(account_id='custodian-test')),
         parse_url_config(output_url)
     )
+    request.addfinalizer(reset_session_cache)
     return log
 
 
@@ -116,19 +117,22 @@ def get_blob_output(request, output_url=None, cleanup=True):
 
     if cleanup:
         request.addfinalizer(lambda : shutil.rmtree(output.root_dir)) # noqa
-
+    request.addfinalizer(reset_session_cache)
     return output
 
 
 @mock.patch('c7n_gcp.output.LogClient')
 @mock.patch('c7n_gcp.output.CloudLoggingHandler')
-def test_gcp_logging(handler, client):
-    output = get_log_output('gcp://')
+def test_gcp_logging(handler, client, request):
+    output = get_log_output(request, 'gcp://')
     with output:
         assert 1
 
     handler().transport.flush.assert_called_once()
     handler().transport.worker.stop.assert_called_once()
+
+    output = get_log_output(request, 'gcp://apples')
+    assert output.get_log_group() == 'custodian-apples-xyz'
 
 
 @mock.patch('c7n_gcp.output.StorageClient')

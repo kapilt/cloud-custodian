@@ -152,20 +152,19 @@ class StackDriverMetrics(Metrics):
 @log_outputs.register('gcp', condition=bool(LogClient))
 class StackDriverLogging(LogOutput):
 
-    def get_handler(self):
-        # gcp has three independent implementation of api bindings for python.
-        # The one used by logging is not yet supported by our test recording.
-
-        # TODO drop these grpc variants for the REST versions, and we can drop
-        # protobuf/grpc deps, and also so we can record tests..
-        # gcp has three different python sdks all independently maintained .. hmmm...
-        # and random monkey shims on top of those :-(
+    def get_log_group(self):
         log_group = self.config.netloc
         if log_group:
             log_group = "custodian-%s-%s" % (log_group, self.ctx.policy.name)
         else:
             log_group = "custodian-%s" % self.ctx.policy.name
+        return log_group
 
+    def get_handler(self):
+        # TODO drop these grpc variants for the REST versions, and we can drop
+        # protobuf/grpc deps, and also so we can record tests.
+
+        log_group = self.get_log_group()
         project_id = local_session(self.ctx.session_factory).get_default_project()
         client = LogClient(project_id)
         return CloudLoggingHandler(
