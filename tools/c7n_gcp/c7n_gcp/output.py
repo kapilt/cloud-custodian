@@ -168,7 +168,6 @@ class StackDriverLogging(LogOutput):
 
         project_id = local_session(self.ctx.session_factory).get_default_project()
         client = LogClient(project_id)
-
         return CloudLoggingHandler(
             client,
             log_group,

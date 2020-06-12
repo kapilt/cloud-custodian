@@ -502,7 +502,7 @@ class BlobOutput(DirectoryOutput):
             date_path = datetime.datetime.utcnow().strftime('%Y/%m/%d/%H')
             return "/".join([s.strip('/') for s in [
                 output_url, self.ctx.policy.name, date_path]])
-        return output_url.format(**self.get_output_vars())
+        return output_url.format(**self.get_output_vars()).rstrip('/')
 
     def __exit__(self, exc_type=None, exc_value=None, exc_traceback=None):
         self.log.debug("%s: uploading policy logs", self.type)

@@ -56,27 +56,31 @@ class DirOutputTest(BaseTest):
 
 class S3OutputTest(TestUtils):
 
-    def xtest_path_join(self):
-
-        self.assertEqual(S3Output.join("s3://xyz/", "/bar/"), "s3://xyz/bar")
-
-        self.assertEqual(S3Output.join("s3://xyz/", "/bar/", "foo"), "s3://xyz/bar/foo")
-
-        self.assertEqual(S3Output.join("s3://xyz/xyz/", "/bar/"), "s3://xyz/xyz/bar")
-
-    def get_s3_output(self, cleanup=True):
-        output_dir = "s3://cloud-custodian/policies"
+    def get_s3_output(self, output_url=None, cleanup=True):
+        if output_url is None:
+            output_url = "s3://cloud-custodian/policies"
         output = S3Output(
             ExecutionContext(
                 lambda assume=False: mock.MagicMock(),
                 Bag(name="xyz", provider_name="ostack"),
-                Config.empty(output_dir=output_dir)),
-            {'url': output_dir})
+                Config.empty(output_dir=output_url, account_id='112233445566')),
+            {'url': output_url, 'test': True})
 
         if cleanup:
             self.addCleanup(shutil.rmtree, output.root_dir)
 
         return output
+
+    def test_output_path(self):
+        with mock_datetime_now(date_parse('2020/06/10 13:00'), datetime):
+            output = self.get_s3_output(output_url='s3://prefix/')
+            self.assertEqual(
+                output.get_output_path('s3://prefix/'),
+                's3://prefix/xyz/2020/06/10/13')
+            self.assertEqual(
+                output.get_output_path('s3://prefix/{region}/{account_id}/{policy_name}/{now:%Y}/'),
+                's3://prefix/us-east-1/112233445566/xyz/2020'
+            )
 
     def test_s3_output(self):
         output = self.get_s3_output()
