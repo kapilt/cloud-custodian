@@ -22,7 +22,7 @@ from dateutil.parser import parse as date_parse
 
 from c7n.ctx import ExecutionContext
 from c7n.config import Config
-from c7n.output import DirectoryOutput, LogFile, metrics_outputs
+from c7n.output import DirectoryOutput, BlobOutput, LogFile, metrics_outputs
 from c7n.resources.aws import S3Output, MetricsOutput
 from c7n.testing import mock_datetime_now, TestUtils
 
@@ -56,7 +56,7 @@ class DirOutputTest(BaseTest):
 
 class S3OutputTest(TestUtils):
 
-    def get_s3_output(self, output_url=None, cleanup=True):
+    def get_s3_output(self, output_url=None, cleanup=True, klass=S3Output):
         if output_url is None:
             output_url = "s3://cloud-custodian/policies"
         output = S3Output(
@@ -70,6 +70,10 @@ class S3OutputTest(TestUtils):
             self.addCleanup(shutil.rmtree, output.root_dir)
 
         return output
+
+    def test_blob_output(self):
+        blob_output = self.get_s3_output(klass=BlobOutput)
+        self.assertRaises(blob_output.upload_file, 'xyz', '/prefix/xyz')
 
     def test_output_path(self):
         with mock_datetime_now(date_parse('2020/06/10 13:00'), datetime):

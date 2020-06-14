@@ -463,20 +463,6 @@ class DirectoryOutput:
             'uuid': str(uuid.uuid4())}
         return data
 
-    def get_resource_set(self):
-        record_path = os.path.join(self.root_dir, 'resources.json')
-
-        if not os.path.exists(record_path):
-            return []
-
-        mdate = datetime.datetime.fromtimestamp(
-            os.stat(record_path).st_ctime)
-
-        with open(record_path) as fh:
-            records = json.load(fh)
-            [r.__setitem__('CustodianDate', mdate) for r in records]
-            return records
-
 
 class BlobOutput(DirectoryOutput):
 

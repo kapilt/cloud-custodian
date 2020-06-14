@@ -24,7 +24,7 @@ import time
 try:
     from google.cloud.storage import Bucket, Client as StorageClient
 except ImportError:
-    StorageClient = None
+    Bucket, StorageClient = None, None
 
 try:
     from google.cloud.logging import Client as LogClient
