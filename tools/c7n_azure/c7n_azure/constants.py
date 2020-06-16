@@ -22,6 +22,9 @@ FUNCTION_EVENT_TRIGGER_MODE = 'azure-event-grid'
 FUNCTION_TIME_TRIGGER_MODE = 'azure-periodic'
 FUNCTION_KEY_URL = 'hostruntime/admin/host/systemkeys/_master?api-version=2018-02-01'
 FUNCTION_AUTOSCALE_NAME = 'cloud_custodian_default'
+AUTH_TYPE_EMBED = "Embedded"
+AUTH_TYPE_MSI = "SystemAssigned"
+AUTH_TYPE_UAI = "UserAssigned"
 
 """
 Azure Container Host

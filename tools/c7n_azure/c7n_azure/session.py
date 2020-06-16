@@ -95,15 +95,19 @@ class Session:
             CLIProvider
         ]
 
+
         for provider in token_providers:
             instance = provider(self._auth_params, self.resource_namespace)
             if instance.is_available():
+                log.info('token provider available %s', instance)
                 result = instance.authenticate()
                 self.subscription_id = result.subscription_id
                 self.tenant_id = result.tenant_id
                 self.credentials = result.credential
                 self.token_provider = provider
                 break
+            else:
+                log.info('token provider unavailable %s', instance)
 
         # Let provided id parameter override everything else
         if self.subscription_id_override is not None:
@@ -140,6 +144,9 @@ class Session:
                 'keyvault_secret_id': os.environ.get(constants.ENV_KEYVAULT_SECRET_ID),
                 'enable_cli_auth': True
             }
+
+        log.info('info auth params %s', self._auth_params)
+        log.info('env %s', dict(os.environ))
 
         try:
             self._authenticate()
@@ -261,13 +268,10 @@ class Session:
             ), data.get('subscription', None))
 
     def get_functions_auth_string(self, target_subscription_id):
-        """
-        Build auth json string for deploying
-        Azure Functions.  Look for dedicated
-        Functions environment variables or
-        fall back to normal Service Principal
-        variables.
+        """Build auth json string for deploying Azure Functions.
 
+        Look for dedicated Functions environment variables or fall
+        back to normal Service Principal variables.
         """
 
         self._initialize_session()

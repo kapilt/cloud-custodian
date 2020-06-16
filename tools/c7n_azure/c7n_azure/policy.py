@@ -18,9 +18,16 @@ import time
 
 from azure.mgmt.eventgrid.models import \
     StorageQueueEventSubscriptionDestination, StringInAdvancedFilter, EventSubscriptionFilter
+import jmespath
+
 from c7n_azure.azure_events import AzureEvents, AzureEventSubscription
-from c7n_azure.constants import (FUNCTION_EVENT_TRIGGER_MODE, FUNCTION_TIME_TRIGGER_MODE,
-                                 RESOURCE_GROUPS_TYPE)
+from c7n_azure.constants import (
+    AUTH_TYPE_EMBED,
+    AUTH_TYPE_MSI,
+    AUTH_TYPE_UAI,
+    FUNCTION_EVENT_TRIGGER_MODE,
+    FUNCTION_TIME_TRIGGER_MODE,
+    RESOURCE_GROUPS_TYPE)
 from c7n_azure.function_package import FunctionPackage
 from c7n_azure.functionapp_utils import FunctionAppUtilities
 from c7n_azure.resources.arm import ArmResourceManager
@@ -44,6 +51,12 @@ class AzureFunctionMode(ServerlessExecutionMode):
         'properties': {
             'provision-options': {
                 'type': 'object',
+                'identity': {
+                    'type': {'enum': [AUTH_TYPE_MSI,
+                                      AUTH_TYPE_UAI,
+                                      AUTH_TYPE_EMBED]},
+                    'id': {'type': 'string'},
+                },
                 'appInsights': {
                     'type': 'object',
                     'oneOf': [
@@ -164,14 +177,15 @@ class AzureFunctionMode(ServerlessExecutionMode):
         function_app_name = FunctionAppUtilities.get_function_name(self.policy_name,
             function_suffix)
         FunctionAppUtilities.validate_function_name(function_app_name)
-
         params = FunctionAppUtilities.FunctionAppInfrastructureParameters(
             app_insights=app_insights,
             service_plan=service_plan,
             storage_account=storage_account,
-            function_app_resource_group_name=service_plan['resource_group_name'],
-            function_app_name=function_app_name)
-
+            function_app={
+                'name': function_app_name,
+                'resource_group_name': service_plan['resource_group_name'],
+                'identity': jmespath.search(
+                    'mode."provision-options".identity', self.policy.data)})
         return params
 
     @staticmethod
@@ -202,7 +216,10 @@ class AzureFunctionMode(ServerlessExecutionMode):
     def provision(self):
         # Make sure we have auth data for function provisioning
         session = local_session(self.policy.session_factory)
-        session.get_functions_auth_string("")
+        if jmespath.search(
+                '"provision-options".identity.type',
+                self.data) in (AUTH_TYPE_EMBED, None):
+            session.get_functions_auth_string("")
 
         self.target_subscription_ids = session.get_function_target_subscription_ids()
 
@@ -214,7 +231,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
         raise NotImplementedError("subclass responsibility")
 
     def build_functions_package(self, queue_name=None, target_subscription_ids=None):
-        self.log.info("Building function package for %s" % self.function_params.function_app_name)
+        self.log.info("Building function package for %s" % self.function_params.function_app['name'])
 
         requirements = generate_requirements('c7n-azure',
                                              ignore=['boto3', 'botocore', 'pywin32'],

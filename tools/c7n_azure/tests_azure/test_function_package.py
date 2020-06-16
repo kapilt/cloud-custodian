@@ -68,25 +68,6 @@ class FunctionPackageTest(BaseTest):
         self.assertEqual(binding['bindings'][0]['type'], 'queueTrigger')
         self.assertEqual(binding['bindings'][0]['connection'], 'AzureWebJobsStorage')
 
-    def test_add_policy(self):
-        p = self.load_policy({
-            'name': 'test-azure-public-ip',
-            'resource': 'azure.publicip',
-            'mode':
-                {'type': FUNCTION_EVENT_TRIGGER_MODE,
-                 'events': ['PublicIpWrite']},
-        })
-
-        packer = FunctionPackage(p.data['name'])
-
-        policy = json.loads(packer._get_policy(p.data))
-
-        self.assertEqual(policy['policies'][0],
-                         {u'resource': u'azure.publicip',
-                          u'name': u'test-azure-public-ip',
-                          u'mode': {u'type': u'azure-event-grid',
-                                    u'events': [u'PublicIpWrite']}})
-
     def test_zipped_files_have_modified_timestamp(self):
         t = time.gmtime(1577854800)
         package = AzurePythonPackageArchive()

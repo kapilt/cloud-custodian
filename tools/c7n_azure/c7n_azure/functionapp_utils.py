@@ -14,6 +14,7 @@
 import logging
 import re
 
+from c7n.config import Bag
 from c7n_azure.provisioning.app_insights import AppInsightsUnit
 from c7n_azure.provisioning.app_service_plan import AppServicePlanUnit
 from c7n_azure.provisioning.function_app import FunctionAppDeploymentUnit
@@ -29,12 +30,11 @@ class FunctionAppUtilities:
 
     class FunctionAppInfrastructureParameters:
         def __init__(self, app_insights, service_plan, storage_account,
-                     function_app_resource_group_name, function_app_name):
+                     function_app):
             self.app_insights = app_insights
             self.service_plan = service_plan
             self.storage_account = storage_account
-            self.function_app_resource_group_name = function_app_resource_group_name
-            self.function_app_name = function_app_name
+            self.function_app = function_app
 
     @staticmethod
     def get_storage_account_connection_string(id):
@@ -57,9 +57,7 @@ class FunctionAppUtilities:
     @staticmethod
     def deploy_function_app(parameters):
         function_app_unit = FunctionAppDeploymentUnit()
-        function_app_params = \
-            {'name': parameters.function_app_name,
-             'resource_group_name': parameters.function_app_resource_group_name}
+        function_app_params = dict(parameters.function_app)
         function_app = function_app_unit.get(function_app_params)
 
         if function_app:
@@ -117,8 +115,8 @@ class FunctionAppUtilities:
         cls.log.info('Publishing Function application')
 
         publish_creds = web_client.web_apps.list_publishing_credentials(
-            function_params.function_app_resource_group_name,
-            function_params.function_app_name).result()
+            function_params.function_app['resource_group_name'],
+            function_params.function_app['name']).result()
 
         if package.wait_for_status(publish_creds):
             package.publish(publish_creds)
