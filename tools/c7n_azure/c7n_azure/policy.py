@@ -51,63 +51,80 @@ class AzureFunctionMode(ServerlessExecutionMode):
         'properties': {
             'provision-options': {
                 'type': 'object',
-                'identity': {
-                    'type': {'enum': [AUTH_TYPE_MSI,
-                                      AUTH_TYPE_UAI,
-                                      AUTH_TYPE_EMBED]},
-                    'id': {'type': 'string'},
-                },
-                'appInsights': {
-                    'type': 'object',
-                    'oneOf': [
-                        {'type': 'string'},
-                        {'type': 'object',
-                         'properties': {
-                             'name': 'string',
-                             'location': 'string',
-                             'resourceGroupName': 'string'}
-                         }
-                    ]
-                },
-                'storageAccount': {
-                    'type': 'object',
-                    'oneOf': [
-                        {'type': 'string'},
-                        {'type': 'object',
-                         'properties': {
-                             'name': 'string',
-                             'location': 'string',
-                             'resourceGroupName': 'string'}
-                         }
-                    ]
-                },
-                'servicePlan': {
-                    'type': 'object',
-                    'oneOf': [
-                        {'type': 'string'},
-                        {'type': 'object',
-                         'properties': {
-                             'name': 'string',
-                             'location': 'string',
-                             'resourceGroupName': 'string',
-                             'skuTier': 'string',
-                             'skuName': 'string',
-                             'autoScale': {
-                                 'type': 'object',
-                                 'properties': {
-                                     'enabled': {'type': 'boolean'},
-                                     'minCapacity': {'type': 'string'},
-                                     'maxCapacity': {'type': 'string'},
-                                     'defaultCapacity': {'type': 'string'}
+                'additionalProperties': False,
+                'properties': {
+                    'identity': {
+                        'type': 'object',
+                        'additionalProperties': False,
+                        'properties': {
+                            'type': {'enum': [AUTH_TYPE_MSI,
+                                              AUTH_TYPE_UAI,
+                                              AUTH_TYPE_EMBED]},
+                            'id': {'type': 'string'},
+#                                   'additionalProperties': False,
+#                                   'required': ['clientId', 'principalId'],
+#                                   'properties': {
+#                                       'clientId': {'type': 'string'},
+#                                       'principalId': {'type': 'string'}
+#                                   }
+#                            },
+                        },
+                    },
+                    'appInsights': {
+                        'oneOf': [
+                            {'type': 'string'},
+                            {'type': 'object',
+                             'additionalProperties': False,
+                             'properties': {
+                                 'name': {'type': 'string'},
+                                 'location': {'type': 'string'},
+                                 'resourceGroupName': {'type': 'string'}
+                                 }
+                            }
+                        ]
+                    },
+                    'storageAccount': {
+                        'oneOf': [
+                            {'type': 'string'},
+                            {'type': 'object',
+                             'additionalProperties': False,
+                             'properties': {
+                                 'name': {'type': 'string'},
+                                 'location': {'type': 'string'},
+                                 'resourceGroupName': {'type': 'string'}
+                             }
+                            }
+                        ]
+                    },
+                    'servicePlan': {
+                        'oneOf': [
+                            {'type': 'string'},
+                            {'type': 'object',
+                             'additionalProperties': False,
+                             'properties': {
+                                 'name': {'type': 'string'},
+                                 'location': {'type': 'string'},
+                                 'resourceGroupName': {'type': 'string'},
+                                 'skuTier': {'type': 'string'},
+                                 'skuName': {'type': 'string'},
+                                 'autoScale': {
+                                     'type': 'object',
+                                     'additionalProperties': False,
+                                     'properties': {
+                                         'enabled': {'type': 'boolean'},
+                                         'minCapacity': {'type': 'string'},
+                                         'maxCapacity': {'type': 'string'},
+                                         'defaultCapacity': {'type': 'string'}
+                                     }
                                  }
                              }
-                         }
-                         }
-                    ]
+                            }
+                        ]
+                    },
                 },
             },
             'execution-options': {'type': 'object'}
-        }
+        },
     }
 
     POLICY_METRICS = ('ResourceCount', 'ResourceTime', 'ActionTime')
@@ -122,6 +139,15 @@ class AzureFunctionMode(ServerlessExecutionMode):
         self.function_params = None
         self.function_app = None
         self.target_subscription_ids = []
+
+    def validate(self):
+        super().validate()
+        identity = jmespath.search(
+            'mode."provision-options".identity', self.policy.data)
+        if (identity and identity['type'] == AUTH_TYPE_UAI and
+            'id' not in identity):
+            raise PolicyValidationError(
+                "policy:%s user assigned identity requires specifying id")
 
     def get_function_app_params(self):
         session = local_session(self.policy.session_factory)
@@ -217,8 +243,8 @@ class AzureFunctionMode(ServerlessExecutionMode):
         # Make sure we have auth data for function provisioning
         session = local_session(self.policy.session_factory)
         if jmespath.search(
-                '"provision-options".identity.type',
-                self.data) in (AUTH_TYPE_EMBED, None):
+                'mode."provision-options".identity.type',
+                self.policy.data) in (AUTH_TYPE_EMBED, None):
             session.get_functions_auth_string("")
 
         self.target_subscription_ids = session.get_function_target_subscription_ids()

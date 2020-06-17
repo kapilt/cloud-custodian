@@ -85,13 +85,9 @@ class FunctionPackage:
                     'type': AUTH_TYPE_EMBED}
             if identity['type'] == AUTH_TYPE_EMBED:
                 auth_contents = s.get_functions_auth_string(target_sub_id)
-            elif identity['type'] == AUTH_TYPE_MSI:
+            elif identity['type'] in (AUTH_TYPE_MSI, AUTH_TYPE_UAI):
                 auth_contents = json.dumps({
                     'use_msi': True, 'subscription_id': target_sub_id})
-            elif identity['type'] == AUTH_TYPE_UAI:
-                auth_contents = json.dumps({
-                    'use_msi': True, 'subscription_id': target_sub_id,
-                    'client_id': identity['id']})
 
             self.pkg.add_contents(dest=name + '/auth.json', contents=auth_contents)
             self.pkg.add_file(self.function_path,

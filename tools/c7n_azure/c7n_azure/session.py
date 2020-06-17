@@ -22,6 +22,7 @@ import sys
 import types
 from collections import namedtuple
 
+import requests
 import jwt
 from azure.common.credentials import (BasicTokenAuthentication,
                                       ServicePrincipalCredentials)
@@ -30,7 +31,7 @@ from c7n_azure import constants
 from c7n_azure.utils import (ResourceIdParser, StringUtils, custodian_azure_send_override,
                              ManagedGroupHelper, get_keyvault_secret)
 from msrest.exceptions import AuthenticationError
-from msrestazure.azure_active_directory import MSIAuthentication
+from msrestazure.azure_active_directory import MSIAuthentication, _is_app_service
 from requests import HTTPError
 
 try:
@@ -451,7 +452,7 @@ class MSIProvider(TokenProvider):
                     client_id=self.client_id,
                     resource=self.resource_namespace)
             else:
-                credential = MSIAuthentication(
+                credential = IdentityAuthentication(
                     resource=self.resource_namespace)
         except HTTPError as e:
             e.message = 'Failed to authenticate with MSI'
@@ -467,3 +468,45 @@ class MSIProvider(TokenProvider):
     def name(self):
         # type: () -> str
         return "MSI"
+
+
+class IdentityAuthentication(MSIAuthentication):
+
+    # override to fix msi version headers
+    def set_token(self):
+        if _is_app_service():
+            self.scheme, _, self.token = get_identity_token_webapp(self.resource)
+        else:
+            return super().set_token()
+
+
+def get_identity_token_webapp(resource, msi_conf=None):
+    """Get an identity/msi token from inside a webapp or functions.
+
+    See https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity
+
+    Env variable will look like:
+
+    - IDENTITY_ENDPOINT = http://127.0.0.1:41741/MSI/token/
+    - IDENTITY_SECRET = 69418689F1E342DD946CB82994CDA3CB
+    """
+    id_endpoint = os.environ['IDENTITY_ENDPOINT']
+    id_secret = os.environ['IDENTITY_SECRET']
+    request_uri = '{}/?resource={}&api-version=2019-08-01'.format(
+        id_endpoint, resource)
+
+    err = None
+    result = requests.get(request_uri, headers={
+        'X-IDENTITY-HEADER': id_secret, 'Metadata': 'true'})
+    if result.status_code != 200:
+        err = result.text
+    if 'ExceptionMessage' in result.text:
+        err = result.text
+    if err:
+        err_msg = "MSI: Failed to retrieve a token from '{}' with an error of '{}'.".format(
+            request_uri, err)
+        raise RuntimeError(err_msg)
+    token_entry = result.json()
+    return (token_entry['token_type'],
+            token_entry['access_token'],
+            token_entry)

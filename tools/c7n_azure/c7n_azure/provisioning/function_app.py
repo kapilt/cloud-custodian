@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from azure.mgmt.web.models import (Site, SiteConfig, ManagedServiceIdentity)
+from azure.mgmt.web.models import (
+    Site,
+    SiteConfig,
+    ManagedServiceIdentity,
+    ManagedServiceIdentityUserAssignedIdentitiesValue as UserAssignedIdentity)
+
 from c7n_azure.constants import (FUNCTION_DOCKER_VERSION, FUNCTION_EXT_VERSION)
 from c7n_azure.provisioning.deployment_unit import DeploymentUnit
 from c7n_azure.utils import azure_name_value_pair
@@ -32,10 +37,10 @@ class FunctionAppDeploymentUnit(DeploymentUnit):
     def _get_identity(self, params):
         if 'identity' not in params:
             return None
-        identity = ManagedServiceIdentity(
-            type=params['identity']['type'])
-        if 'ids' in params['identity']:
-            identity.user_assigned_identities = params['identity']['ids']
+        identity = ManagedServiceIdentity(type=params['identity']['type'])
+        if 'id' in params['identity']:
+            identity.user_assigned_identities = {
+                params['identity']['id']: UserAssignedIdentity()}
         return identity
 
     def _provision(self, params):

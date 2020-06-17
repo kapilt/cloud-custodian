@@ -314,7 +314,7 @@ class AzurePolicyModeTest(BaseTest):
         self.assertEqual(params.app_insights['resource_group_name'], 'test')
         self.assertEqual(params.service_plan['resource_group_name'], "test")
 
-        self.assertTrue(params.function_app_name.startswith('test-azure-serverless-mode-'))
+        self.assertTrue(params.function_app['name'].startswith('test-azure-serverless-mode-'))
 
     def test_init_azure_function_mode_no_service_plan_name(self):
         p = self.load_policy({
@@ -342,7 +342,7 @@ class AzurePolicyModeTest(BaseTest):
         self.assertEqual(params.storage_account['location'], "eastus")
         self.assertEqual(params.storage_account['resource_group_name'], 'cloud-custodian')
 
-        self.assertTrue(params.function_app_name.startswith('test-azure-serverless-mode-'))
+        self.assertTrue(params.function_app['name'].startswith('test-azure-serverless-mode-'))
 
     def test_init_azure_function_mode_invalid_policy_name(self):
         p = self.load_policy({
@@ -368,7 +368,7 @@ class AzurePolicyModeTest(BaseTest):
 
         function_mode = AzureFunctionMode(p)
         params = function_mode.get_function_app_params()
-        self.assertRegex(params.function_app_name, "invalid-policy-name1-[a-zA-Z0-9]+")
+        self.assertRegex(params.function_app['name'], "invalid-policy-name1-[a-zA-Z0-9]+")
 
     def test_init_azure_function_mode_with_resource_ids(self):
         ai_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups' \
@@ -407,7 +407,7 @@ class AzurePolicyModeTest(BaseTest):
         self.assertEqual(params.service_plan['name'], "testsp")
         self.assertEqual(params.service_plan['resource_group_name'], "testrg")
 
-        self.assertTrue(params.function_app_name.startswith('test-azure-serverless-mode-'))
+        self.assertTrue(params.function_app['name'].startswith('test-azure-serverless-mode-'))
 
     def test_event_grid_mode_creates_advanced_filtered_subscription(self):
         p = self.load_policy({
