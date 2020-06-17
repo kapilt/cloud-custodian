@@ -95,7 +95,6 @@ class Session:
             CLIProvider
         ]
 
-
         for provider in token_providers:
             instance = provider(self._auth_params, self.resource_namespace)
             if instance.is_available():

@@ -35,7 +35,7 @@ class FunctionAppDeploymentUnit(DeploymentUnit):
         identity = ManagedServiceIdentity(
             type=params['identity']['type'])
         if 'ids' in params['identity']:
-            identity.user_assigned_identities=params['identity']['ids']
+            identity.user_assigned_identities = params['identity']['ids']
         return identity
 
     def _provision(self, params):

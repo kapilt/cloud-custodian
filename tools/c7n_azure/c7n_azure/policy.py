@@ -231,7 +231,9 @@ class AzureFunctionMode(ServerlessExecutionMode):
         raise NotImplementedError("subclass responsibility")
 
     def build_functions_package(self, queue_name=None, target_subscription_ids=None):
-        self.log.info("Building function package for %s" % self.function_params.function_app['name'])
+        self.log.info(
+            "Building function package for %s",
+            self.function_params.function_app['name'])
 
         requirements = generate_requirements('c7n-azure',
                                              ignore=['boto3', 'botocore', 'pywin32'],

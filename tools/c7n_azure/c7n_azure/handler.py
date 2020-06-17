@@ -27,7 +27,6 @@ from c7n.resources import load_resources
 from c7n.structure import StructureParser
 
 from c7n_azure.provider import Azure
-from c7n_azure import constants
 
 log = logging.getLogger('custodian.azure.functions')
 
