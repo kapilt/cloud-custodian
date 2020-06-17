@@ -61,13 +61,6 @@ class AzureFunctionMode(ServerlessExecutionMode):
                                               AUTH_TYPE_UAI,
                                               AUTH_TYPE_EMBED]},
                             'id': {'type': 'string'},
-#                                   'additionalProperties': False,
-#                                   'required': ['clientId', 'principalId'],
-#                                   'properties': {
-#                                       'clientId': {'type': 'string'},
-#                                       'principalId': {'type': 'string'}
-#                                   }
-#                            },
                         },
                     },
                     'appInsights': {
@@ -78,9 +71,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
                              'properties': {
                                  'name': {'type': 'string'},
                                  'location': {'type': 'string'},
-                                 'resourceGroupName': {'type': 'string'}
-                                 }
-                            }
+                                 'resourceGroupName': {'type': 'string'}}}
                         ]
                     },
                     'storageAccount': {
@@ -91,9 +82,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
                              'properties': {
                                  'name': {'type': 'string'},
                                  'location': {'type': 'string'},
-                                 'resourceGroupName': {'type': 'string'}
-                             }
-                            }
+                                 'resourceGroupName': {'type': 'string'}}}
                         ]
                     },
                     'servicePlan': {
@@ -117,8 +106,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
                                          'defaultCapacity': {'type': 'string'}
                                      }
                                  }
-                             }
-                            }
+                             }}
                         ]
                     },
                 },
@@ -145,7 +133,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
         identity = jmespath.search(
             'mode."provision-options".identity', self.policy.data)
         if (identity and identity['type'] == AUTH_TYPE_UAI and
-            'id' not in identity):
+                'id' not in identity):
             raise PolicyValidationError(
                 "policy:%s user assigned identity requires specifying id")
 
