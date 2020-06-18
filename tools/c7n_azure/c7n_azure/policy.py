@@ -36,7 +36,7 @@ from c7n_azure.utils import ResourceIdParser, StringUtils
 
 from c7n import utils
 from c7n.actions import EventAction
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from c7n.mu import generate_requirements
 from c7n.policy import PullMode, ServerlessExecutionMode, execution
 from c7n.utils import local_session
@@ -139,7 +139,6 @@ class AzureFunctionMode(ServerlessExecutionMode):
 
     def get_function_app_params(self):
         session = local_session(self.policy.session_factory)
-
         provision_options = self.policy.data['mode'].get('provision-options', {})
 
         # Service plan is parsed first, location might be shared with storage & insights
@@ -190,6 +189,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
 
         function_app_name = FunctionAppUtilities.get_function_name(self.policy_name,
             function_suffix)
+
         FunctionAppUtilities.validate_function_name(function_app_name)
         params = FunctionAppUtilities.FunctionAppInfrastructureParameters(
             app_insights=app_insights,
@@ -198,9 +198,41 @@ class AzureFunctionMode(ServerlessExecutionMode):
             function_app={
                 'name': function_app_name,
                 'resource_group_name': service_plan['resource_group_name'],
-                'identity': jmespath.search(
-                    'mode."provision-options".identity', self.policy.data)})
+                'identity': self._get_identity(session)})
         return params
+
+    def _get_identity(self, session):
+        identity = jmespath.search(
+            'mode."provision-options".identity', self.policy.data) or {
+                'type': AUTH_TYPE_EMBED}
+        if identity['type'] != AUTH_TYPE_UAI:
+            return identity
+
+        # We need to resolve the client id of the uai, as the metadata
+        # service in functions is old and doesn't support newer
+        # metadata api versions where this would be extraneous
+        # (ie. versions 2018-02-01 or 2019-08-01). notably the
+        # official docs here are wrong
+        # https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity
+
+        # TODO: switch out to using uai resource manager so we get some cache
+        # benefits across policies using the same uai.
+        id_client = session.client('azure.mgmt.msi.ManagedServiceIdentityClient')
+
+        found = None
+        for uai in id_client.user_assigned_identities.list_by_subscription():
+            if uai.id == identity['id'] or uai.name == identity['id']:
+                found = uai
+                break
+        if not found:
+            raise PolicyExecutionError(
+                "policy:%s Could not found the user assigned identity %s" % (
+                    self.policy.name, identity['id']))
+        identity['id'] = found.id
+        identity['client_id'] = found.client_id
+        __import__("pdb").set_trace()
+
+        return identity
 
     @staticmethod
     def extract_properties(options, name, properties):

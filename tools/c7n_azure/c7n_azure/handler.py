@@ -57,10 +57,9 @@ def run(event, context, subscription_id=None):
 
     load_resources(StructureParser().get_resource_types(policy_config))
 
-    log.debug('Load azure provider')
     options = Azure().initialize(options)
-
     policies = PolicyCollection.from_data(policy_config, options)
+
     if policies:
         for p in policies:
             try:

@@ -16,8 +16,8 @@
 Azure Functions
 """
 # Docker version from https://hub.docker.com/r/microsoft/azure-functions/
-FUNCTION_DOCKER_VERSION = 'DOCKER|mcr.microsoft.com/azure-functions/python:2.0-python3.6-appservice'
-FUNCTION_EXT_VERSION = '~2'
+FUNCTION_DOCKER_VERSION = 'DOCKER|mcr.microsoft.com/azure-functions/python:3.0-python3.8'
+FUNCTION_EXT_VERSION = '~3'
 FUNCTION_EVENT_TRIGGER_MODE = 'azure-event-grid'
 FUNCTION_TIME_TRIGGER_MODE = 'azure-periodic'
 FUNCTION_KEY_URL = 'hostruntime/admin/host/systemkeys/_master?api-version=2018-02-01'
@@ -118,8 +118,14 @@ FUNCTION_HOST_CONFIG = {
     "functionTimeout": "00:10:00",
     "logging": {
         "fileLoggingMode": "always",
+        "console": {
+            "isEnabled": "true"
+        },
         "logLevel": {
-            "default": "Debug"
+            "default": "Debug",
+            "Host.Results": "Trace",
+            "Function": "Trace",
+            "Host.Aggregator": "Trace"
         }
     },
     "extensions": {
