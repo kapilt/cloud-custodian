@@ -137,6 +137,11 @@ class AzureFunctionMode(ServerlessExecutionMode):
             raise PolicyValidationError(
                 "policy:%s user assigned identity requires specifying id" % (
                     self.policy.name))
+        if not identity or identity['type'] == AUTH_TYPE_EMBED:
+            log.error((
+                'policy:%s function policies should use UserAssigned Identities '
+                'see https://cloudcustodian.io/docs/azure/configuration/functionshosting.html#authentication-options'), # noqa
+                self.policy.name)
 
     def get_function_app_params(self):
         session = local_session(self.policy.session_factory)
