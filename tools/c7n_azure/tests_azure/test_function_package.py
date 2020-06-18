@@ -14,6 +14,7 @@
 import json
 import os
 import time
+import zipfile
 
 from azure.mgmt.web.models import User
 from c7n_azure.constants import ENV_CUSTODIAN_DISABLE_SSL_CERT_VERIFICATION, \
@@ -49,6 +50,48 @@ class FunctionPackageTest(BaseTest):
         self.assertEqual(binding['bindings'][0]['type'], 'timerTrigger')
         self.assertEqual(binding['bindings'][0]['name'], 'input')
         self.assertEqual(binding['bindings'][0]['schedule'], '0 1 0 1 1 1')
+
+    def test_auth_file_system_assigned(self):
+        p = self.load_policy({
+            'name': 'test-azure-public-ip',
+            'resource': 'azure.publicip',
+            'mode':
+                {'type': FUNCTION_EVENT_TRIGGER_MODE,
+                 'provision-options': {
+                     'identity': {
+                         'id': 'awolf',
+                         'client_id': 'dog',
+                         'type': 'UserAssigned'}},
+                 'events': ['PublicIpWrite']}}, validate=False)
+        packer = FunctionPackage(p.data['name'])
+        packer.pkg = AzurePythonPackageArchive()
+        packer._add_functions_required_files(p.data, 'c7n-azure==1.0', 'test-queue')
+
+        packer.pkg.close()
+        with zipfile.ZipFile(packer.pkg.path) as zf:
+            content = json.loads(zf.read('test-azure-public-ip/auth.json'))
+            self.assertEqual(content, {
+                'client_id': 'dog',
+                'subscription_id': None, 'use_msi': True})
+
+    def test_auth_file_user_assigned_identity(self):
+        p = self.load_policy({
+            'name': 'test-azure-public-ip',
+            'resource': 'azure.publicip',
+            'mode':
+                {'type': FUNCTION_EVENT_TRIGGER_MODE,
+                 'provision-options': {
+                     'identity': {
+                         'type': 'SystemAssigned'}},
+                 'events': ['PublicIpWrite']}})
+        packer = FunctionPackage(p.data['name'])
+        packer.pkg = AzurePythonPackageArchive()
+        packer._add_functions_required_files(p.data, 'c7n-azure==1.0', 'test-queue')
+
+        packer.pkg.close()
+        with zipfile.ZipFile(packer.pkg.path) as zf:
+            content = json.loads(zf.read('test-azure-public-ip/auth.json'))
+            self.assertEqual(content, {'subscription_id': None, 'use_msi': True})
 
     def test_add_function_config_events(self):
         p = self.load_policy({

@@ -135,7 +135,8 @@ class AzureFunctionMode(ServerlessExecutionMode):
         if (identity and identity['type'] == AUTH_TYPE_UAI and
                 'id' not in identity):
             raise PolicyValidationError(
-                "policy:%s user assigned identity requires specifying id")
+                "policy:%s user assigned identity requires specifying id" % (
+                    self.policy.name))
 
     def get_function_app_params(self):
         session = local_session(self.policy.session_factory)
@@ -226,7 +227,7 @@ class AzureFunctionMode(ServerlessExecutionMode):
                 break
         if not found:
             raise PolicyExecutionError(
-                "policy:%s Could not found the user assigned identity %s" % (
+                "policy:%s Could not find the user assigned identity %s" % (
                     self.policy.name, identity['id']))
         identity['id'] = found.id
         identity['client_id'] = found.client_id

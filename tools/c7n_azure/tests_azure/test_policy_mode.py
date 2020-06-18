@@ -17,7 +17,8 @@ from c7n_azure.constants import FUNCTION_EVENT_TRIGGER_MODE, FUNCTION_TIME_TRIGG
 from c7n_azure.policy import AzureEventGridMode, AzureFunctionMode, AzureModeCommon
 from mock import mock, patch, Mock
 
-from c7n.exceptions import PolicyValidationError
+from c7n.config import Bag
+from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from .azure_common import BaseTest, DEFAULT_SUBSCRIPTION_ID, arm_template, cassette_name
 
 
@@ -281,6 +282,61 @@ class AzurePolicyModeTest(BaseTest):
                      'schedule': '*/5 * * * *'}
             }, validate=True)
             self.assertTrue(p)
+
+    def test_azure_function_uai_sans_id(self):
+        with self.assertRaises(PolicyValidationError) as em:
+            self.load_policy({
+                'name': 'something',
+                'resource': 'azure.vm',
+                'mode': {
+                    'type': FUNCTION_EVENT_TRIGGER_MODE,
+                    'events': ['VmWrite'],
+                    'provision-options': {
+                        'identity': {'type': 'UserAssigned'}}}},
+                validate=True)
+        self.assertIn(
+            'policy:something user assigned identity requires specifying id',
+            str(em.exception))
+
+    def test_azure_function_unresolved_uai_identity(self):
+        session = mock.MagicMock()
+        p = self.load_policy({
+            'name': 'sm',
+            'resource': 'azure.vm',
+            'mode': {
+                'type': FUNCTION_EVENT_TRIGGER_MODE,
+                'events': ['VmWrite'],
+                'provision-options': {
+                    'identity': {'type': 'UserAssigned', 'id': 'mike'}}}})
+        exec_mode = p.get_execution_mode()
+        with self.assertRaises(PolicyExecutionError) as em:
+            exec_mode._get_identity(session)
+        self.assertIn(
+            'policy:sm Could not find the user assigned identity mike',
+            str(em.exception))
+
+    def test_azure_function_resolved_uai_identity(self):
+        session = mock.MagicMock()
+        p = self.load_policy({
+            'name': 'sm',
+            'resource': 'azure.vm',
+            'mode': {
+                'type': FUNCTION_EVENT_TRIGGER_MODE,
+                'events': ['VmWrite'],
+                'provision-options': {
+                    'identity': {'type': 'UserAssigned', 'id': 'mike'}}}})
+        exec_mode = p.get_execution_mode()
+        uai = dict(
+            name='mike', id='/subscriptions/xyz/userAssignedIdentities/foo',
+            client_id='bob')
+        session.client(
+            'azure.mgmt.msi.ManagedServiceIdentityClient'
+        ).user_assigned_identities.list_by_subscription.return_value = [Bag(uai)]
+        identity = exec_mode._get_identity(session)
+        self.assertEqual(identity, {
+            'type': 'UserAssigned',
+            'client_id': 'bob',
+            'id': '/subscriptions/xyz/userAssignedIdentities/foo'})
 
     def test_init_azure_function_mode_with_service_plan(self):
         p = self.load_policy({
