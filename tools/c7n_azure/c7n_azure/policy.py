@@ -230,8 +230,6 @@ class AzureFunctionMode(ServerlessExecutionMode):
                     self.policy.name, identity['id']))
         identity['id'] = found.id
         identity['client_id'] = found.client_id
-        __import__("pdb").set_trace()
-
         return identity
 
     @staticmethod
