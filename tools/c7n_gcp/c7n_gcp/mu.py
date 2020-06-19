@@ -326,18 +326,19 @@ class PolicyFunction(CloudFunction):
 
     def get_output_deps(self):
         deps = []
+        self.policy.ctx.initialize()
+
         outputs = (
-            ('metrics', self.policy.ctx.api_stats),
+            ('metrics', self.policy.ctx.metrics),
             ('blob', self.policy.ctx.output),
             ('log', self.policy.ctx.logs)
         )
-
         for (output_type, instance) in outputs:
             if not instance:
                 continue
-            if f"{output_type}.{instance}" not in OUTPUT_PACKAGE_MAP:
+            if f"{output_type}.{instance.type}" not in OUTPUT_PACKAGE_MAP:
                 continue
-            deps.append(OUTPUT_PACKAGE_MAP[f"{output_type}.{instance}"])
+            deps.append(OUTPUT_PACKAGE_MAP[f"{output_type}.{instance.type}"])
         return deps
 
     @property

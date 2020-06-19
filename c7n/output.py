@@ -53,7 +53,9 @@ class OutputRegistry(PluginRegistry):
     def select(self, selector, ctx):
         if not selector:
             return self['default'](ctx, {'url': selector})
-        if self.default_protocol and '://' not in selector:
+        if '://' not in selector and selector in self:
+            selector = "{}://".format(selector)
+        elif self.default_protocol and '://' not in selector:
             selector = "{}://{}".format(
                 self.default_protocol, selector)
         for k in self.keys():
