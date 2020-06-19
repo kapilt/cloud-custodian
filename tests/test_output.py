@@ -59,7 +59,7 @@ class S3OutputTest(TestUtils):
     def get_s3_output(self, output_url=None, cleanup=True, klass=S3Output):
         if output_url is None:
             output_url = "s3://cloud-custodian/policies"
-        output = S3Output(
+        output = klass(
             ExecutionContext(
                 lambda assume=False: mock.MagicMock(),
                 Bag(name="xyz", provider_name="ostack"),

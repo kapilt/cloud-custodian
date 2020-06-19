@@ -507,9 +507,7 @@ class S3Output(BlobOutput):
 
     def __init__(self, ctx, config):
         super().__init__(ctx, config)
-        # Lazy import
-        # can't use a local session as we dont want an unassumed session
-        # cached.
+        # can't use a local session as we dont want an unassumed session cached.
         self.transfer = S3Transfer(
             self.ctx.session_factory(assume=False).client('s3'))
 
