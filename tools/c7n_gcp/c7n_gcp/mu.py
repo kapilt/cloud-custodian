@@ -43,6 +43,7 @@ def custodian_archive(packages=None, deps=()):
     # but for pure python packages, if we have a local install and its
     # relatively small, it might be faster to just upload.
     #
+    # note we pin requirements to the same versions installed locally.
     requirements = set()
     requirements.update((
         'jmespath',
@@ -53,7 +54,9 @@ def custodian_archive(packages=None, deps=()):
         'google-auth-httplib2',
         'google-api-python-client'))
     requirements.update(deps)
-    archive.add_contents('requirements.txt', generate_requirements(requirements))
+    archive.add_contents(
+        'requirements.txt',
+        generate_requirements(requirements, include_self=True))
     return archive
 
 
@@ -321,7 +324,8 @@ class PolicyFunction(CloudFunction):
     def __init__(self, policy, archive=None, events=()):
         self.policy = policy
         self.func_data = self.policy.data['mode']
-        self.archive = archive or custodian_archive(self.get_output_deps())
+        self.archive = archive or custodian_archive(
+            deps=self.get_output_deps())
         self._events = events
 
     def get_output_deps(self):
