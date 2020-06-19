@@ -20,7 +20,6 @@ See docs/usage/outputs.rst
 """
 import contextlib
 import datetime
-import json
 import gzip
 import logging
 import os
