@@ -327,9 +327,9 @@ class PolicyFunction(CloudFunction):
     def get_output_deps(self):
         deps = []
         outputs = (
-            ('metrics', self.ctx.api_stats),
-            ('blob', self.ctx.output),
-            ('log', self.ctx.logs)
+            ('metrics', self.policy.ctx.api_stats),
+            ('blob', self.policy.ctx.output),
+            ('log', self.policy.ctx.logs)
         )
 
         for (output_type, instance) in outputs:
@@ -338,9 +338,7 @@ class PolicyFunction(CloudFunction):
             if f"{output_type}.{instance}" not in OUTPUT_PACKAGE_MAP:
                 continue
             deps.append(OUTPUT_PACKAGE_MAP[f"{output_type}.{instance}"])
-        return [
-            "{dep}=={dep_version}".format(
-                dep, version(dep)) for dep in deps]
+        return deps
 
     @property
     def name(self):

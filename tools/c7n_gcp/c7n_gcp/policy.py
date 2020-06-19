@@ -35,7 +35,7 @@ class FunctionMode(ServerlessExecutionMode):
            'network': {'type': 'string'},
            'max-instances': {'type': 'integer'},
            'service-account': {'type': 'string'},
-           'environment': {'type': '#/definitions/string_dict'}}
+           'environment': {'$ref': '#/definitions/string_dict'}}
     )
 
     def __init__(self, policy):
