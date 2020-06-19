@@ -19,15 +19,21 @@ import logging
 import hashlib
 
 from c7n_gcp.client import errors
-from c7n.mu import custodian_archive as base_archive
+from c7n.mu import generate_requirements, custodian_archive as base_archive
 from c7n.utils import local_session
 
 from googleapiclient.errors import HttpError
 
 log = logging.getLogger('c7n_gcp.mu')
 
+OUTPUT_PACKAGE_MAP = {
+    'metrics.gcp': 'google-cloud-monitoring',
+    'log.gcp': 'google-cloud-logging',
+    'blob.gs': 'google-cloud-storage',
+}
 
-def custodian_archive(packages=None):
+
+def custodian_archive(packages=None, deps=()):
     if not packages:
         packages = []
     packages.append('c7n_gcp')
@@ -38,17 +44,16 @@ def custodian_archive(packages=None):
     # relatively small, it might be faster to just upload.
     #
     requirements = set()
-    requirements.add('jmespath')
-    requirements.add('retrying')
-    requirements.add('python-dateutil')
-    requirements.add('ratelimiter>=1.2.0.post0')
-    requirements.add('google-auth>=1.4.1')
-    requirements.add('google-auth-httplib2>=0.0.3')
-    requirements.add('google-api-python-client>=1.7.3')
-
-    archive.add_contents(
-        'requirements.txt',
-        '\n'.join(sorted(requirements)))
+    requirements.update((
+        'jmespath',
+        'retrying',
+        'python-dateutil',
+        'ratelimiter',
+        'google-auth',
+        'google-auth-httplib2',
+        'google-api-python-client'))
+    requirements.update(deps)
+    archive.add_contents('requirements.txt', generate_requirements(requirements))
     return archive
 
 
@@ -316,8 +321,26 @@ class PolicyFunction(CloudFunction):
     def __init__(self, policy, archive=None, events=()):
         self.policy = policy
         self.func_data = self.policy.data['mode']
-        self.archive = archive or custodian_archive()
+        self.archive = archive or custodian_archive(self.get_output_deps())
         self._events = events
+
+    def get_output_deps(self):
+        deps = []
+        outputs = (
+            ('metrics', self.ctx.api_stats),
+            ('blob', self.ctx.output),
+            ('log', self.ctx.logs)
+        )
+
+        for (output_type, instance) in outputs:
+            if not instance:
+                continue
+            if f"{output_type}.{instance}" not in OUTPUT_PACKAGE_MAP:
+                continue
+            deps.append(OUTPUT_PACKAGE_MAP[f"{output_type}.{instance}"])
+        return [
+            "{dep}=={dep_version}".format(
+                dep, version(dep)) for dep in deps]
 
     @property
     def name(self):

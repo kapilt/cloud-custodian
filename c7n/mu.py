@@ -34,9 +34,12 @@ import zipfile
 # that support service side building.
 # Its also used for release engineering on our pypi uploads
 try:
-    import importlib_metadata as pkgmd
-except (ImportError, FileNotFoundError):
-    pkgmd = None
+    from importlib import metadata as pkgmd
+except ImportError:
+    try:
+        import importlib_metadata as pkgmd
+    except (ImportError, FileNotFoundError):
+        pkgmd = None
 
 
 # Static event mapping to help simplify cwe rules creation
