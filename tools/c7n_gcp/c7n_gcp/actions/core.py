@@ -90,6 +90,10 @@ class MethodAction(Action):
                 return e
             raise
 
+    def get_permissions(self):
+        m = self.manager.resource_type
+        return ("{}.{}.{}".format(m.service, m.component, self.method_spec['op']),)
+
     def get_operation_name(self, model, resource):
         return self.method_spec['op']
 

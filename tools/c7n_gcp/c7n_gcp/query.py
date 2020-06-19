@@ -86,7 +86,8 @@ class DescribeSource:
         return self.query.filter(self.manager, **query)
 
     def get_permissions(self):
-        return ()
+        m = self.manager.resource_type
+        return ("%s.%s.%s" % (m.service, m.component, m.enum_spec[0]),)
 
     def augment(self, resources):
         return resources
@@ -156,7 +157,7 @@ class QueryResourceManager(ResourceManager, metaclass=QueryMeta):
         self.source = self.get_source(self.source_type)
 
     def get_permissions(self):
-        return ()
+        return self.source.get_permissions()
 
     def get_source(self, source_type):
         return sources.get(source_type)(self)

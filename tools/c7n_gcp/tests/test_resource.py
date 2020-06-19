@@ -18,6 +18,16 @@ from c7n_gcp.provider import resources
 
 class ResourceMetaTest(BaseTest):
 
+    def test_get_permissions(self):
+        p = self.load_policy(
+            {'name': 'istop',
+             'resource': 'gcp.instance',
+             'filters': [{'name': 'instance-1'}, {'status': 'RUNNING'}],
+             'actions': ['stop']})
+        self.assertEqual(
+            p.get_permissions(),
+            {'compute.instances.aggregatedList', 'compute.instances.stop'})
+
     def test_resource_id_meta(self):
         missing = []
         for name, resource in resources.items():
