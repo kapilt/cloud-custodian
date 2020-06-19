@@ -30,7 +30,7 @@ import json
 import inspect
 import logging
 
-from jsonschema import Draft4Validator as JsonSchemaValidator
+from jsonschema import Draft7Validator as JsonSchemaValidator
 from jsonschema.exceptions import best_match
 
 from c7n.policy import execution
