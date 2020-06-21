@@ -270,6 +270,19 @@ class PythonPackageArchive:
         return [n.filename for n in self.get_reader().filelist]
 
 
+def get_exec_options(options):
+    """preserve cli output options into serverless environment.
+    """
+    d = {}
+    for k in ('log_group', 'tracer', 'output_dir', 'metrics_enabled'):
+        if options[k]:
+            d[k] = options[k]
+    # ignore local fs/dir output paths
+    if 'output_dir' in d and not '://' in d['output_dir']:
+        d.pop('output_dir')
+    return d
+
+
 def checksum(fh, hasher, blocksize=65536):
     buf = fh.read(blocksize)
     while len(buf) > 0:
@@ -905,7 +918,7 @@ class PolicyLambda(AbstractLambdaFunction):
     def get_archive(self):
         self.archive.add_contents(
             'config.json', json.dumps(
-                {'execution-options': dict(self.policy.options),
+                {'execution-options': get_exec_options(self.policy.options),
                  'policies': [self.policy.data]}, indent=2))
         self.archive.add_contents('custodian_policy.py', PolicyHandlerTemplate)
         self.archive.close()

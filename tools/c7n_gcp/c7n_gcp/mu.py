@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# import base64
+import base64
 from collections import namedtuple
 import json
 import logging
 import hashlib
 
 from c7n_gcp.client import errors
-from c7n.mu import generate_requirements, custodian_archive as base_archive
+from c7n.mu import generate_requirements, get_exec_options, custodian_archive as base_archive
 from c7n.utils import local_session
 
 from googleapiclient.errors import HttpError
 
 log = logging.getLogger('c7n_gcp.mu')
+
 
 OUTPUT_PACKAGE_MAP = {
     'metrics.gcp': 'google-cloud-monitoring',
@@ -356,8 +357,10 @@ class PolicyFunction(CloudFunction):
     def get_archive(self):
         self.archive.add_contents('main.py', PolicyHandlerTemplate)
         self.archive.add_contents(
-            'config.json', json.dumps(
-                {'policies': [self.policy.data]}, indent=2))
+            'config.json', json.dumps({
+                'execution-options': get_exec_options(self.policy.options),
+                'policies': [self.policy.data]},
+                indent=2))
         self.archive.close()
         return self.archive
 
