@@ -278,7 +278,7 @@ def get_exec_options(options):
         if options[k]:
             d[k] = options[k]
     # ignore local fs/dir output paths
-    if 'output_dir' in d and not '://' in d['output_dir']:
+    if 'output_dir' in d and '://' not in d['output_dir']:
         d.pop('output_dir')
     return d
 
