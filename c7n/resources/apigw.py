@@ -188,6 +188,7 @@ class RestApiCrossAccount(CrossAccountAccessFilter):
                 'Principal': '*'}]}
         return policy
 
+
 @RestApi.action_registry.register('update')
 class UpdateApi(BaseAction):
     """Update configuration of a REST API.
