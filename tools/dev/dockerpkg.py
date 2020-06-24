@@ -351,6 +351,7 @@ def retry(retry_count, exceptions, func, *args, **kw):
         try:
             func(*args, **kw)
         except tuple(exceptions):
+            log.warn('retrying on %s' % func)
             attempts += 1
             time.sleep(5)
 
