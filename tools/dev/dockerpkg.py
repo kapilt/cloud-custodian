@@ -319,7 +319,7 @@ def build(provider, registry, tag, image, quiet, push, test, scan, verbose):
         if scan:
             scan_image(":".join(image_refs[0]))
         if push:
-            retry(3, RuntimeException, push_image, client, image_id, image_refs)
+            retry(3, RuntimeError, push_image, client, image_id, image_refs)
 
 
 def get_labels(image):
