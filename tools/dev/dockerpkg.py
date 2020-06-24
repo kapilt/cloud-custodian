@@ -25,6 +25,7 @@ We also support running functional tests and image cve scanning before pushing.
 
 import logging
 import os
+import time
 import subprocess
 import sys
 from datetime import datetime
@@ -351,6 +352,7 @@ def retry(retry_count, exceptions, func, *args, **kw):
             func(*args, **kw)
         except tuple(exceptions):
             attempts += 1
+            time.sleep(5)
 
 
 def get_github_env():
