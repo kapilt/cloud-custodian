@@ -151,6 +151,24 @@ def generate(resource_types=()):
     resource_defs = {}
     definitions = {
         'resources': resource_defs,
+        'string_dict': {
+            "type": "object",
+            "patternProperties": {
+                "": {"type": "string"},
+            },
+        },
+        'basic_dict': {
+            "type": "object",
+            "patternProperties": {
+                "": {
+                    'oneOf': [
+                        {"type": "string"},
+                        {"type": "boolean"},
+                        {"type": "number"},
+                    ],
+                }
+            },
+        },
         'iam-statement': {
             'additionalProperties': False,
             'type': 'object',
