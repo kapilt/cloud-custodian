@@ -27,6 +27,7 @@ from .securityhub import PostFinding
 class DescribeDomain(DescribeSource):
 
     def get_resources(self, resource_ids):
+        # augment will turn these into resource dictionaries
         return resource_ids
 
     def augment(self, domains):
