@@ -19,6 +19,7 @@ from botocore.exceptions import ClientError as BotoClientError
 from c7n.exceptions import PolicyValidationError
 from c7n.resources.aws import shape_validate
 
+
 class VpcTest(BaseTest):
 
     @functional
