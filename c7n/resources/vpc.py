@@ -432,7 +432,7 @@ class DhcpOptionsFilter(Filter):
 
 
 @Vpc.action_registry.register('post-finding')
-class VpcPostFinding1(PostFinding):
+class VpcPostFinding(PostFinding):
 
     resource_type = "AwsEc2Vpc"
 
@@ -443,13 +443,13 @@ class VpcPostFinding1(PostFinding):
             'DhcpOptionsId': r.get('DhcpOptionsId'),
             'State': r['State']}
 
-        for assoc in r['CidrBlockAssociationSet']:
+        for assoc in r.get('CidrBlockAssociationSet', ()):
             detail.setdefault('CidrBlockAssociationSet', []).append(dict(
                 AssociationId=assoc['AssociationId'],
                 CidrBlock=assoc['CidrBlock'],
                 CidrBlockState=assoc['CidrBlockState']['State']))
 
-        for assoc in r['Ipv6CidrBlockAssociationSet']:
+        for assoc in r.get('Ipv6CidrBlockAssociationSet', ()):
             detail.setdefault('Ipv6CidrBlockAssociationSet', []).append(dict(
                 AssociationId=assoc['AssociationId'],
                 Ipv6CidrBlock=assoc['Ipv6CidrBlock'],
