@@ -359,7 +359,7 @@ def get_py_name(packages):
             stats[f.parent.parts] += 1
         parts = sorted(
             [(len(k), stats[k], k) for k in stats.keys() if (
-                (stats[k] > 1 or not '-' in d) or len(stats) == 1)])
+                (stats[k] > 1 or '-' not in d) or len(stats) == 1)])
         roots = set()
 
         for idx, i in enumerate(parts):
