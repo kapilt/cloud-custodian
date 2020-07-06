@@ -30,6 +30,7 @@ from c7n.filters.health import HealthEventFilter
 
 from c7n.manager import resources
 from c7n.resources.kms import ResourceKmsKeyAlias
+from c7n.resources.securityhub import PostFinding
 from c7n.query import QueryResourceManager, TypeInfo
 from c7n.tags import Tag, coalesce_copy_user_tags
 from c7n.utils import (
@@ -559,6 +560,27 @@ class EBS(QueryResourceManager):
                     continue
                 raise
         return []
+
+
+@EBS.action_registry.register('post-finding')
+class EBSPostFinding(PostFinding):
+
+    resource_type = 'AwsEc2Volume'
+
+    def format_resource(self, r):
+        envelope, payload = self.format_envelope(r)
+        details = select_keys(
+            r, ['KmsKeyId', 'Size', 'SnapshotId', 'Status', 'CreateTime', 'Encrypted'])
+        details['CreateTime'] = details['CreateTime'].isoformat()
+        for attach in r.get('Attachments', ()):
+            details.setdefault('Attachments', []).append(
+                self.filter_empty({
+                    'AttachTime': attach['AttachTime'].isoformat(),
+                    'InstanceId': attach.get('InstanceId'),
+                    'DeleteOnTermination': attach['DeleteOnTermination'],
+                    'Status': attach['State']}))
+        payload.update(details)
+        return envelope
 
 
 @EBS.action_registry.register('detach')
