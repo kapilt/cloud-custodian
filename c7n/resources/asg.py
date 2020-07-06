@@ -31,7 +31,8 @@ from c7n.manager import resources
 from c7n import query
 from c7n.resources.securityhub import PostFinding
 from c7n.tags import TagActionFilter, DEFAULT_TAG, TagCountFilter, TagTrim, TagDelayedAction
-from c7n.utils import local_session, type_schema, chunks, get_retry
+from c7n.utils import (
+    local_session, type_schema, chunks, get_retry, select_keys)
 
 from .ec2 import deserialize_user_data
 
@@ -730,6 +731,7 @@ class PropagatedTagFilter(Filter):
                 if not match and not all(k in tags for k in keys):
                     results.append(asg)
         return results
+
 
 @ASG.action_registry.register('post-finding')
 class AsgPostFinding(PostFinding):

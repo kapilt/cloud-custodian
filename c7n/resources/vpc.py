@@ -26,7 +26,7 @@ from c7n.filters.related import RelatedResourceFilter
 from c7n.filters.revisions import Diff
 from c7n import query, resolver
 from c7n.manager import resources
-from c7n.resources.securityhub import PostFinding
+from c7n.resources.securityhub import OtherResourcePostFinding, PostFinding
 from c7n.utils import (
     chunks, local_session, type_schema, get_retry, parse_cidr)
 

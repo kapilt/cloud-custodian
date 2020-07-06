@@ -38,6 +38,7 @@ from c7n.utils import (
     chunks,
     get_retry,
     local_session,
+    select_keys,
     set_annotation,
     type_schema,
     QueryParser,
