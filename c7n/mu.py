@@ -18,6 +18,7 @@ docs/lambda.rst
 """
 import abc
 import base64
+from collections import Counter
 import hashlib
 import importlib
 import io
@@ -317,6 +318,64 @@ def generate_requirements(packages, ignore=(), exclude=(), include_self=False):
         except pkgmd.PackageNotFoundError:
             continue
     return '\n'.join(lines)
+
+
+def get_dep_py_names(package):
+    deps = _package_deps(package)
+    deps.append(package)
+    return get_py_name(deps)
+
+
+def get_py_name(packages):
+    """get the python import paths for a given package and its dependencies
+
+    list(get_py_name('pyyaml')) -> ['yaml']
+    list(get_py_name('setuptools') -> ['pkg_resources', 'setuptools']
+    list(get_py_name('azure-mgmt-batch')) -> ['azure.mgmt.batch']
+    """
+    # tried really hard to avoid this but there's no way to cleanly
+    # disambiguate, ie the logic below works at auto classifying import
+    # names for namespace packages to ignore the top level namespace
+    # but then fails at datadog which is a not namespace package.
+    # fallback to explicitly listing top level namespaces we're trying
+    # to support.
+    if isinstance(packages, str):
+        packages = [packages]
+    namespaces = set(('azure',))
+    for d in packages:
+        try:
+            p = pkgmd.distribution(d)
+        except pkgmd.PackageNotFoundError:
+            continue
+        # most of this complexity comes from the truly egregious ways
+        # that the azure sdk team like to stuff unrelated directories
+        # into the same package. thankfully some of the worst of that is
+        # removed in the latest packages, but we're currently pinned.
+        stats = Counter()
+        for f in p.files:
+            # skip __init__ to avoid picking up namespace package top level entries.
+            if not f.name.endswith('.py'):
+                continue
+            stats[f.parent.parts] += 1
+        parts = sorted(
+            [(len(k), stats[k], k) for k in stats.keys() if (
+                (stats[k] > 1 or not '-' in d) or len(stats) == 1)])
+        roots = set()
+
+        for idx, i in enumerate(parts):
+            # ignore nested top level namespaces
+            if ((i[-1] and i[-1][0] in namespaces) and
+                len(i[-1]) == 1 and
+                len(parts) > 1 and
+                i[1] == 1 and
+                    '-' not in d):
+                continue
+            if not i[-1] or i[-1][0] in roots:
+                continue
+            if '..' in i[-1] or 'bin' in i[-1]:
+                continue
+            roots.add(i[-1][0])
+            yield ".".join(i[-1])
 
 
 def _package_deps(package, deps=None, ignore=()):
