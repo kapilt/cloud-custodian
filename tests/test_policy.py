@@ -223,9 +223,6 @@ class PolicyMetaLint(BaseTest):
 
         whitelist = set(('AwsS3Object', 'Container'))
         todo = set((
-            'AwsEc2Vpc',
-            'AwsEc2Volume',
-            'AwsAutoScalingAutoScalingGroup',
             'AwsRdsDbInstance',
             'AwsElbv2LoadBalancer',
             'AwsEc2SecurityGroup',
