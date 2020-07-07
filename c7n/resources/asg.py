@@ -737,18 +737,16 @@ class PropagatedTagFilter(Filter):
 class AsgPostFinding(PostFinding):
 
     resource_type = 'AwsAutoScalingAutoScalingGroup'
-
-    def process(self, resources):
-        self.launch_info = LaunchInfo(self.manager)
-        super().process(resources)
+    launch_info = LaunchInfo(None)
 
     def format_resource(self, r):
-        envelope, payload = self.format_resource(r)
+        envelope, payload = self.format_envelope(r)
         details = select_keys(r, [
             'CreatedTime', 'HealthCheckType', 'HealthCheckGracePeriod', 'LoadBalancerNames'])
         lid = self.launch_info.get_launch_id(r)
         if isinstance(lid, tuple):
             lid = "%s:%s" % lid
+        details['CreatedTime'] = details['CreatedTime'].isoformat()
         # let's arbitrarily cut off key information per security hub's restrictions...
         details['LaunchConfigurationName'] = lid[:32]
         payload.update(details)
