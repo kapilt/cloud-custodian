@@ -573,6 +573,7 @@ class EBSPostFinding(PostFinding):
         details = select_keys(
             r, ['KmsKeyId', 'Size', 'SnapshotId', 'Status', 'CreateTime', 'Encrypted'])
         details['CreateTime'] = details['CreateTime'].isoformat()
+        self.filter_empty(details)
         for attach in r.get('Attachments', ()):
             details.setdefault('Attachments', []).append(
                 self.filter_empty({
