@@ -1005,8 +1005,8 @@ class PolicyConditionsTest(BaseTest):
                 'value_from': {
                     'url': 'file:///{}/accounts.txt'.format(tmp_dir),
                     'type': 'txt'}
-                }]
-            })
+            }]
+        })
         with open(os.path.join(tmp_dir, 'accounts.txt'), 'w') as fh:
             fh.write(p.ctx.options.account_id)
         self.assertTrue(p.is_runnable())
