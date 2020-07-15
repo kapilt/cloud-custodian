@@ -923,7 +923,7 @@ class PolicyConditions:
         self.data = data
         self.filters = self.data.get('conditions', [])
         # for value_from usage / we use the conditions class
-        # to mimic a resource manager interface. we can't used
+        # to mimic a resource manager interface. we can't use
         # the actual resource manager as we're overriding block
         # filters which work w/ resource type metadata and our
         # resource here is effectively the execution variables.
