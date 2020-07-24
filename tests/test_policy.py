@@ -30,7 +30,7 @@ from c7n.resources.ec2 import EC2
 from c7n.policy import ConfigPollRuleMode, PullMode
 from c7n.schema import generate, JsonSchemaValidator
 from c7n.utils import dumps
-from c7n.query import ConfigSource, TypeInfo
+from c7n.query import ConfigSource, TypeInfo, QueryResourceManager
 from c7n.version import version
 
 from .common import BaseTest, event_data, Bag, load_data
@@ -134,11 +134,20 @@ class PolicyMetaLint(BaseTest):
 
     def test_resource_universal_taggable_arn_type(self):
         missing = []
+        cfg = Config.empty()
         for k, v in manager.resources.items():
-            if not getattr(v, 'augment', None):
+            qrm_augment = getattr(v, 'augment', None)
+            if qrm_augment is None:
                 continue
+            elif qrm_augment == QueryResourceManager.augment:
+                p = Bag({"name": "permcheck", "resource": k, 'provider_name': 'aws'})
+                ctx = self.get_context(config=cfg, policy=p)
+                mgr = v(ctx, p)
+                source = mgr.get_source("describe")
+            else:
+                source = v
             if (
-                v.augment.__name__ == "universal_augment" and
+                source.augment.__name__ == "universal_augment" and
                     v.resource_type.arn_type is None
             ):
                 missing.append(k)
