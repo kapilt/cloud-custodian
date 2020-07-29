@@ -2,7 +2,7 @@
 # https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
 
 # These owners will be the default owners for everything in the repo.
-* @kapilt @stefangordon
+* @kapilt
 
 # Currently c7n is a mixture of aws and core, this mapping will get
 # much simpler as we extract core.
