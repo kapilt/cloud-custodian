@@ -2,7 +2,7 @@
 
 ## Leads
 
-- Kapil Thangavelu @kapilt (kapil@stacklet.io)
+- Kapil Thangavelu @kapilt (@kapilt)
   project lead (bdfl)
 
 ## Aws Provider Maintainers
