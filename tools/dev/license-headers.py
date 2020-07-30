@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Add License headers to all py files."""
+
+from difflib import SequenceMatcher
 import fnmatch
 import os
 import inspect
@@ -19,8 +21,7 @@ import sys
 
 import c7n
 
-header = """\
-# Copyright 2018-2019 Capital One Services, LLC
+apache_license_header = [l + '\n' for  l in """\
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,17 +29,16 @@ header = """\
 #
 # http://www.apache.org/licenses/LICENSE-2.0
 #
-"""
-
-
-suffix = """\
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
+""".splitlines()]
 
+target_header = """\
+# SPDX-License-Identifier: Apache-2.0
+"""
 
 def update_headers(src_tree):
     """Main."""
@@ -49,13 +49,19 @@ def update_headers(src_tree):
             print("checking", f)
             p = os.path.join(root, f)
             with open(p) as fh:
-                contents = fh.read()
-            if suffix in contents:
+                contents = list(fh.readlines())
+            matcher = SequenceMatcher(None, apache_license_header, contents)
+            match = matcher.find_longest_match(
+                0, len(apache_license_header), 0, len(contents))
+            if match.size != len(apache_license_header):
                 continue
-            print("Adding license header to %s" % p)
+
+            contents[match.b : match.b + match.size] = [target_header]
+
+
+            print("Adding license header to %s" % (p,))
             with open(p, 'w') as fh:
-                fh.write(
-                    '%s%s%s' % (header, suffix, contents))
+                fh.write("".join(contents))
 
 
 def main():
