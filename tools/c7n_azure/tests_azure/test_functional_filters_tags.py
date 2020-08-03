@@ -1,4 +1,5 @@
 # Copyright 2019 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from . import tools_tags as tools
 from .azure_common import BaseTest, arm_template

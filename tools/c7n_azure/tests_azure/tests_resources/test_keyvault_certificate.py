@@ -1,4 +1,5 @@
 # Copyright 2019 Microsoft Corporation
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 import azure.keyvault.http_bearer_challenge_cache as kv_cache
 from ..azure_common import BaseTest, arm_template

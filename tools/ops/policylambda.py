@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2018-2019 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 """
 Cli tool to package up custodian lambda policies for folks that

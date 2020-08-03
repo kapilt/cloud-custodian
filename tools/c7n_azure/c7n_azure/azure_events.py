@@ -1,4 +1,5 @@
 # Copyright 2016-2017 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from azure.mgmt.eventgrid.models import EventSubscription, EventSubscriptionFilter
 from c7n_azure.session import Session

@@ -1,5 +1,6 @@
 # Copyright 2018-2019 Amazon.com, Inc. or its affiliates.
 # All Rights Reserved.
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from collections import Counter
 from datetime import datetime

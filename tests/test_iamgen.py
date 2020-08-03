@@ -1,4 +1,5 @@
 # Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 
 from .common import BaseTest, load_data

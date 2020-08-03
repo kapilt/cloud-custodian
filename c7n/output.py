@@ -1,4 +1,5 @@
 # Copyright 2015-2017 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 """
 Outputs metrics, logs, stats, traces, and structured records across

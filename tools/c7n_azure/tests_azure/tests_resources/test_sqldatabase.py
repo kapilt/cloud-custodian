@@ -1,4 +1,5 @@
 # Copyright 2015-2018 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from azure.mgmt.sql.models import DatabaseUpdate, Sku
 from ..azure_common import BaseTest, arm_template, requires_arm_polling

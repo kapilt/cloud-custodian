@@ -1,4 +1,5 @@
 # Copyright 2019 Microsoft Corporation
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from azure.mgmt.monitor.models import EventData
 from c7n_azure.actions.tagging import AutoTagBase, AutoTagDate

@@ -1,4 +1,5 @@
 # Copyright 2016-2017 Capital One Services, LLC
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 import datetime
 from dateutil import tz as tzutil

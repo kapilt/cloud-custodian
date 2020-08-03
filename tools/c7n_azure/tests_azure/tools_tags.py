@@ -1,4 +1,5 @@
 # Copyright 2019 Microsoft Corporation
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 from azure.mgmt.compute.models import VirtualMachineUpdate
 from azure.mgmt.resource.resources.models import GenericResource

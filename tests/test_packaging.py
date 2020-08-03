@@ -1,4 +1,5 @@
 # Copyright 2020 Cloud Custodian Project and Contributors. All Rights Reserved.
+# Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 import toml
 from pathlib import Path
