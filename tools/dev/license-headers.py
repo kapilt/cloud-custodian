@@ -22,6 +22,7 @@ target_copyright_header = """\
 # Copyright The Cloud Custodian Authors.
 """
 
+
 def update_license_header(p):
     # switch from apache pre-amble to spdx identifier
     with open(p) as fh:
@@ -73,7 +74,6 @@ def update_headers(src_tree):
             update_copyright_header(p)
 
 
-
 def main():
     explicit = False
     if len(sys.argv) == 2:
@@ -88,6 +88,7 @@ def main():
         update_headers(os.path.abspath('tests'))
         update_headers(os.path.abspath('ftests'))
         update_headers(os.path.abspath('tools'))
+
 
 if __name__ == '__main__':
     main()
