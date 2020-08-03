@@ -21,7 +21,7 @@ import sys
 
 import c7n
 
-apache_license_header = [l + '\n' for  l in """\
+apache_license_header = [l + '\n' for l in """\
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ target_header = """\
 # SPDX-License-Identifier: Apache-2.0
 """
 
+
 def update_headers(src_tree):
     """Main."""
     print("src tree", src_tree)
@@ -56,8 +57,7 @@ def update_headers(src_tree):
             if match.size != len(apache_license_header):
                 continue
 
-            contents[match.b : match.b + match.size] = [target_header]
-
+            contents[match.b: match.b + match.size] = [target_header]
 
             print("Adding license header to %s" % (p,))
             with open(p, 'w') as fh:
