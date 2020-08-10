@@ -21,6 +21,7 @@ from c7n_mailer.deploy import CORE_DEPS
 
 try:
     from c7n.mu import generate_requirements
+    from c7n_azure.constants import AUTH_TYPE_EMBED
     from c7n_azure.function_package import FunctionPackage
     from c7n_azure.functionapp_utils import FunctionAppUtilities
     from c7n_azure.policy import AzureFunctionMode
@@ -133,8 +134,9 @@ def provision(config):
         app_insights=app_insights,
         service_plan=service_plan,
         storage_account=storage_account,
-        function_app_resource_group_name=service_plan['resource_group_name'],
-        function_app_name=function_app_name)
+        function_app={'resource_group_name': service_plan['resource_group_name'],
+                      'identity': {'type': AUTH_TYPE_EMBED},
+                      'name': function_app_name})
 
     FunctionAppUtilities.deploy_function_app(params)
 
