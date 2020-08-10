@@ -4,14 +4,15 @@
 import logging
 import re
 
+from c7n_azure.constants import AUTH_TYPE_EMBED
+from c7n_azure.session import Session
+from c7n_azure.utils import ResourceIdParser, StringUtils
+from c7n.utils import local_session
+
 from c7n_azure.provisioning.app_insights import AppInsightsUnit
 from c7n_azure.provisioning.app_service_plan import AppServicePlanUnit
 from c7n_azure.provisioning.function_app import FunctionAppDeploymentUnit
 from c7n_azure.provisioning.storage_account import StorageAccountUnit
-from c7n_azure.session import Session
-from c7n_azure.utils import ResourceIdParser, StringUtils
-
-from c7n.utils import local_session
 
 
 class FunctionAppUtilities:
@@ -47,6 +48,8 @@ class FunctionAppUtilities:
     def deploy_function_app(parameters):
         function_app_unit = FunctionAppDeploymentUnit()
         function_app_params = dict(parameters.function_app)
+        if function_app_params['identity']['type'] == AUTH_TYPE_EMBED:
+            function_app_params.pop('identity')
         function_app = function_app_unit.get(function_app_params)
 
         if function_app:
