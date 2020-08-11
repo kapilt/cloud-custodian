@@ -579,11 +579,12 @@ uuid/id and client id of the identity must be provided. You can
 retrieve this information on the cli using the `az identity list`.
 
 ```yaml
+
 function_properties:
-   identity:
-      type: UserAssigned
-	  id: "/subscriptions/333fd504-7f11-2270-88c8-7325a27f7222/resourcegroups/c7n/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mailer"
-	  client_id: "b9cb06fa-dfb8-4342-add3-aab5acb2abbc"
+  identity:
+    type: UserAssigned
+    id: "/subscriptions/333fd504-7f11-2270-88c8-7325a27f7222/resourcegroups/c7n/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mailer"
+    client_id: "b9cb06fa-dfb8-4342-add3-aab5acb2abbc"
 ```
 
 A system managed identity can also be used, and the Azure platform will
@@ -592,9 +593,10 @@ then needs to be retrieved and mapped to rbac permissions post provisioning, thi
 user management activity must be performed manually.
 
 ```yaml
+
 function_properties:
-   identity:
-      type: SystemAssigned
+  identity:
+    type: SystemAssigned
 ```
 
 ## Writing an email template
