@@ -4,7 +4,6 @@
 import logging
 import re
 
-from c7n_azure.constants import AUTH_TYPE_EMBED
 from c7n_azure.session import Session
 from c7n_azure.utils import ResourceIdParser, StringUtils
 from c7n.utils import local_session
