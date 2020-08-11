@@ -58,8 +58,6 @@ class FunctionAppUtilities:
     def deploy_function_app(parameters):
         function_app_unit = FunctionAppDeploymentUnit()
         function_app_params = dict(parameters.function_app)
-        if function_app_params['identity']['type'] == AUTH_TYPE_EMBED:
-            function_app_params.pop('identity')
         function_app = function_app_unit.get(function_app_params)
 
         if function_app:
