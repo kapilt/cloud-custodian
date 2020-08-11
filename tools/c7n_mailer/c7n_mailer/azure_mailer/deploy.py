@@ -6,7 +6,7 @@ import json
 import logging
 import os
 
-
+import jmespath
 from c7n_mailer.deploy import CORE_DEPS
 
 try:
@@ -50,9 +50,11 @@ def build_function_package(config, function_name, sub_id):
         target_sub_ids=[sub_id],
         cache_override_path=cache_override_path)
 
+    identity = jmespath.search('function_properties.identity', config)
     package.build(None,
                   modules=['c7n', 'c7n_azure', 'c7n_mailer'],
-                  requirements=get_mailer_requirements())
+                  requirements=get_mailer_requirements(),
+                  identity=identity)
 
     package.pkg.add_contents(
         function_path + '/function.json',
@@ -133,6 +135,6 @@ def provision(config):
     log.info("Building function package for %s" % function_app_name)
     package = build_function_package(config, function_name, sub_id)
 
-    log.info("Function package built, size is %dMB" % (package.pkg.size / (1024 * 1024)))
+    log.info("Function package built, size is %0.2f MB" % (package.pkg.size / (1024 * 1024.0)))
 
     FunctionAppUtilities.publish_functions_package(params, package)
