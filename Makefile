@@ -63,7 +63,7 @@ pkg-increment:
 
 pkg-publish-wheel:
 # azure pin uses ancient wheel version, upgrade first
-        pip install -U wheel
+	pip install -U wheel
 # clean up any artifacts first
 	rm -f dist/*
 	for pkg in $(PKG_SET); do cd $$pkg && rm -f dist/* && cd ../..; done
