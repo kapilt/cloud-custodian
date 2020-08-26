@@ -51,6 +51,7 @@ setup_kwargs = {{
 setup(**setup_kwargs)
 """
 
+
 @cli.command()
 @click.option('-p', '--package-dir', type=click.Path())
 @click.option('-f', '--version-file', type=click.Path())
