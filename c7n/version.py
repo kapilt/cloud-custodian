@@ -1,1 +1,2 @@
-version = 0.9.5
+# Generated via tools/dev/poetrypkg.py
+version = "0.9.5"

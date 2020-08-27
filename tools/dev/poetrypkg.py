@@ -59,7 +59,8 @@ def gen_version_file(package_dir, version_file):
     data = toml.load(Path(str(package_dir)) / 'pyproject.toml')
     version = data['tool']['poetry']['version']
     with open(version_file, 'w') as fh:
-        fh.write('version = {}\n'.format(version))
+        fh.write('# Generated via tools/dev/poetrypkg.py\n')
+        fh.write('version = "{}"\n'.format(version))
 
 
 @cli.command()
