@@ -58,7 +58,7 @@ setup(**setup_kwargs)
 def gen_version_file(package_dir, version_file):
     data = toml.load(Path(str(package_dir)) / 'pyproject.toml')
     version = data['tool']['poetry']['version']
-    with open(version_file) as fh:
+    with open(version_file, 'w') as fh:
         fh.write('version = {}\n'.format(version))
 
 
