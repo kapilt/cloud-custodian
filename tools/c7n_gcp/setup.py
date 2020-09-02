@@ -11,9 +11,9 @@ package_data = \
 
 install_requires = \
 ['argcomplete (>=1.12.0,<2.0.0)',
- 'attrs (>=19.3.0,<20.0.0)',
- 'boto3 (>=1.14.31,<2.0.0)',
- 'botocore (>=1.17.31,<2.0.0)',
+ 'attrs (>=20.1.0,<21.0.0)',
+ 'boto3 (>=1.14.53,<2.0.0)',
+ 'botocore (>=1.17.53,<2.0.0)',
  'c7n (>=0.9.5,<0.10.0)',
  'docutils (>=0.15.2,<0.16.0)',
  'google-api-python-client>=1.7,<2.0',
