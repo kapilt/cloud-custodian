@@ -17,6 +17,7 @@ try:
 except ImportError: # noqa
     pass
 
+
 class CustodianAWSTesting(PyTestUtils, PillTest):
     """Pytest AWS Testing Fixture
     """
