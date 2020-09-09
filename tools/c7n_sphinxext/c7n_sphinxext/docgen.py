@@ -18,6 +18,7 @@ from jinja2 import Environment, PackageLoader
 from sphinx.directives import SphinxDirective as Directive
 from sphinx.util.nodes import nested_parse_with_titles
 
+from c7n.config import Config
 from c7n.schema import (
     ElementSchema, resource_vocabulary, generate as generate_schema)
 from c7n.policy import execution
@@ -37,8 +38,19 @@ def get_environment():
     env.globals['ename'] = ElementSchema.name
     env.globals['edoc'] = ElementSchema.doc
     env.globals['eschema'] = CustodianSchema.render_schema
+    env.globals['eperm'] = eperm
     env.globals['render_resource'] = CustodianResource.render_resource
     return env
+
+
+def eperm(r, el):
+    if el.permissions:
+        return el.permissions
+    print('no permission defined %s %s' % (el.type, el))    
+    cfg = Config.empty(session_factory=lambda : 1)
+    rtype = r({}, Config.empty(options=cfg))
+    e = el({}, rtype)
+    return e.get_permissions()
 
 
 class SafeNoAliasDumper(yaml.SafeDumper):

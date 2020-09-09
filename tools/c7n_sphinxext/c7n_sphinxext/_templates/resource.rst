@@ -21,6 +21,9 @@ Filters
 {{underline(ename(f), '+')}}
 {{edoc(f)}}
 {{eschema(f)}}
+{% for p in eperm(resource, f) %}
+Permission - {{p}}
+{% endfor %}
 {% endif %}{% endfor %}
 
 
@@ -41,4 +44,7 @@ Actions
 {{underline(ename(a), '+')}}
 {{edoc(a)}}
 {{eschema(a)}}
+{% for p in eperm(resource, a) %}
+Permission - {{p}}
+{% endfor %}
 {% endif %}{% endfor %}
