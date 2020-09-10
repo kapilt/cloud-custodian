@@ -368,9 +368,9 @@ class IAMMFAFilter(BaseTest):
         self.assertEqual(len(resources), 2)
 
 
-@terraform('iam_role_delete', replay=False, teardown=terraform.TEARDOWN_IGNORE)
+@terraform('iam_role_delete', teardown=terraform.TEARDOWN_IGNORE)
 def test_iam_role_delete(test, iam_role_delete):
-    session_factory = test.record_flight_data('test_iam_role_delete')
+    session_factory = test.replay_flight_data('test_iam_role_delete')
     client = session_factory().client('iam')
     pdata = {
         'name': 'group-delete',
