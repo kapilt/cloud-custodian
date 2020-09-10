@@ -368,6 +368,36 @@ class IAMMFAFilter(BaseTest):
         self.assertEqual(len(resources), 2)
 
 
+@terraform('iam_role_delete', replay=False, teardown=terraform.TEARDOWN_IGNORE)
+def test_iam_role_delete(test, iam_role_delete):
+    session_factory = test.record_flight_data('test_iam_role_delete')
+    client = session_factory().client('iam')
+    pdata = {
+        'name': 'group-delete',
+        'resource': 'iam-role',
+        'mode': {
+            'type': 'cloudtrail',
+            'events': [{
+                'source': 'source',
+                'event': 'event',
+                'ids': "RoleNames"}]
+        },
+        'actions': [{'type': 'delete', 'force': True}]
+    }
+
+    event = {'detail': {
+        'eventName': 'event', 'eventSource': 'source',
+        'RoleNames': [iam_role_delete['aws_iam_role.test_role.name']]}}
+    if test.recording:
+        time.sleep(3)
+    p = test.load_policy(pdata, session_factory=session_factory)
+    resources = p.push(event)
+    assert len(resources) == 1
+
+    with pytest.raises(client.exceptions.NoSuchEntityException):
+        client.get_role(RoleName=iam_role_delete['aws_iam_role.test_role.name'])
+
+
 class IamRoleTest(BaseTest):
 
     def test_iam_role_post(self):
