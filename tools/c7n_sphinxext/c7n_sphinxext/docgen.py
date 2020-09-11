@@ -46,8 +46,7 @@ def get_environment():
 def eperm(r, el):
     if el.permissions:
         return el.permissions
-    print('no permission defined %s %s' % (el.type, el))    
-    cfg = Config.empty(session_factory=lambda : 1)
+    cfg = Config.empty(session_factory=lambda: 1)
     rtype = r({}, Config.empty(options=cfg))
     e = el({}, rtype)
     return e.get_permissions()
