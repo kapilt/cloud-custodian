@@ -1969,7 +1969,7 @@ NetworkAddress.action_registry.register('set-shield', SetShieldProtection)
 
 
 @NetworkAddress.action_registry.register('post-finding')
-class NetworkAddrPostFinding(DefaultPostFinding):
+class NetworkAddrPostFinding(DescribePostFinding):
 
     resource_type = 'AwsEc2Eip'
 

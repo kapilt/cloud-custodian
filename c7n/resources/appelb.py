@@ -418,7 +418,6 @@ class AppELBTagAction(tags.Tag):
             Tags=ts)
 
 
-
 @AppELB.action_registry.register('remove-tag')
 class AppELBRemoveTagAction(tags.RemoveTag):
     """Action to remove tag/tags from an ELB

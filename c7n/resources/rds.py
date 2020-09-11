@@ -60,7 +60,7 @@ from c7n.tags import universal_augment
 from c7n.utils import (
     local_session, type_schema, get_retry, chunks, snapshot_identifier)
 from c7n.resources.kms import ResourceKmsKeyAlias
-from c7n.resources.securityhub import OtherResourcePostFinding, DescribePostFinding
+from c7n.resources.securityhub import DescribePostFinding
 
 log = logging.getLogger('custodian.rds')
 
@@ -665,7 +665,7 @@ class CopySnapshotTags(BaseAction):
 
 
 @RDS.action_registry.register("post-finding")
-class DbInstanceFinding(DescribeResourcePostFinding):
+class DbInstanceFinding(DescribePostFinding):
 
     resource_type = 'AwsRdsDbInstance'
 
