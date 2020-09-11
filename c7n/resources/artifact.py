@@ -20,6 +20,9 @@ class ArtifactDomain(QueryResourceManager):
 class DeleteDomain(Action):
 
     schema = type_schema('delete', force={'type': 'boolean'})
+    permissions = ('codeartifact:DeleteDomain',
+                   'codeartifact:DeleteRepository',
+                   'codeartifact:ListRepositoriesInDomain')
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('codeartifact')
@@ -60,6 +63,7 @@ class ArtifactRepo(QueryResourceManager):
 class CrossAccountRepo(CrossAccountAccessFilter):
 
     policy_attribute = 'c7n:Policy'
+    permissions = ('codeartifact:GetRepositoryPermissionsPolicy',)
 
     def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('codeartifact')
@@ -80,6 +84,7 @@ class CrossAccountRepo(CrossAccountAccessFilter):
 class DeleteRepo(Action):
 
     schema = type_schema('delete')
+    permissions = ('codeartifact:DeleteRepository',)
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('codeartifact')
