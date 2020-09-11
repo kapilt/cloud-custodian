@@ -16,14 +16,13 @@ class ArtifactDomain(QueryResourceManager):
         arn = 'arn'
 
 
-@ArtifactDomain.register('delete')
+@ArtifactDomain.action_registry.register('delete')
 class DeleteDomain(Action):
 
     schema = type_schema('delete', force={'type': 'boolean'})
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('codeartifact')
-
         force = self.data.get('force', False)
         for r in resources:
             if force:
@@ -37,7 +36,7 @@ class DeleteDomain(Action):
 
         try:
             results = paginator.paginate(domain=domain['name'])
-            repos.extend(results.build_full_result())
+            repos.extend(results.build_full_result().get('repositories'))
         except client.exceptions.ResourceNotFoundException:
             return False
 
@@ -68,11 +67,13 @@ class CrossAccountRepo(CrossAccountAccessFilter):
         for r in resources:
             try:
                 result = client.get_repository_permissions_policy(
-                    domain=r['domain'], repository=r['name']
+                    domain=r['domainName'], repository=r['name']
                 )
                 r[self.policy_attribute] = result['policy']['document']
             except client.exceptions.ResourceNotFoundException:
                 pass
+
+        return super().process(resources)
 
 
 @ArtifactRepo.action_registry.register('delete')
@@ -85,6 +86,6 @@ class DeleteRepo(Action):
 
         for r in resources:
             try:
-                r.delete_repository(domain=r['domain'], repository=r['name'])
+                client.delete_repository(domain=r['domainName'], repository=r['name'])
             except client.exceptions.ResourceNotFoundException:
                 continue
