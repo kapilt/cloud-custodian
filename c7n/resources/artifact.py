@@ -3,7 +3,7 @@
 from c7n.actions import Action
 from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources
-from c7n.query import QueryResourceManager, TypeInfo, RetryPageIterator
+from c7n.query import QueryResourceManager, DescribeSource, TypeInfo, RetryPageIterator
 from c7n.utils import local_session, type_schema
 
 
@@ -12,13 +12,49 @@ class ArtifactDomain(QueryResourceManager):
     class resource_type(TypeInfo):
         service = 'codeartifact'
         enum_spec = ('list_domains', 'domains', None)
+        detail_spec = ('describe_domain', 'domain', 'name', 'domain')
         id = name = 'name'
         arn = 'arn'
 
 
+@ArtifactDomain.filter_registry.register('cross-account')
+class CrossAccountDomain(CrossAccountAccessFilter):
+
+    policy_attribute = 'c7n:Policy'
+    permissions = ('codeartifact:GetDomainPermissionsPolicy',)
+
+    def process(self, resources, event=None):
+        client = local_session(self.manager.session_factory).client('codeartifact')
+        for r in resources:
+            result = self.manager.retry(
+                client.get_domain_permissions_policy,
+                domain=r['domainName'],
+                ignore_err_codes=('ResourceNotFoundException',))
+        return super().process(resources)
+
+
 @ArtifactDomain.action_registry.register('delete')
 class DeleteDomain(Action):
+    """
+    :example:
 
+    Delete empty domains older than 30 days.
+
+    .. code-block:: yaml
+
+      policies:
+        - name: empty-delete
+          resource: artifact-domain
+          filters:
+             - type: value
+               key: createdTime
+               value_type: age
+               op: greater-than
+               value: 30
+             - assetSizeBytes: 0
+          actions:
+             - delete
+    """
     schema = type_schema('delete', force={'type': 'boolean'})
     permissions = ('codeartifact:DeleteDomain',
                    'codeartifact:DeleteRepository',
@@ -44,14 +80,35 @@ class DeleteDomain(Action):
             return False
 
         for r in repos:
-            try:
-                client.delete_repository(domain=domain['name'], repository=r['name'])
-            except client.exceptions.ResourceNotFoundException:
-                continue
+            self.manager.retry(
+                client.delete_repository,
+                domain=domain['name'],
+                repository=r['name'],
+                ignore_err_codes=('ResourceNotFoundException',))
+
+
+class DescribeRepo(DescribeSource):
+
+    def augment(self, resources):
+        client = local_session(self.manager.session_factory).client(
+            self.manager.resource_type.service)
+        results = []
+        for r in resources:
+            rdescribe = self.manager.retry(
+                client.describe_repository,
+                repository=r['name'],
+                domain=r['domainName'],
+                ignore_err_codes=('ResourceNotFoundException',))
+            if rdescribe:
+                results.append(rdescribe['repository'])
+        return results
 
 
 @resources.register('artifact-repo')
 class ArtifactRepo(QueryResourceManager):
+
+    source_mapping = {'describe': DescribeRepo}
+
     class resource_type(TypeInfo):
         service = 'codeartifact'
         enum_spec = ('list_repositories', 'repositories', None)
@@ -82,15 +139,31 @@ class CrossAccountRepo(CrossAccountAccessFilter):
 
 @ArtifactRepo.action_registry.register('delete')
 class DeleteRepo(Action):
+    """Delete a repository
 
+    :example:
+
+    .. code-block:: yaml
+
+      policies:
+        - name: no-pypi
+          resource: artifact-repo
+          filters:
+             - type: value
+               key: externalConnections[].externalConnectionName
+               value: public:pypi
+               op: contains
+          actions:
+             - delete
+    """
     schema = type_schema('delete')
     permissions = ('codeartifact:DeleteRepository',)
 
     def process(self, resources):
         client = local_session(self.manager.session_factory).client('codeartifact')
-
         for r in resources:
-            try:
-                client.delete_repository(domain=r['domainName'], repository=r['name'])
-            except client.exceptions.ResourceNotFoundException:
-                continue
+            self.manager.retry(
+                client.delete_repository,
+                domain=r['domainName'],
+                repository=r['name'],
+                ignore_err_codes=('ResourceNotFoundException',))
