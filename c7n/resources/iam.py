@@ -33,7 +33,7 @@ from c7n.utils import (
 )
 
 from c7n.resources.aws import Arn
-from c7n.resources.securityhub import OtherResourcePostFinding, DefaultPostFinding
+from c7n.resources.securityhub import OtherResourcePostFinding, DescribePostFinding
 
 
 class DescribeGroup(DescribeSource):
@@ -1235,7 +1235,7 @@ class AllowAllIamPolicies(Filter):
 
 
 @Policy.action_registry.register('post-finding')
-class PolicyPostFinding(DefaultPostFinding):
+class PolicyPostFinding(DescribePostFinding):
 
     resource_type = 'AwsIamPolicy'
 
