@@ -224,6 +224,20 @@ def init(provider):
     return env
 
 
+def setup(app):
+    # we're no longer a sphinx extension, instead we're
+    # a sphinx/rst generator. we need to update our setup.py
+    # metadata
+    app.add_directive_to_domain(
+        'py', 'c7n-schema', CustodianSchema)
+
+    app.add_directive_to_domain(
+        'py', 'c7n-resource', CustodianResource)
+
+    return {'version': '0.1',
+            'parallel_read_safe': True,
+            'parallel_write_safe': True}
+
 @click.command()
 @click.option('--provider', required=True)
 @click.option('--output-dir', type=click.Path(), required=True)
