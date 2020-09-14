@@ -238,6 +238,7 @@ def setup(app):
             'parallel_read_safe': True,
             'parallel_write_safe': True}
 
+
 @click.command()
 @click.option('--provider', required=True)
 @click.option('--output-dir', type=click.Path(), required=True)
