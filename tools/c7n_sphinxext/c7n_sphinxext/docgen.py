@@ -228,6 +228,7 @@ def setup(app):
     # we're no longer a sphinx extension, instead we're
     # a sphinx/rst generator. we need to update our setup.py
     # metadata
+    init(None)
     app.add_directive_to_domain(
         'py', 'c7n-schema', CustodianSchema)
 
