@@ -5,6 +5,7 @@
 
 {% if resource.__doc__ %}{{edoc(resource)}}{% endif %}
 
+
 Filters
 -------
 
@@ -21,9 +22,11 @@ Filters
 {{underline(ename(f), '+')}}
 {{edoc(f)}}
 {{eschema(f)}}
-{% for p in eperm(resource, f) %}
-Permission - {{p}}
-{% endfor %}
+
+{% set permissions = eperm(f, resource) %}
+{% if permissions %}
+Permissions - {{ permissions | join(", ") }}
+{% endif %}
 {% endif %}{% endfor %}
 
 
@@ -44,7 +47,9 @@ Actions
 {{underline(ename(a), '+')}}
 {{edoc(a)}}
 {{eschema(a)}}
-{% for p in eperm(resource, a) %}
-Permission - {{p}}
-{% endfor %}
+
+{% set permissions = eperm(a, resource) %}
+{% if permissions %}
+Permissions - {{ permissions | join(", ") }}
+{% endif %}
 {% endif %}{% endfor %}
