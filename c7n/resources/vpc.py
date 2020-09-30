@@ -1969,6 +1969,9 @@ class NetworkAddress(query.QueryResourceManager):
         filter_type = 'list'
         config_type = "AWS::EC2::EIP"
 
+    def augment(self, resources):
+        return [r for r in resources if self.resource_type.id in r]
+
 
 NetworkAddress.filter_registry.register('shield-enabled', IsShieldProtected)
 NetworkAddress.action_registry.register('set-shield', SetShieldProtection)
