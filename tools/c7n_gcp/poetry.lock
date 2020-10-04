@@ -114,7 +114,7 @@ version = "0.9.6"
 [package.dependencies]
 argcomplete = "^1.11.1"
 boto3 = "^1.12.31"
-importlib-metadata = "^1.5.0;python_version<3.8"
+importlib-metadata = ">=1.7.0"
 jsonschema = "^3.2.0"
 python-dateutil = "^2.8.1"
 pyyaml = "^5.3"
