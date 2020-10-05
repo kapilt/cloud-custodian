@@ -1980,6 +1980,7 @@ class NetworkAddress(query.QueryResourceManager):
         'config': query.ConfigSource
     }
 
+
 NetworkAddress.filter_registry.register('shield-enabled', IsShieldProtected)
 NetworkAddress.action_registry.register('set-shield', SetShieldProtection)
 
