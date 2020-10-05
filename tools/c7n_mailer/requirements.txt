@@ -6,7 +6,6 @@ chardet==3.0.4
 datadog==0.34.1
 decorator==4.4.2
 idna==2.10
-importlib-metadata==2.0.0; python_version < "3.8"
 jinja2==2.11.2
 jmespath==0.10.0
 jsonpatch==1.26
