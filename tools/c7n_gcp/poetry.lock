@@ -114,7 +114,8 @@ version = "0.9.6"
 [package.dependencies]
 argcomplete = "^1.11.1"
 boto3 = "^1.12.31"
-importlib-metadata = ">=1.7.0"
+importlib-metadata = "<2.0.0;python_version<3.8"
+jsonpickle = "1.3"
 jsonschema = "^3.2.0"
 python-dateutil = "^2.8.1"
 pyyaml = "^5.3"
@@ -401,7 +402,7 @@ description = "Read metadata from Python packages"
 name = "importlib-metadata"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
-version = "2.0.0"
+version = "1.7.0"
 
 [package.dependencies]
 zipp = ">=0.5"
@@ -425,6 +426,14 @@ name = "jmespath"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "0.10.0"
+
+[[package]]
+category = "dev"
+description = "Python library for serializing any arbitrary object graph into JSON"
+name = "jsonpickle"
+optional = false
+python-versions = "*"
+version = "1.3"
 
 [[package]]
 category = "dev"
@@ -972,8 +981,8 @@ idna-ssl = [
     {file = "idna-ssl-1.1.0.tar.gz", hash = "sha256:a933e3bb13da54383f9e8f35dc4f9cb9eb9b3b78c6b36f311254d6d0d92c6c7c"},
 ]
 importlib-metadata = [
-    {file = "importlib_metadata-2.0.0-py2.py3-none-any.whl", hash = "sha256:cefa1a2f919b866c5beb7c9f7b0ebb4061f30a8a9bf16d609b000e2dfaceb9c3"},
-    {file = "importlib_metadata-2.0.0.tar.gz", hash = "sha256:77a540690e24b0305878c37ffd421785a6f7e53c8b5720d211b211de8d0e95da"},
+    {file = "importlib_metadata-1.7.0-py2.py3-none-any.whl", hash = "sha256:dc15b2969b4ce36305c51eebe62d418ac7791e9a157911d58bfb1f9ccd8e2070"},
+    {file = "importlib_metadata-1.7.0.tar.gz", hash = "sha256:90bb658cdbbf6d1735b6341ce708fc7024a3e14e99ffdc5783edea9f9b077f83"},
 ]
 iniconfig = [
     {file = "iniconfig-1.0.1-py3-none-any.whl", hash = "sha256:80cf40c597eb564e86346103f609d74efce0f6b4d4f30ec8ce9e2c26411ba437"},
@@ -982,6 +991,10 @@ iniconfig = [
 jmespath = [
     {file = "jmespath-0.10.0-py2.py3-none-any.whl", hash = "sha256:cdf6525904cc597730141d61b36f2e4b8ecc257c420fa2f4549bac2c2d0cb72f"},
     {file = "jmespath-0.10.0.tar.gz", hash = "sha256:b85d0567b8666149a93172712e68920734333c0ce7e89b78b3e987f71e5ed4f9"},
+]
+jsonpickle = [
+    {file = "jsonpickle-1.3-py2.py3-none-any.whl", hash = "sha256:efc6839cb341985f0c24f98650a4c1063a2877c236ffd3d7e1662f0c482bac93"},
+    {file = "jsonpickle-1.3.tar.gz", hash = "sha256:71bca2b80ae28af4e3f86629ef247100af7f97032b5ca8d791c1f8725b411d95"},
 ]
 jsonschema = [
     {file = "jsonschema-3.2.0-py2.py3-none-any.whl", hash = "sha256:4e5b3cf8216f577bee9ce139cbe72eca3ea4f292ec60928ff24758ce626cd163"},
