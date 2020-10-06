@@ -110,7 +110,6 @@ class ConfigS3(query.ConfigSource):
 
         # owner is under acl per describe
         resource.pop('Owner', None)
-        resource['CreationDate'] = parse_date(resource['CreationDate'])
 
         for k, null_value in S3_CONFIG_SUPPLEMENT_NULL_MAP.items():
             if cfg.get(k) == null_value:
