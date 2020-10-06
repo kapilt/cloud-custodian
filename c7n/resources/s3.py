@@ -42,7 +42,6 @@ from botocore.exceptions import ClientError
 
 from collections import defaultdict
 from concurrent.futures import as_completed
-from dateutil.parser import parse as parse_date
 
 try:
     from urllib3.exceptions import SSLError
