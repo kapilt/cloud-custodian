@@ -2236,7 +2236,7 @@ class UserGroupDelete(BaseAction):
             - type: delete
               force: True
     """
-    schema = type_schema('delete', force={'type': 'boolean'})
+    schema = type_schema('delete', force={'type': 'boolean'}, force_delay={'type': 'integer'})
     permissions = ('iam:DeleteGroup', 'iam:RemoveUserFromGroup')
 
     def process(self, resources):
@@ -2252,6 +2252,9 @@ class UserGroupDelete(BaseAction):
             for user in users:
                 client.remove_user_from_group(
                     UserName=user['UserName'], GroupName=r['GroupName'])
+            if users:
+                # wait for iam to convert
+                time.sleep(self.data.get('force_delay', 5))
 
         try:
             client.delete_group(GroupName=r['GroupName'])

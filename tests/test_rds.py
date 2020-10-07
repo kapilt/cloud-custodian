@@ -870,6 +870,13 @@ class RDSTest(BaseTest):
 
 class RDSSnapshotTest(BaseTest):
 
+    def test_rds_snapshot_get_resource(self):
+        factory = self.record_flight_data('test_rds_snapshot_get_resources')
+        p = self.load_policy({
+            'name': 'rds-snap',
+            'resource': 'aws.rds-snapshot'}, session_factory=session_factory)
+        p.resource_manager.get_resources([])
+        
     def test_rds_snapshot_copy_tags_enable(self):
         session_factory = self.replay_flight_data("test_rds_snapshot_copy_tags_enable")
         client = session_factory(region="us-east-1").client("rds")
