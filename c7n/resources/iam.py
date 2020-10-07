@@ -2254,7 +2254,7 @@ class UserGroupDelete(BaseAction):
                     UserName=user['UserName'], GroupName=r['GroupName'])
             if users:
                 # wait for iam to convert
-                time.sleep(self.data.get('force_delay', 5))
+                time.sleep(self.data.get('force_delay', 30))
 
         try:
             client.delete_group(GroupName=r['GroupName'])
