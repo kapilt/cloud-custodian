@@ -15,6 +15,7 @@ from c7n.actions import BaseAction
 from c7n.utils import type_schema
 from c7n.tags import universal_augment
 
+from c7n.resources.aws import Arn
 from c7n.resources.securityhub import PostFinding
 
 
