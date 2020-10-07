@@ -278,13 +278,13 @@ class ConfigS3(query.ConfigSource):
     def handle_BucketReplicationConfiguration(self, resource, item_value):
         d = {'Role': item_value['roleARN'], 'Rules': []}
         for rid, r in item_value['rules'].items():
-            rule = filter_empty({
+            rule = {
                 'ID': rid,
                 'Status': r.get('status', ''),
-                'Prefix': r.get('prefix'),
+                'Prefix': r.get('prefix', ''),
                 'Destination': {
                     'Bucket': r['destinationConfig']['bucketARN']}
-            })
+            }
             if 'Account' in r['destinationConfig']:
                 rule['Destination']['Account'] = r['destinationConfig']['Account']
             if r['destinationConfig'].get('storageClass'):
