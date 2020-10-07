@@ -116,11 +116,18 @@ def test_route53_hostedzone_delete(test, route53_hostedzone_delete):
         "actions": ["delete"]},
         session_factory=session_factory)
 
-    p.run()
+    resources = p.run()
 
-    if test.recording:
+    start = time.time()
+    if test.recording and resources:
         # wait for hosted zone deletion
         time.sleep(30)
+        resources = client.list_hosted_zones_by_name(
+            DNSName=route53_hostedzone_delete['aws_route53_zone.test_hosted_zone.name']
+        ).get('HostedZones')
+        # max wait time
+        if time.time() - start > 300:
+            resources = []
 
     assert client.list_hosted_zones_by_name(
         DNSName=route53_hostedzone_delete['aws_route53_zone.test_hosted_zone.name']
