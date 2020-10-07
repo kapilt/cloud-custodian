@@ -953,19 +953,6 @@ class RDSSubscriptionDelete(BaseAction):
 
 class DescribeRDSSnapshot(DescribeSource):
 
-    def get_resources(self, resource_ids):
-        resources = []
-        client = local_session(self.manager.session_factory).client('rds')
-
-        for r in resource_ids:
-            try:
-                resources.extend(
-                    client.describe_db_snapshots(
-                        DBSnapshotIdentifier=r).get('DBSnapshots', []))
-            except client.exceptions.DBSnapshotNotFoundFault:
-                continue
-        return resources
-
     def augment(self, snaps):
         return universal_augment(
             self.manager, super(DescribeRDSSnapshot, self).augment(snaps))
