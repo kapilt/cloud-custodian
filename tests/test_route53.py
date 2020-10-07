@@ -119,7 +119,7 @@ def test_route53_hostedzone_delete(test, route53_hostedzone_delete):
     resources = p.run()
 
     start = time.time()
-    if test.recording and resources:
+    while test.recording and resources:
         # wait for hosted zone deletion
         time.sleep(30)
         resources = client.list_hosted_zones_by_name(
