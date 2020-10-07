@@ -101,7 +101,7 @@ class CodeBuild(BaseTest):
             session_factory=factory).run()
         assert set(config_resources[0].keys()) == (
             set(resources[0].keys()).difference(('created', 'lastModified', 'badge')))
-        
+
     def test_query_builds(self):
         factory = self.replay_flight_data("test_codebuild")
         p = self.load_policy(

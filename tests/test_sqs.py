@@ -9,7 +9,7 @@ import json
 import pytest
 import time
 
-from c7n.resources.aws import shape_validate
+from c7n.resources.aws import shape_validate, Arn
 
 
 def test_sqs_config_translate(test):
@@ -22,6 +22,7 @@ def test_sqs_config_translate(test):
         'mode': {'type': 'config-rule'}})
     config = p.resource_manager.get_source('config')
     resource = config.load_resource(event['detail']['configurationItem'])
+    Arn.parse(resource['QueueArn']).resource == 'config-changes'
     assert resource == {
         'CreatedTimestamp': '1602023249',
         'DelaySeconds': '0',
