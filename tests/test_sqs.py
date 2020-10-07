@@ -28,7 +28,7 @@ def test_sqs_config_translate(test):
         'LastModifiedTimestamp': '1602023249',
         'MaximumMessageSize': '262144',
         'MessageRetentionPeriod': '345600',
-        'Policy': '{"Version":"2012-10-17","Statement":[{"Sid":"","Effect":"Allow","Principal":{"Service":"events.amazonaws.com"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:644160558196:config-changes"}]}',
+        'Policy': '{"Version":"2012-10-17","Statement":[{"Sid":"","Effect":"Allow","Principal":{"Service":"events.amazonaws.com"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:644160558196:config-changes"}]}', # noqa
         'QueueArn': 'arn:aws:sqs:us-east-1:644160558196:config-changes',
         'QueueUrl': 'https://sqs.us-east-1.amazonaws.com/644160558196/config-changes',
         'ReceiveMessageWaitTimeSeconds': '0',
