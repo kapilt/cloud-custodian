@@ -205,7 +205,7 @@ class RemoveLaunchPermissions(BaseAction):
             return
         client.modify_image_attribute(
             ImageId=image['ImageId'],
-            LaunchPermissions={'Remove': remove},
+            LaunchPermission={'Remove': remove},
             OperationType='remove')
 
 
