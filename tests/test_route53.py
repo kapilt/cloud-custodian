@@ -111,7 +111,6 @@ class Route53HostedZoneTest(BaseTest):
 
 @terraform('route53_hostedzone_delete', teardown=terraform.TEARDOWN_IGNORE)
 def test_route53_hostedzone_delete(test, route53_hostedzone_delete):
-    print('running test')
     session_factory = test.replay_flight_data("test_route53_hostedzone_delete")
     client = session_factory().client("route53")
     pdata = {

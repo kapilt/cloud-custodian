@@ -245,9 +245,14 @@ class Delete(BaseAction):
         paginator = client.get_paginator('list_resource_record_sets')
         paginator.PAGE_ITERATOR_CLS = RetryPageIterator
         rrsets = paginator.paginate(HostedZoneId=hz['Id']).build_full_result()
+
         for rrset in rrsets['ResourceRecordSets']:
             # Trigger the deletion of all the resource record sets before deleting
             # the hosted zone
+
+            # Exempt the two zone associated mandatory records
+            if rrset['Name'] == hz['Name'] and rrset['Type'] in ('NS', 'SOA'):
+                continue
             self.manager.retry(
                 client.change_resource_record_sets,
                 HostedZoneId=hz['Id'],
