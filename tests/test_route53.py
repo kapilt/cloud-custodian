@@ -124,7 +124,7 @@ def test_route53_hostedzone_delete(test, route53_hostedzone_delete):
 
     p = test.load_policy(pdata, session_factory=session_factory)
     with pytest.raises(ClientError) as ecm:
-        resources = p.run()
+        p.run()
     assert ecm.value.response['Error']['Code'] == 'HostedZoneNotEmpty'
     assert "set force to remove all records in zone" in output.getvalue()
 
