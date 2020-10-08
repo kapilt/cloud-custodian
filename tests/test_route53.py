@@ -130,7 +130,7 @@ def test_route53_hostedzone_delete(test, route53_hostedzone_delete):
 
     pdata['actions'] = [{'type': 'delete', 'force': True}]
     p = test.load_policy(pdata, session_factory=session_factory)
-    resources = p.run()
+    p.run()
 
     if test.recording:
         time.sleep(3)
