@@ -50,8 +50,8 @@ class TestAMI(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertEqual(
-            resources[0]['c7n:CrossAccountViolations'],
-            ['665544332211', '112233445566'])
+            sorted(resources[0]['c7n:CrossAccountViolations']),
+            ['112233445566', '665544332211'])
 
         client = factory().client('ec2')
         perms = client.describe_image_attribute(
