@@ -216,6 +216,16 @@ class DeleteProject(BaseAction):
                 "Exception deleting project:\n %s" % e)
 
 
+class ConfigPipeline(ConfigSource):
+
+    def load_resource(self, item):
+        item_config = item['configuration']
+        resource = item_config.pop('pipeline')
+        resource.update(item_config['metadata'])
+        self._load_supplementary_tags(resource, item)
+        return resource
+
+
 class DescribePipeline(DescribeSource):
 
     def augment(self, resources):
@@ -239,7 +249,7 @@ class CodeDeployPipeline(QueryResourceManager):
 
     source_mapping = {
         'describe': DescribePipeline,
-        'config': ConfigSource
+        'config': ConfigPipeline
     }
 
 

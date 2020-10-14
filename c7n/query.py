@@ -350,15 +350,17 @@ class ConfigSource:
                 resource['Tags'] = [
                     {u'Key': k, u'Value': v} for k, v in item['tags'].items()]
             else:
-                # config has a bit more variation on tags (serialized json, list, dict, etc)
-                stags = item['supplementaryConfiguration']['Tags']
-                if isinstance(stags, str):
-                    stags = json.loads(stags)
-                if isinstance(stags, list):
-                    resource['Tags'] = [{u'Key': t['key'], u'Value': t['value']} for t in stags]
-                elif isinstance(stags, dict):
-                    resource['Tags'] = [{u'Key': k, u'Value': v} for k, v in stags.items()]
+                self._load_supplementary_tags(resource, item)
         return resource
+
+    def _load_supplementary_tags(self, resource, item):
+        stags = item['supplementaryConfiguration']['Tags']
+        if isinstance(stags, str):
+            stags = json.loads(stags)
+        if isinstance(stags, list):
+            resource['Tags'] = [{u'Key': t['key'], u'Value': t['value']} for t in stags]
+        elif isinstance(stags, dict):
+            resource['Tags'] = [{u'Key': k, u'Value': v} for k, v in stags.items()]
 
     def get_listed_resources(self, client):
         # fallback for when config decides to arbitrarily break select
