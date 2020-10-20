@@ -15,6 +15,9 @@ from c7n.utils import local_session
 
 class LogicAppTest(BaseTest):
 
+    def test_valid_schema(self):
+        assert 'url' not in LogicAppAction.schema['properties']
+
     def test_valid_policy(self):
         policy = {
             "name": "logic-app",
