@@ -142,6 +142,10 @@ def type_schema(
         s['additionalProperties'] = False
 
     s['properties'].update(props)
+
+    for k, v in props.items():
+        if v is None:
+            del s['properties'][k]
     if not required:
         required = []
     if isinstance(required, list):
