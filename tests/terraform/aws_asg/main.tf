@@ -21,7 +21,7 @@ resource "aws_launch_template" "foobar" {
 }
 
 resource "aws_autoscaling_group" "bar" {
-  availability_zones = ["us-east-1a"]
+  availability_zones = ["us-east-1d"]
   desired_capacity   = 1
   max_size           = 1
   min_size           = 1
@@ -30,7 +30,7 @@ resource "aws_autoscaling_group" "bar" {
     id      = aws_launch_template.foobar.id
     version = "$Latest"
   }
-  tags {
+  tag {
     key = "App"
     value = "Testing"
     propagate_at_launch = true
