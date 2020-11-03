@@ -2285,6 +2285,9 @@ class SamlProviderDescribe(DescribeSource):
             r['IDPSSODescriptor'] = root['IDPSSODescriptor']
         return resources
 
+    def get_permissions(self):
+        return ('iam:GetSAMLProvider', 'iam:ListSAMLProviders')
+
 
 def sso_metadata(md):
     root = ElementTree.fromstringlist(md)
@@ -2309,6 +2312,7 @@ class SamlProvider(QueryResourceManager):
     we parse and expose attributes of the SAML Metadata XML Document
     as resources attribute for use with custodian's standard value filter.
     """
+
     class resource_type(TypeInfo):
 
         service = 'iam'
@@ -2322,6 +2326,12 @@ class SamlProvider(QueryResourceManager):
     source_mapping = {'describe': SamlProviderDescribe}
 
 
+class OpenIdDescribe(DescribeSource):
+
+    def get_permissions(self):
+        return ('iam:GetOpenIDConnectProvider', 'iam:ListOpenIDConnectProviders')
+
+
 @resources.register('iam-oidc-provider')
 class OpenIdProvider(QueryResourceManager):
 
@@ -2329,8 +2339,10 @@ class OpenIdProvider(QueryResourceManager):
 
         service = 'iam'
         name = id = 'Arn'
-        enum_spec = 'list_open_id_connect_providers'
-        detail_spec = 'get_open_id_connect_provider'
+        enum_spec = ('list_open_id_connect_providers', 'OpenIDConnectProviderList', None)
+        detail_spec = ('get_open_id_connect_provider', 'OpenIDConnectProviderArn', 'Arn', None)
         arn = 'Arn'
         arn_type = 'oidc-provider'
         global_resource = True
+
+    source_mapping = {'describe': OpenIdDescribe}
