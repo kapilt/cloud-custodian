@@ -103,6 +103,7 @@ class AutoTagUser(EventAction):
         if user is None:
             return
         # if the auto-tag-user policy set update to False (or it's unset) then we
+        return principal_id_value
 
     def process(self, resources, event):
         if event is None:
@@ -132,12 +133,13 @@ class AutoTagUser(EventAction):
         }
         # if principal_id_key is set (and value), we'll set the principalId tag.
         principal_id_key = self.data.get('principal_id_tag', None)
-        if principal_id_key and principal_id_value:
-            new_tags[principal_id_key] = principal_id_value
+        if principal_id_key and user:
+            new_tags[principal_id_key] = user
 
-        self.set_resource_tags(tags, untagged_resources)
+        self.set_resource_tags(new_tags, untagged_resources)
 
     def set_resource_tag(self, tags, resources):
+        tag_action = self.manager.action_registry.get('tag')
         for key, value in tags.items():
             tag_action({'key': key, 'value': value}, self.manager).process(resources)
 
