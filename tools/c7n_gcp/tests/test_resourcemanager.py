@@ -155,7 +155,8 @@ class ProjectTest(BaseTest):
                 'labels': {
                     'env_type': 'dev',
                     'app': 'c7n'}
-            }]}, session_factory=factory)
+            }]},
+            session_factory=factory)
         resources = p.run()
         assert len(resources) == 1
         client = p.resource_manager.get_client()
