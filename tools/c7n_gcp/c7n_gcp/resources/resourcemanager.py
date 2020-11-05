@@ -7,6 +7,7 @@ from c7n_gcp.query import QueryResourceManager, TypeInfo
 
 from c7n.utils import type_schema
 
+
 @resources.register('organization')
 class Organization(QueryResourceManager):
     """GCP resource: https://cloud.google.com/resource-manager/reference/rest/v1/organizations
