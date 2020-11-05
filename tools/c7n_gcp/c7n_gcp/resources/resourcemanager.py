@@ -5,7 +5,7 @@ from c7n_gcp.actions import SetIamPolicy, MethodAction
 from c7n_gcp.provider import resources
 from c7n_gcp.query import QueryResourceManager, TypeInfo
 
-from c7n.utils import type_schema
+from c7n.utils import type_schema, local_session
 
 
 @resources.register('organization')
@@ -53,6 +53,15 @@ class Folder(QueryResourceManager):
             "name", "displayName", "lifecycleState", "createTime", "parent"]
         asset_type = "cloudresourcemanager.googleapis.com/Folder"
         perm_service = 'resourcemanager'
+
+    def get_resources(self, resource_ids):
+        client = self.get_client()
+        results = []
+        for rid in resource_ids:
+            if not rid.startswith('folders/'):
+                rid = 'folders/%s' % rid
+            results.append(client.execute_query('get', {'name': rid}))
+        return results
 
     def get_resource_query(self):
         if 'query' in self.data:
@@ -123,3 +132,42 @@ class ProjectSetIamPolicy(SetIamPolicy):
         verb_arguments = SetIamPolicy._verb_arguments(self, resource)
         verb_arguments['body'] = {}
         return verb_arguments
+
+
+class HierarchyAction(MethodAction):
+
+    def load_hierarchy(self, resources):
+        parents = {}
+        folder_ids = set()
+        session = local_session(self.manager.session_factory)
+        for r in resources:
+            client = self.get_client(session, self.manager.resource_type)
+            ancestors = client.execute_command(
+                'getAncestry', {'projectId': r['projectId']}).get('ancestor')
+            parents[r['projectId']] = ancestors
+            for a in ancestors[1:-1]:
+                if a['resourceId']['type'] != 'folder':
+                    continue
+                folder_ids.add(a['resourceId']['id'])
+        self.parents = parents
+        self.folder_ids = folder_ids
+
+    def load_folders(self):
+        folder_manager = self.manager.get_resource_manager('gcp.folder')
+        self.folders = {
+            f['name'].split('/', 1)[-1]: f for f in
+            folder_manager.get_resources(list(self.folder_ids))}
+
+    def load_metadata(self, folders):
+        raise NotImplementedError()
+
+    def diff(self, resources):
+        raise NotImplementedError()
+
+    def process(self, resources):
+        self.load_hierarchy(resources)
+        self.load_metadata()
+        op_set = self.diff(resources)
+        client = self.resource_manager.get_client()
+        for op in op_set:
+            self.invoke_op(client, *op)
