@@ -122,6 +122,29 @@ class FolderTest(BaseTest):
 
 class ProjectTest(BaseTest):
 
+    def test_project_label(self):
+        factory = self.replay_flight_data('project-set-labels')
+        p = self.load_policy({
+            'name': 'p-set-labels',
+            'resource': 'gcp.project',
+            'query': [
+                {'filter': 'id:c7n-test-target'}],
+            'filters': [
+                {'tag:app': 'absent'}],
+            'actions': [{
+                'type': 'set-labels',
+                'labels': {
+                    'env_type': 'dev',
+                    'app': 'c7n'}
+                }]
+            }, session_factory=factory)
+        resources = p.run()
+        assert len(resources) == 1
+        client = p.resource_manager.get_client()
+        project = client.execute_query(
+            'get', {'projectId': 'c7n-test-target'})
+        assert project['labels'] == {'app': 'c7n', 'env_type': 'dev'}
+
     def test_project_set_iam_policy(self):
         resource_full_name = 'cloud-custodian'
         get_iam_policy_params = {'resource': resource_full_name, 'body': {}}

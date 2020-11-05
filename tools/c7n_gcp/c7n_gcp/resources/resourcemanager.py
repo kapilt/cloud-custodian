@@ -74,6 +74,23 @@ class Project(QueryResourceManager):
             "name", "displayName", "lifecycleState", "createTime", "parent"]
         asset_type = "cloudresourcemanager.googleapis.com/Project"
         perm_service = 'resourcemanager'
+        labels = True
+        labels_op = 'update'
+
+        @staticmethod
+        def get_label_params(resource, labels):
+            return {'projectId': resource['projectId'],
+                    'body': {
+                        'name': resource['name'],
+                        'parent': resource['parent'],
+                        'labels': labels}}
+
+    def get_resource_query(self):
+        # https://cloud.google.com/resource-manager/reference/rest/v1/projects/list
+        if 'query' in self.data:
+            for child in self.data.get('query'):
+                if 'filter' in child:
+                    return {'filter': child['filter']}
 
 
 @Project.action_registry.register('set-iam-policy')
