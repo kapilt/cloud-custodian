@@ -1836,7 +1836,7 @@ class SAMLProviderTests(BaseTest):
         resources = p.run()
         assert len(resources) == 1
         self.assertJmes(
-            'IDPSSODescriptor.SingleSignOnService.Location',
+            'IDPSSODescriptor.SingleSignOnService[0].Location',
             resources[0],
             'https://portal.sso.us-east-1.amazonaws.com/saml/assertion/MDMwNTk1ODQ3MDk5X2lucy')
 

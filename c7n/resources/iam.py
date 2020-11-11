@@ -2299,7 +2299,14 @@ def sso_metadata(md):
 def _sso_recurse(node, d):
     d.update(node.attrib)
     for c in node:
-        d[c.tag.split('}', 1)[-1]] = cd = {}
+        k = c.tag.split('}', 1)[-1]
+        cd = {}
+        if k in d:
+            if not isinstance(d[k], list):
+                d[k] = [d[k]]
+            d[k].append(cd)
+        else:
+            d[k] = cd
         _sso_recurse(c, cd)
     if node.text and node.text.strip():
         d['Value'] = node.text.strip()
