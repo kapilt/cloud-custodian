@@ -4,6 +4,7 @@
 import logging
 
 import time
+import os
 
 from c7n_gcp.resources.resourcemanager import HierarchyAction
 from gcp_common import BaseTest
@@ -122,6 +123,38 @@ class FolderTest(BaseTest):
 
 
 class ProjectTest(BaseTest):
+
+    def test_propagate_tags(self):
+        factory = self.replay_flight_data('project-propagate-tags')
+
+        label_path = os.path.join(
+            os.path.dirname(__file__), 'data', 'folder-labels.json')
+
+        p = self.load_policy({
+            'name': 'p-label',
+            'resource': 'gcp.project',
+            'query': [
+                {'filter': 'parent.id:389734459213 parent.type:folder'}],
+            'filters': [
+                {'tag:cost-center': 'absent'}],
+            'actions': [
+                {'type': 'propagate-labels',
+                 'folder-labels': {
+                     'url': 'file://%s' % label_path}}
+            ],
+        }, session_factory=factory)
+        resources = p.run()
+        assert len(resources) == 3
+        # verify we successfully filtered out non active projects
+        assert {r['lifecycleState'] for r in resources} == {'ACTIVE', 'DELETE_REQUESTED'}
+        # verify tags
+        client = p.resource_manager.get_client()
+        project = client.execute_query(
+            'get', {'projectId': 'c7n-test-target'})
+        assert project['labels'] == {'app': 'c7n',
+                                     'cost-center': 'qa',
+                                     'env_type': 'dev',
+                                     'owner': 'testing'}
 
     def test_project_hierarchy(self):
         factory = self.replay_flight_data('project-hierarchy')
