@@ -158,7 +158,7 @@ class HierarchyAction(MethodAction):
             f['name'].split('/', 1)[-1]: f for f in
             folder_manager.get_resources(list(self.folder_ids))}
 
-    def load_metadata(self, folders):
+    def load_metadata(self):
         raise NotImplementedError()
 
     def diff(self, resources):
@@ -168,6 +168,6 @@ class HierarchyAction(MethodAction):
         self.load_hierarchy(resources)
         self.load_metadata()
         op_set = self.diff(resources)
-        client = self.resource_manager.get_client()
+        client = self.manager.get_client()
         for op in op_set:
             self.invoke_op(client, *op)
