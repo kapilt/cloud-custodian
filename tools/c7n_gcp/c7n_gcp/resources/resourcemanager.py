@@ -218,7 +218,7 @@ class ProjectPropagateLabels(HierarchyAction):
          filters:
            - "tag:owner": absent
          actions:
-           - type: propagate-tags
+           - type: propagate-labels
              folder-labels:
                 url: file://folder-labels.json
 
@@ -227,7 +227,7 @@ class ProjectPropagateLabels(HierarchyAction):
 
     """
     schema = type_schema(
-        'propagate-tags',
+        'propagate-labels',
         required=('folder-labels',),
         **{
             'folder-labels': {
