@@ -2,9 +2,11 @@
 # Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 import logging
-
-import time
 import os
+import sys
+import time
+
+import pytest
 
 from c7n_gcp.resources.resourcemanager import HierarchyAction
 from gcp_common import BaseTest
@@ -124,6 +126,8 @@ class FolderTest(BaseTest):
 
 class ProjectTest(BaseTest):
 
+    @pytest.mark.skipif(
+        sys.platform.startswith('win'), reason='windows file path fun')
     def test_propagate_tags(self):
         factory = self.replay_flight_data('project-propagate-tags')
 
