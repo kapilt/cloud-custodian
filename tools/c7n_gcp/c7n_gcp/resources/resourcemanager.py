@@ -237,6 +237,7 @@ class ProjectPropagateLabels(HierarchyAction):
     attr_filter = ('lifecycleState', ('ACTIVE',))
     permissions = ('resourcemanager.folders.get',
                    'resourcemanager.projects.update')
+    method_spec = {'op': 'update'}
 
     def load_metadata(self):
         """Load hierarchy tags"""
