@@ -182,22 +182,61 @@ class HierarchyAction(MethodAction):
 class ProjectPropagateLabels(HierarchyAction):
     """Propagate labels from the organization hierarchy to a project.
 
-    folder-labels should resolve to a data mapping of folder id to labels that should
-    be applied to descendants.
+    folder-labels should resolve to a json data mapping of folder path
+    to labels that should be applied to contained projects.
+
+    as a worked example assume the following resource hierarchy
+
+    ::
+
+      - /dev
+           /network
+              /project-a
+           /ml
+              /project-b
+
+    Given a folder-labels json with contents like
+
+    .. code-block:: json
+
+      {"dev": {"env": "dev", "owner": "dev"},
+       "dev/network": {"owner": "network"},
+       "dev/ml": {"owner": "ml"}
+
+    Running the following policy
+
+    .. code-block:: yaml
+
+      policies:
+       - name: tag-projects
+         resource: gcp.project
+         # use a server side filter to only look at projects
+         # under the /dev folder the id for the dev folder needs
+         # to be manually resolved outside of the policy.
+         query:
+           - filter: "parent.id:389734459211 parent.type:folder"
+         filters:
+           - "tag:owner": absent
+         actions:
+           - type: propagate-tags
+             folder-labels:
+                url: file://folder-labels.json
+
+    Will result in project-a being tagged with owner: network and env: dev
+    and project-b being tagged with owner: ml and env: dev
+
     """
     schema = type_schema(
         'propagate-tags',
         required=('folder-labels',),
         **{
-            'path-label': {'type': 'string'},
-            # 'path': 'eng-dev-network'
-            'display-path': {'type': 'boolean'},
             'folder-labels': {
                 '$ref': '#/definitions/filters_common/value_from'}},
     )
 
-    method_spec = {'op': 'update'}
     attr_filter = ('lifecycleState', ('ACTIVE',))
+    permissions = ('resourcemanager.folders.get',
+                   'resourcemanager.projects.update')
 
     def load_metadata(self):
         """Load hierarchy tags"""
