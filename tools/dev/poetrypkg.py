@@ -70,8 +70,8 @@ def gen_version_file(package_dir, version_file):
 def gen_setup(package_dir):
     """Generate a setup suitable for dev compatibility with pip.
     """
-    from poetry.masonry.builders import sdist
-    from poetry.factory import Factory
+    from poetry.core.masonry.builders import sdist
+    from poetry.core.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
@@ -107,8 +107,8 @@ def gen_setup(package_dir):
 def gen_frozensetup(package_dir, output):
     """Generate a frozen setup suitable for distribution.
     """
-    from poetry.masonry.builders import sdist
-    from poetry.factory import Factory
+    from poetry.core.masonry.builders import sdist
+    from poetry.core.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
@@ -145,7 +145,7 @@ def resolve_source_deps(poetry, package, reqs, frozen=False):
     if not source_deps:
         return
 
-    from poetry.packages.dependency import Dependency
+    from poetry.core.packages.dependency import Dependency
 
     dep_map = {d['name']: d for d in poetry.locker.lock_data['package']}
     seen = set(source_deps)
