@@ -219,10 +219,10 @@ class DeleteProject(BaseAction):
 class ConfigPipeline(ConfigSource):
 
     def load_resource(self, item):
-        item_config = item['configuration']
+        item_config = self._load_item_config(item)
         resource = item_config.pop('pipeline')
         resource.update(item_config['metadata'])
-        self._load_supplementary_tags(resource, item)
+        self._load_resource_tags(resource, item)
         return resource
 
 
