@@ -1,5 +1,3 @@
-# Copyright The Cloud Custodian Authors.
-# SPDX-License-Identifier: Apache-2.0
 # Automatically generated from poetry/pyproject.toml
 # flake8: noqa
 # -*- coding: utf-8 -*-
@@ -21,7 +19,7 @@ install_requires = \
  'applicationinsights>=0.11.9,<0.12.0',
  'apscheduler>=3.6.3,<4.0.0',
  'argcomplete (>=1.12.1,<2.0.0)',
- 'attrs (>=20.2.0,<21.0.0)',
+ 'attrs (>=20.3.0,<21.0.0)',
  'azure-cli-core>=2.0.81,<3.0.0',
  'azure-cosmos>=3.1.2,<4.0.0',
  'azure-cosmosdb-table>=1.0.6,<2.0.0',
@@ -65,9 +63,9 @@ install_requires = \
  'azure-storage-blob>=2.1,<2.2',
  'azure-storage-file>=2.1.0,<3.0.0',
  'azure-storage-queue>=2.1,<2.2',
- 'boto3 (>=1.16.6,<2.0.0)',
- 'botocore (>=1.19.6,<2.0.0)',
- 'c7n (>=0.9.7,<0.10.0)',
+ 'boto3 (>=1.16.19,<2.0.0)',
+ 'botocore (>=1.19.19,<2.0.0)',
+ 'c7n (>=0.9.8,<0.10.0)',
  'click>=7.0,<8.0',
  'distlib>=0.3.0,<0.4.0',
  'importlib-metadata (>=1.7.0,<2.0.0)',
@@ -83,7 +81,7 @@ install_requires = \
  's3transfer (>=0.3.3,<0.4.0)',
  'six (>=1.15.0,<2.0.0)',
  'tabulate (>=0.8.7,<0.9.0)',
- 'urllib3 (>=1.25.11,<2.0.0)',
+ 'urllib3 (>=1.26.2,<2.0.0)',
  'zipp (>=3.4.0,<4.0.0)']
 
 extras_require = \
