@@ -363,6 +363,63 @@ def custodian_archive(packages=None):
     return PythonPackageArchive(sorted(modules))
 
 
+class ResourceTags:
+
+    # - cloud watch event rules
+    # - config rules
+    # - lambda functions
+    # - security hub action?
+
+    arn_attribute = 'Arn'
+
+    def __init__(self, client):
+        self.client = client
+
+    def process(self, previous, current_tags):
+        resource_arn = self._get_arn(previous)
+        old_tags = self._get_tags(previous)
+        tadd, tremove = self.diff(old_tags, new_tags)
+        changed = bool(tadd) or bool(tremove)
+        if tadd:
+            log.debug("Updating resource tags: %s" % resource_arn)
+            self.client.tag_resource(Resource=base_arn, Tags=tadd)
+        if tags_to_remove:
+            log.debug("Removing stale resource tags: %s" % resource_arn)
+            self.client.untag_resource(Resource=resource_arn, TagKeys=tremove)
+        return changed
+
+    def _get_tags(self, resource):
+        return {
+            t['Key']: t['Value'] for t in
+            client.list_tags_for_resource(ResourceArn=self._get_arn(resource)).get('Tags', [])}
+
+    def _get_arn(self, resource):
+        return resource[self.arn_attribute]
+
+    def diff(self, old_tags, new_tags):
+        add = {}
+        remove = set()
+        for k, v in new_tags.items():
+            if k not in old_tags or old_tags[k] != v:
+                add[k] = v
+        for k in old_tags:
+            if k not in new_tags:
+                remove.add(k)
+        return add, list(remove)
+
+
+class LambdaTags(ResourceTags):
+
+    def _get_arn(self, resource):
+        base_arn = resource['Configuration']['FunctionArn']
+        if base_arn.count(':') > 6:  # trim version/alias
+            base_arn = base_arn.rsplit(':', 1)[0]
+        return base_arn
+
+    def _get_tags(self, resource):
+        return resource.get('Tags', ())
+
+
 class LambdaManager:
     """ Provides CRUD operations around lambda functions
     """
@@ -1588,6 +1645,11 @@ class BucketSNSNotification(SNSSubscription):
                                                      NotificationConfiguration=notifies)
             topic_arns = [topic_arn]
         return topic_arns
+
+
+class ConfigRuleTags(ResourceTags):
+
+    arn_attribute = 'ConfigRuleArn'
 
 
 class ConfigRule(AWSEventBase):
