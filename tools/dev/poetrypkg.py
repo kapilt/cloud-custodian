@@ -21,7 +21,11 @@ def cli():
     """
     # If there is a global installation of poetry, prefer that.
     poetry_python_lib = os.path.expanduser('~/.poetry/lib')
-    sys.path.append(os.path.realpath(poetry_python_lib))
+    sys.path.insert(0, os.path.realpath(poetry_python_lib))
+    # poetry env vendored deps
+    sys.path.insert(0,
+        os.path.join(poetry_python_lib, 'poetry', '_vendor', 'py{}.{}'.format(
+            sys.version_info.major, sys.version_info.minor)))
 
 
 # Override the poetry base template as all our readmes files
@@ -71,7 +75,7 @@ def gen_setup(package_dir):
     """Generate a setup suitable for dev compatibility with pip.
     """
     from poetry.core.masonry.builders import sdist
-    from poetry.core.factory import Factory
+    from poetry.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
@@ -108,7 +112,7 @@ def gen_frozensetup(package_dir, output):
     """Generate a frozen setup suitable for distribution.
     """
     from poetry.core.masonry.builders import sdist
-    from poetry.core.factory import Factory
+    from poetry.factory import Factory
 
     factory = Factory()
     poetry = factory.create_poetry(package_dir)
