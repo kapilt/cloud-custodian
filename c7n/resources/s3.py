@@ -350,7 +350,6 @@ class S3(query.QueryResourceManager):
         service = 's3'
         arn_type = ''
         enum_spec = ('list_buckets', 'Buckets[]', None)
-        detail_spec = ('list_objects', 'Bucket', 'Contents[]')
         name = id = 'Name'
         date = 'CreationDate'
         dimension = 'BucketName'

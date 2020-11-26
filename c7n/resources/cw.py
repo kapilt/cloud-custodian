@@ -22,7 +22,8 @@ class Alarm(QueryResourceManager):
         service = 'cloudwatch'
         arn_type = 'alarm'
         enum_spec = ('describe_alarms', 'MetricAlarms', None)
-        id = 'AlarmArn'
+        id = 'AlarmName'
+        arn = 'AlarmArn'
         filter_name = 'AlarmNames'
         filter_type = 'list'
         name = 'AlarmName'
