@@ -350,6 +350,8 @@ class S3(query.QueryResourceManager):
         service = 's3'
         arn_type = ''
         enum_spec = ('list_buckets', 'Buckets[]', None)
+        # not used but we want some consistency on the metadata
+        detail_spec = ('get_bucket_location', 'Bucket', 'Name', 'LocationConstraint')
         name = id = 'Name'
         date = 'CreationDate'
         dimension = 'BucketName'

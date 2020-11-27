@@ -146,8 +146,8 @@ class LogGroup(QueryResourceManager):
         service = 'logs'
         arn_type = 'log-group'
         enum_spec = ('describe_log_groups', 'logGroups', None)
-        name = 'logGroupName'
-        id = 'arn'
+        id = name = 'logGroupName'
+        arn = 'arn'  # see get-arns override re attribute usage
         filter_name = 'logGroupNamePrefix'
         filter_type = 'scalar'
         dimension = 'LogGroupName'
