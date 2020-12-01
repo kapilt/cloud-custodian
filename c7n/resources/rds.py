@@ -74,6 +74,16 @@ class DescribeRDS(DescribeSource):
             self.manager, super(DescribeRDS, self).augment(dbs))
 
 
+class ConfigRDS(ConfigSource):
+
+    def load_resource(self, item):
+        resource = super().load_resource(item)
+        for k in list(resource.keys()):
+            if k.startswith('Db'):
+                resource["DB%s" % k[2:]] = resource[k]
+        return resource
+
+
 @resources.register('rds')
 class RDS(QueryResourceManager):
     """Resource manager for RDS DB instances.
@@ -111,7 +121,7 @@ class RDS(QueryResourceManager):
 
     source_mapping = {
         'describe': DescribeRDS,
-        'config': ConfigSource
+        'config': ConfigRDS
     }
 
 

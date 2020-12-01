@@ -3,8 +3,6 @@
 import logging
 
 from concurrent.futures import as_completed
-from datetime import datetime
-from dateutil.tz import tzutc
 
 from c7n.actions import BaseAction
 from c7n.filters import AgeFilter, CrossAccountAccessFilter
@@ -27,6 +25,16 @@ class DescribeCluster(DescribeSource):
         return tags.universal_augment(self.manager, resources)
 
 
+class ConfigCluster(ConfigSource):
+
+    def load_resource(self, item):
+        resource = super().load_resource(item)
+        for k in list(resource.keys()):
+            if k.startswith('Dbc'):
+                resource["DBC%s" % (k[3:])] = resource[k]
+        return resource
+
+
 @resources.register('rds-cluster')
 class RDSCluster(QueryResourceManager):
     """Resource manager for RDS clusters.
@@ -46,7 +54,7 @@ class RDSCluster(QueryResourceManager):
         cfn_type = config_type = 'AWS::RDS::DBCluster'
 
     source_mapping = {
-        'config': ConfigSource,
+        'config': ConfigCluster,
         'describe': DescribeCluster
     }
 
@@ -374,12 +382,6 @@ class ConfigClusterSnapshot(ConfigSource):
                 k = 'IAMD%s' % k[4:]
                 resource[k] = v
         resource['Tags'] = [{'Key': k, 'Value': v} for k, v in item['tags'].items()]
-
-        utc = tzutc()
-        resource['SnapshotCreateTime'] = datetime.fromtimestamp(
-            resource['SnapshotCreateTime'] / 1000, tz=utc)
-        resource['ClusterCreateTime'] = datetime.fromtimestamp(
-            resource['ClusterCreateTime'] / 1000, tz=utc)
         return resource
 
 
