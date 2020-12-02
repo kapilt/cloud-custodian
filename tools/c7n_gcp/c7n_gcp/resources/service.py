@@ -70,7 +70,6 @@ class Disable(MethodAction):
         usage={'enum': ['SKIP', 'CHECK']})
 
     method_spec = {'op': 'disable'}
-    method_perm = 'update'
 
     def get_resource_params(self, model, resource):
         return {'name': resource['name'],
