@@ -32,17 +32,13 @@ class Service(QueryResourceManager):
 
     def get_resource_query(self):
         # https://cloud.google.com/service-usage/docs/reference/rest/v1/services/list
-        # default to just listing enabled services
+        # default to just listing enabled services, if we add in support for enabling
+        # services we would want to add some user specified query filtering capability
+        # here, ala
         # use::
         #  query:
         #    - filter: "state:DISABLED"
-        # to query all
-        if 'query' in self.data:
-            for child in self.data.get('query'):
-                if 'filter' in child:
-                    return {'filter': child['filter']}
-        else:
-            return {'filter': 'state:ENABLED'}
+        return {'filter': 'state:ENABLED'}
 
 
 @Service.action_registry.register('disable')
