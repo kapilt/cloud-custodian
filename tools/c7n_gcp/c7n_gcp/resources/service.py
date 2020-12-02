@@ -28,8 +28,21 @@ class Service(QueryResourceManager):
 
         @staticmethod
         def get(client, resource_info):
-            serviceName = resource_info['resourceName'].rsplit('/', 1)[-1][1:-1]
-            return {'serviceName': serviceName}
+            return client.execute_command('get', {'name': resource_info['resourceName']})
+
+    def get_resource_query(self):
+        # https://cloud.google.com/service-usage/docs/reference/rest/v1/services/list
+        # default to just listing enabled services
+        # use::
+        #  query:
+        #    - filter: "state:DISABLED"
+        # to query all
+        if 'query' in self.data:
+            for child in self.data.get('query'):
+                if 'filter' in child:
+                    return {'filter': child['filter']}
+        else:
+            return {'filter': 'state:ENABLED'}
 
 
 @Service.action_registry.register('disable')
