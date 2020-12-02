@@ -21,13 +21,13 @@ class ServiceTest(BaseTest):
             {'name': 'disable-service',
              'resource': 'gcp.service',
              'filters': [
-                 {'serviceName': 'deploymentmanager.googleapis.com'}],
+                 {'config.name': 'deploymentmanager.googleapis.com'}],
              'actions': ['disable']},
             session_factory=factory)
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        self.assertEqual(
-            resources[0]['serviceName'],
+        self.assertJmes('config.name',
+            resources[0],
             'deploymentmanager.googleapis.com')
 
     def test_service_get(self):
