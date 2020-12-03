@@ -107,6 +107,12 @@ def filter_empty(d):
     return d
 
 
+# We need a minimum floor when examining possible timestamp
+# values to distinguish from other numeric time usages. Use
+# the S3 Launch Date.
+DATE_FLOOR = time.mktime((2006, 3, 19, 0, 0, 0, 0, 0, 0))
+
+
 def parse_date(v, tz=None):
     """Handle various permutations of a datetime serialization
     to a datetime with the given timezone.
@@ -124,7 +130,7 @@ def parse_date(v, tz=None):
             return v.astimezone(tz)
         return v
 
-    if isinstance(v, str):
+    if isinstance(v, str) and not v.isdigit():
         try:
             return parse(v).astimezone(tz)
         except (AttributeError, TypeError, ValueError, OverflowError):
@@ -135,14 +141,16 @@ def parse_date(v, tz=None):
 
     if isinstance(v, (int, float, str)):
         try:
-            v = datetime.fromtimestamp(float(v)).astimezone(tz)
+            if float(v) > DATE_FLOOR:
+                v = datetime.fromtimestamp(float(v)).astimezone(tz)
         except exceptions:
             pass
 
     if isinstance(v, (int, float, str)):
+        # try interpreting as milliseconds epoch
         try:
-            # try interpreting as milliseconds epoch
-            v = datetime.fromtimestamp(float(v) / 1000).astimezone(tz)
+            if float(v) > DATE_FLOOR:
+                v = datetime.fromtimestamp(float(v) / 1000).astimezone(tz)
         except exceptions:
             pass
 
@@ -262,8 +270,8 @@ def camelResource(obj, implicitDate=False):
                 try:
                     dv = parse_date(v)
                 except ParserError:
-                    pass
-                else:
+                    dv = None
+                if dv:
                     obj["%s%s" % (k[0].upper(), k[1:])] = dv
         if isinstance(v, dict):
             camelResource(v)
