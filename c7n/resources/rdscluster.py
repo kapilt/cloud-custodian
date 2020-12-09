@@ -29,6 +29,7 @@ class ConfigCluster(ConfigSource):
 
     def load_resource(self, item):
         resource = super().load_resource(item)
+        resource.pop('TagList', None)  # we pull tags from supplementary config
         for k in list(resource.keys()):
             if k.startswith('Dbc'):
                 resource["DBC%s" % (k[3:])] = resource.pop(k)
