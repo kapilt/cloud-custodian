@@ -125,7 +125,7 @@ class AutoTagCreator(BaseTest):
         auto_tag_user.data = {"tag": "CreatorName", "principal_id_tag": "CreatorId"}
         auto_tag_user.manager = MagicMock()
         result = auto_tag_user.process(resources, event)
-        self.assertEqual(result["CrleatorName"], "c7nbot")
+        self.assertEqual(result["CreatorName"], "c7nbot")
         self.assertEqual(result["CreatorId"], "AIDAJEZOTH6YPO3DY45QW")
 
         # check that it doesn't set principalId if not specified regular IAMUser creator
