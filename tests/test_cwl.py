@@ -23,8 +23,8 @@ def test_tagged_log_group_delete(test, log_delete):
 
     resources = p.run()
     assert len(resources) == 1
-    log_arn = log_delete['aws_cloudwatch_log_group.test_group.arn']
-
+    assert resources[0]['logGroupName'] == log_delete[
+        'aws_cloudwatch_log_group.test_group.name']
     client = factory().client('logs')
     assert client.describe_log_groups(
         logGroupNamePrefix=resources[0]['logGroupName']).get(
