@@ -465,10 +465,9 @@ def assemble_bucket(item):
             # https://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGETlocation.html
             if b_location is None:
                 b_location = "us-east-1"
-                v['LocationConstraint'] = b_location
             elif b_location == 'EU':
                 b_location = "eu-west-1"
-                v['LocationConstraint'] = b_location
+                v['LocationConstraint'] = 'eu-west-1'
             if v and v != c_location:
                 c = s.client('s3', region_name=b_location)
             elif c_location != location:
