@@ -576,23 +576,8 @@ class LambdaManager:
             ReservedConcurrentExecutions=func.concurrency)
 
     def _update_tags(self, existing, new_tags):
-        # tag dance
-        base_arn = existing['Configuration']['FunctionArn']
-        if base_arn.count(':') > 6:  # trim version/alias
-            base_arn = base_arn.rsplit(':', 1)[0]
-
-        tags_to_add, tags_to_remove = self.diff_tags(
-            existing.get('Tags', {}), new_tags)
-        changed = False
-        if tags_to_add:
-            log.debug("Updating function tags: %s" % base_arn)
-            self.client.tag_resource(Resource=base_arn, Tags=tags_to_add)
-            changed = True
-        if tags_to_remove:
-            log.debug("Removing function stale tags: %s" % base_arn)
-            self.client.untag_resource(Resource=base_arn, TagKeys=tags_to_remove)
-            changed = True
-        return changed
+        tagger = LambdaTags(self.client)
+        return tagger.process(existing, new_tags)
 
     def _upload_func(self, s3_uri, func, archive):
         from boto3.s3.transfer import S3Transfer, TransferConfig
