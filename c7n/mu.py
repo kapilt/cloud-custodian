@@ -378,12 +378,12 @@ class ResourceTags:
     def process(self, previous, current_tags):
         resource_arn = self._get_arn(previous)
         old_tags = self._get_tags(previous)
-        tadd, tremove = self.diff(old_tags, new_tags)
+        tadd, tremove = self.diff(old_tags, current_tags)
         changed = bool(tadd) or bool(tremove)
         if tadd:
             log.debug("Updating resource tags: %s" % resource_arn)
-            self.client.tag_resource(Resource=base_arn, Tags=tadd)
-        if tags_to_remove:
+            self.client.tag_resource(Resource=resource_arn, Tags=tadd)
+        if tremove:
             log.debug("Removing stale resource tags: %s" % resource_arn)
             self.client.untag_resource(Resource=resource_arn, TagKeys=tremove)
         return changed
@@ -391,7 +391,7 @@ class ResourceTags:
     def _get_tags(self, resource):
         return {
             t['Key']: t['Value'] for t in
-            client.list_tags_for_resource(ResourceArn=self._get_arn(resource)).get('Tags', [])}
+            self.client.list_tags_for_resource(ResourceArn=self._get_arn(resource)).get('Tags', [])}
 
     def _get_arn(self, resource):
         return resource[self.arn_attribute]
