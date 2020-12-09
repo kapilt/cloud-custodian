@@ -5,6 +5,9 @@ from c7n.resources.rdscluster import RDSCluster, _run_cluster_method
 
 from .common import BaseTest, event_data
 
+import pytest
+import sys
+
 
 class RDSClusterTest(BaseTest):
 
@@ -30,6 +33,9 @@ class RDSClusterTest(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 0)
 
+    @pytest.mark.skipif(
+        (sys.version_info.major, sys.version_info.minor) < (3, 7) or sys.platform != 'linux',
+        reason="needs py 3.8")
     def test_rdscluster_config(self):
         factory = self.replay_flight_data('test_rdscluster_config')
         p = self.load_policy(
@@ -39,9 +45,14 @@ class RDSClusterTest(BaseTest):
         describe_resource = p.resource_manager.get_resources(['database-1'])[0]
         config_resource = source.load_resource(
             event_data('rds-cluster.json', 'config')['configurationItems'][0])
+
+        assert {t['Key']: t['Value'] for t in config_resource['Tags']} == {
+            t['Key']: t['Value'] for t in describe_resource['Tags']}
+
         known_keys = (
             'ClusterCreateTime', 'CustomEndpoints', 'DBClusterOptionGroupMemberships',
-            'EnabledCloudwatchLogsExports', 'LatestRestorableTime', 'EarliestRestorableTime')
+            'EnabledCloudwatchLogsExports', 'LatestRestorableTime',
+            'EarliestRestorableTime', 'Tags')
         for kk in known_keys:
             config_resource.pop(kk, None)
             describe_resource.pop(kk, None)
