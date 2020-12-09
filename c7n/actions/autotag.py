@@ -136,7 +136,8 @@ class AutoTagUser(EventAction):
         if principal_id_key and user_info['id']:
             new_tags[principal_id_key] = user_info['id']
 
-        self.set_resource_tags(new_tags, untagged_resources)
+        if new_tags:
+            self.set_resource_tags(new_tags, untagged_resources)
         return new_tags
 
     def set_resource_tags(self, tags, resources):
