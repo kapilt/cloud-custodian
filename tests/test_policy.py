@@ -79,6 +79,13 @@ class PolicyMetaLint(BaseTest):
             },
         )
 
+    def test_resource_type_repr_with_arn_type(self):
+        policy = self.load_policy({'name': 'ecr', 'resource': 'aws.ops-item'})
+        # check the repr absent a config type and cfn type but with an arn type
+        assert policy.resource_manager.resource_type.config_type is None
+        assert policy.resource_manager.resource_type.cfn_type is None
+        assert str(policy.resource_manager.resource_type) == '<TypeInfo AWS::Ssm::Opsitem>'
+
     def test_resource_type_repr(self):
         policy = self.load_policy({'name': 'ecr', 'resource': 'aws.ecr'})
         # check the repr absent a config type but with a cfn type
