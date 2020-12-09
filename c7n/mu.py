@@ -371,13 +371,16 @@ class ResourceTags:
     # - security hub action?
 
     arn_attribute = 'Arn'
+    arn_param = 'ResourceArn'
 
     def __init__(self, client):
         self.client = client
 
-    def process(self, previous, current_tags):
+    def process(self, previous, current_tags, created=False):
         resource_arn = self._get_arn(previous)
-        old_tags = self._get_tags(previous)
+        old_tags = created and {}
+        if not created:
+            old_tags = self._get_tags(previous)
         tadd, tremove = self.diff(old_tags, current_tags)
         changed = bool(tadd) or bool(tremove)
         if tadd:
@@ -389,9 +392,11 @@ class ResourceTags:
         return changed
 
     def _get_tags(self, resource):
+        tag_params = {self.arn_param: self._get_arn(resource)}
         return {
             t['Key']: t['Value'] for t in
-            self.client.list_tags_for_resource(ResourceArn=self._get_arn(resource)).get('Tags', [])}
+            self.client.list_tags_for_resource(
+                **tag_params).get('Tags', [])}
 
     def _get_arn(self, resource):
         return resource[self.arn_attribute]
@@ -1004,6 +1009,15 @@ class AWSEventBase:
         return self._client
 
 
+class EventRuleTags(ResourceTags):
+
+    arn_param = 'ResourceARN'
+
+    def _get_arn(self, resource):
+        # put rule returns rulearn, get returns arn
+        return resource.get('Arn', resource.get('RuleArn'))
+
+
 class CloudWatchEventSource(AWSEventBase):
     """Subscribe a lambda to cloud watch events.
 
@@ -1150,17 +1164,20 @@ class CloudWatchEventSource(AWSEventBase):
         if schedule:
             params['ScheduleExpression'] = schedule
 
+        tagger = EventRuleTags(self.client)
+        created = False
         rule = self.get(func.name)
-
         if rule and self.delta(rule, params):
             log.debug("Updating cwe rule for %s" % func.name)
             response = self.client.put_rule(**params)
         elif not rule:
             log.debug("Creating cwe rule for %s" % (self))
+            created = True
             response = self.client.put_rule(**params)
         else:
             response = {'RuleArn': rule['Arn']}
 
+        tagger.process(response, func.tags, created)
         client = self.session.client('lambda')
         try:
             client.add_permission(
@@ -1718,12 +1735,17 @@ class ConfigRule(AWSEventBase):
         rule = self.get(func.name)
         params = self.get_rule_params(func)
 
+        tagger = ConfigRuleTags(self.client)
+
         if rule and self.delta(rule, params):
             log.debug("Updating config rule for %s" % self)
             rule.update(params)
-            return LambdaRetry(self.client.put_config_rule, ConfigRule=rule)
+            rule = LambdaRetry(self.client.put_config_rule, ConfigRule=rule)
+            tagger.process(rule, func.tags)
+            return rule
         elif rule:
             log.debug("Config rule up to date")
+            tagger.process(rule, func.tags)
             return
         client = self.session.client('lambda')
         try:
@@ -1737,7 +1759,10 @@ class ConfigRule(AWSEventBase):
             pass
 
         log.debug("Adding config rule for %s" % func.name)
-        return LambdaRetry(self.client.put_config_rule, ConfigRule=params)
+
+        rule = LambdaRetry(self.client.put_config_rule, ConfigRule=params)
+        tagger.process(rule, func.tags, created=True)
+        return rule
 
     def remove(self, func):
         rule = self.get(func.name)
