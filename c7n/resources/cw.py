@@ -67,6 +67,20 @@ class AlarmDelete(BaseAction):
                 AlarmNames=[r['AlarmName'] for r in resource_set])
 
 
+@resources.register('event-bridge')
+class EventBridge(QueryResourceManager):
+
+    class resource_type(TypeInfo):
+        service = 'events'
+        arn_type = 'event-bus'
+        arn = 'Arn'
+        enum_spec = ('list_event_buses', 'EventBuses', None)
+        id = name = 'Name'
+        universal_taggable = object()
+
+    augment = universal_augment
+
+
 @resources.register('event-rule')
 class EventRule(QueryResourceManager):
 
