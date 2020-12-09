@@ -37,14 +37,15 @@ class RDSClusterTest(BaseTest):
             session_factory=factory)
         source = p.resource_manager.get_source('config')
         describe_resource = p.resource_manager.get_resources(['database-1'])[0]
-        config_resource = source.load_resource(event_data('rds-cluster.json', 'config')['configurationItems'][0])
-
-        known_keys = ('ClusterCreateTime', 'CustomEndpoints', 'DBClusterOptionGroupMemberships',
-                      'EnabledCloudwatchLogsExports', 'LatestRestorableTime', 'EarliestRestorableTime')
+        config_resource = source.load_resource(
+            event_data('rds-cluster.json', 'config')['configurationItems'][0])
+        known_keys = (
+            'ClusterCreateTime', 'CustomEndpoints', 'DBClusterOptionGroupMemberships',
+            'EnabledCloudwatchLogsExports', 'LatestRestorableTime', 'EarliestRestorableTime')
         for kk in known_keys:
             config_resource.pop(kk, None)
             describe_resource.pop(kk, None)
-            
+
         assert describe_resource == config_resource
 
     def test_rdscluster_security_group(self):
