@@ -31,7 +31,11 @@ class ConfigCluster(ConfigSource):
         resource = super().load_resource(item)
         for k in list(resource.keys()):
             if k.startswith('Dbc'):
-                resource["DBC%s" % (k[3:])] = resource[k]
+                resource["DBC%s" % (k[3:])] = resource.pop(k)
+            elif k.startswith('Iamd'):
+                resource['IAMD%s' % (k[4:])] = resource.pop(k)
+            elif k.startswith('Dbs'):
+                resource["DBS%s" % (k[3:])] = resource.pop(k)                
         return resource
 
 
