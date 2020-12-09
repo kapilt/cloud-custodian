@@ -79,6 +79,12 @@ class PolicyMetaLint(BaseTest):
             },
         )
 
+    def test_resource_type_repr(self):
+        policy = self.load_policy({'name': 'ecr', 'resource': 'aws.ecr'})
+        # check the repr absent a config type but with a cfn type
+        assert policy.resource_manager.resource_type.config_type == None
+        assert str(policy.resource_manager.resource_type) == '<TypeInfo AWS::ECR::Repository>'
+
     def test_schema_plugin_name_mismatch(self):
         # todo iterate over all clouds not just aws resources
         for k, v in manager.resources.items():
