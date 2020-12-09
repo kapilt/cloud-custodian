@@ -138,7 +138,7 @@ class AutoTagUser(EventAction):
 
         self.set_resource_tags(new_tags, untagged_resources)
 
-    def set_resource_tag(self, tags, resources):
+    def set_resource_tags(self, tags, resources):
         tag_action = self.manager.action_registry.get('tag')
         for key, value in tags.items():
             tag_action({'key': key, 'value': value}, self.manager).process(resources)

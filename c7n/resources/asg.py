@@ -1142,15 +1142,12 @@ class Tag(Action):
 
         return tags
 
-    from c7n.executor import MainThreadExecutor
-    executor_factory = MainThreadExecutor
-
     def process(self, asgs):
         tags = self.get_tag_set()
         error = None
 
         client = self.get_client()
-        with self.executor_factory(max_workers=3) as w:
+        with self.executor_factory(max_workers=2) as w:
             futures = {}
             for asg_set in chunks(asgs, self.batch_size):
                 futures[w.submit(
