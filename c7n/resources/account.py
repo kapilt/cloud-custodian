@@ -108,6 +108,7 @@ class MacieEnabled(ValueFilter):
     schema_alias = False
     annotation_key = 'c7n:macie'
     annotate = False
+    permissions = ('macie2:GetMacieSession', 'macie2:GetMasterAccount',)
 
     def process(self, resources, event=None):
 
