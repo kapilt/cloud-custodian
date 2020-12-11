@@ -27,7 +27,7 @@ resource "aws_launch_template" "foobar" {
 }
 
 resource "aws_autoscaling_group" "bar" {
-  availability_zones = [availability_zone = data.aws_availability_zones.available.names[0]]
+  availability_zones = [data.aws_availability_zones.available.names[0]]
   desired_capacity   = 1
   max_size           = 1
   min_size           = 1
