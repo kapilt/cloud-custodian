@@ -14,6 +14,12 @@ data "aws_ami" "ubuntu" {
     owners = ["099720109477"] # Canonical
 }
 
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+
 resource "aws_launch_template" "foobar" {
   name_prefix   = "foobar"
   image_id      = data.aws_ami.ubuntu.id
@@ -21,7 +27,7 @@ resource "aws_launch_template" "foobar" {
 }
 
 resource "aws_autoscaling_group" "bar" {
-  availability_zones = ["us-east-1d"]
+  availability_zones = [availability_zone = data.aws_availability_zones.available.names[0]]
   desired_capacity   = 1
   max_size           = 1
   min_size           = 1
