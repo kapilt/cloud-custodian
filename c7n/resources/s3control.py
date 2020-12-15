@@ -37,7 +37,7 @@ class S3AccessPoint(QueryResourceManager):
         filter_name = 'PolicyIds'
         filter_type = 'list'
         arn = 'AccessPointArn'
-        arn_service =  's3'
+        arn_service = 's3'
         arn_type = 'accesspoint'
         cfn_type = 'AWS::S3::AccessPoint'
 
