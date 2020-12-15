@@ -1,4 +1,3 @@
-
 from c7n.actions import Action
 from c7n.filters.iamaccess import CrossAccountAccessFilter
 from c7n.manager import resources
@@ -73,4 +72,3 @@ class Delete(Action):
                 client.delete_access_point(AccountId=r['AccountId'], Name=r['Name'])
             except client.NotFoundException:
                 continue
-        
