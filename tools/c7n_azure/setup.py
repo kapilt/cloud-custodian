@@ -63,12 +63,12 @@ install_requires = \
  'azure-storage-blob>=2.1,<2.2',
  'azure-storage-file>=2.1.0,<3.0.0',
  'azure-storage-queue>=2.1,<2.2',
- 'boto3 (>=1.16.37,<2.0.0)',
- 'botocore (>=1.19.37,<2.0.0)',
+ 'boto3 (>=1.16.38,<2.0.0)',
+ 'botocore (>=1.19.38,<2.0.0)',
  'c7n (>=0.9.10,<0.10.0)',
  'click>=7.0,<8.0',
  'distlib>=0.3.0,<0.4.0',
- 'importlib-metadata (>=1.7.0,<2.0.0)',
+ 'importlib-metadata (>=3.3.0,<4.0.0)',
  'jmespath (>=0.10.0,<0.11.0)',
  'jsonpickle (>=1.3,<2.0)',
  'jsonpickle==1.3',
@@ -81,6 +81,7 @@ install_requires = \
  's3transfer (>=0.3.3,<0.4.0)',
  'six (>=1.15.0,<2.0.0)',
  'tabulate (>=0.8.7,<0.9.0)',
+ 'typing-extensions (>=3.7.4.3,<4.0.0.0)',
  'urllib3 (>=1.26.2,<2.0.0)',
  'zipp (>=3.4.0,<4.0.0)']
 
