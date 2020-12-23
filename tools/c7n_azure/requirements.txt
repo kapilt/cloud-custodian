@@ -66,7 +66,7 @@ distlib==0.3.1
 humanfriendly==8.2; python_full_version >= "3.6.0"
 idna==2.10; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
 importlib-metadata==3.3.0; python_version == "3.6" and python_full_version >= "3.6.0" or python_version == "3.7" and python_full_version >= "3.6.0"
-importlib-resources==3.3.0; python_version >= "2.7" and python_full_version < "3.0.0" and python_version < "3.7" or python_full_version >= "3.6.0" and python_version < "3.7"
+importlib-resources==3.3.1; python_version >= "2.7" and python_full_version < "3.0.0" and python_version < "3.7" or python_full_version >= "3.6.0" and python_version < "3.7"
 isodate==0.6.0
 jmespath==0.10.0; python_full_version >= "3.6.0"
 jsonpickle==1.3
