@@ -81,8 +81,11 @@ class EventBus(QueryResourceManager):
     augment = universal_augment
 
 
-EventBus.filter_registry.register(
-    'cross-account', CrossAccountAccessFilter)
+@EventBus.filter_registry.register('cross-account')
+class EventBusCrossAccountFilter(CrossAccountAccessFilter):
+
+    # dummy permission
+    permissions = ('events:ListEventBuses',)
 
 
 @resources.register('event-rule')
