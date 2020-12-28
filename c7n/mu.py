@@ -376,19 +376,23 @@ class ResourceTags:
     def __init__(self, client):
         self.client = client
 
-    def process(self, previous, current_tags, created=False):
+    def process(self, previous, current_tags, created=False, update=False):
+        # for resources that support tagging on update, set update: True
+        # and we'll just process removals, and return tags for update
         resource_arn = self._get_arn(previous)
         old_tags = created and {}
         if not created:
             old_tags = self._get_tags(previous)
         tadd, tremove = self.diff(old_tags, current_tags)
         changed = bool(tadd) or bool(tremove)
-        if tadd:
+        if tadd and not update:
             log.debug("Updating resource tags: %s" % resource_arn)
             self.client.tag_resource(Resource=resource_arn, Tags=tadd)
         if tremove:
             log.debug("Removing stale resource tags: %s" % resource_arn)
             self.client.untag_resource(Resource=resource_arn, TagKeys=tremove)
+        if update:
+            return tadd
         return changed
 
     def _get_tags(self, resource):
@@ -410,7 +414,12 @@ class ResourceTags:
         for k in old_tags:
             if k not in new_tags:
                 remove.add(k)
-        return add, list(remove)
+
+class KVResourceTags(ResourceTags):
+
+    def diff(self, old_tags, new_tags):
+        tadd, remove = super().diff(old_tags, new_tags)
+        return [{'Key': k, 'Value': v} for t in add.items()], list(remove)
 
 
 class LambdaTags(ResourceTags):
@@ -1009,7 +1018,7 @@ class AWSEventBase:
         return self._client
 
 
-class EventRuleTags(ResourceTags):
+class EventRuleTags(KVResourceTags):
 
     arn_param = 'ResourceARN'
 
@@ -1165,19 +1174,20 @@ class CloudWatchEventSource(AWSEventBase):
             params['ScheduleExpression'] = schedule
 
         tagger = EventRuleTags(self.client)
-        created = False
         rule = self.get(func.name)
         if rule and self.delta(rule, params):
             log.debug("Updating cwe rule for %s" % func.name)
+            tupdate = tagger.process(rule, func.tags, update=True)
+            params['Tags'] = tupdate
             response = self.client.put_rule(**params)
         elif not rule:
             log.debug("Creating cwe rule for %s" % (self))
-            created = True
+            params['Tags'], _ = tagger.diff({}, func.tags)
             response = self.client.put_rule(**params)
         else:
             response = {'RuleArn': rule['Arn']}
+            tagger.process(rule, func.tags)
 
-        tagger.process(response, func.tags, created)
         client = self.session.client('lambda')
         try:
             client.add_permission(
@@ -1649,7 +1659,7 @@ class BucketSNSNotification(SNSSubscription):
         return topic_arns
 
 
-class ConfigRuleTags(ResourceTags):
+class ConfigRuleTags(KVResourceTags):
 
     arn_attribute = 'ConfigRuleArn'
 
@@ -1734,14 +1744,14 @@ class ConfigRule(AWSEventBase):
     def add(self, func):
         rule = self.get(func.name)
         params = self.get_rule_params(func)
-
         tagger = ConfigRuleTags(self.client)
 
         if rule and self.delta(rule, params):
             log.debug("Updating config rule for %s" % self)
             rule.update(params)
-            LambdaRetry(self.client.put_config_rule, ConfigRule=rule)
-            tagger.process(rule, func.tags)
+            tupdate = tagger.process(rule, func.tags, update=True)
+            LambdaRetry(
+                self.client.put_config_rule, ConfigRule=rule, Tags=tupdate)
             return rule
         elif rule:
             log.debug("Config rule up to date")
@@ -1759,11 +1769,9 @@ class ConfigRule(AWSEventBase):
             pass
 
         log.debug("Adding config rule for %s" % func.name)
-
-
-        LambdaRetry(self.client.put_config_rule, ConfigRule=params)
-        rule = self.get(func.name)
-        tagger.process(rule, func.tags, created=True)
+        tags = tagger.diff({}, func.tags)
+        LambdaRetry(
+            self.client.put_config_rule, ConfigRule=params, Tags=tags)
         return rule
 
     def remove(self, func):
