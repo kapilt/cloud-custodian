@@ -414,6 +414,7 @@ class ResourceTags:
         for k in old_tags:
             if k not in new_tags:
                 remove.add(k)
+        return {}, ()
 
 class KVResourceTags(ResourceTags):
 
