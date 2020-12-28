@@ -419,7 +419,7 @@ class ResourceTags:
 class KVResourceTags(ResourceTags):
 
     def diff(self, old_tags, new_tags):
-        tadd, remove = super().diff(old_tags, new_tags)
+        add, remove = super().diff(old_tags, new_tags)
         return [{'Key': k, 'Value': v} for t in add.items()], list(remove)
 
 
@@ -1770,7 +1770,7 @@ class ConfigRule(AWSEventBase):
             pass
 
         log.debug("Adding config rule for %s" % func.name)
-        tags = tagger.diff({}, func.tags)
+        tags, _ = tagger.diff({}, func.tags)
         LambdaRetry(
             self.client.put_config_rule, ConfigRule=params, Tags=tags)
         return rule
