@@ -239,16 +239,16 @@ class StreamTest(TestUtils):
         changes = [c.data() for c in policy_repo.delta_stream(
             sort=pygit2.GIT_SORT_TOPOLOGICAL | pygit2.GIT_SORT_REVERSE)]
         self.assertEqual(
-            [(c['change'],
+            {(c['change'],
               c['policy']['data']['name'],
-              c['commit']['message'].strip()) for c in changes],
-            [('add', 'ec2-check', 'init'),
+              c['commit']['message'].strip()) for c in changes},
+            {('add', 'ec2-check', 'init'),
              ('add', 'lambda-check', 'init'),
              ('add', 'ec2-ami-check', 'move'),
              ('moved', 'lambda-check', 'move'),
              ('remove', 'ec2-ami-check', 'consolidate'),
              ('moved', 'ec2-check', 'consolidate'),
-             ('moved', 'lambda-check', 'consolidate')]
+             ('moved', 'lambda-check', 'consolidate')}
         )
 
     def test_stream_move_policy(self):
