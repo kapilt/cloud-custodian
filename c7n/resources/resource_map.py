@@ -65,7 +65,7 @@ ResourceMap = {
     "aws.emr": "c7n.resources.emr.EMRCluster",
     "aws.emr-security-configuration": "c7n.resources.emr.EMRSecurityConfiguration",
     "aws.eni": "c7n.resources.vpc.NetworkInterface",
-    "aws.event-bridge": "c7n.resources.cw.EventBridge",
+    "aws.event-bus": "c7n.resources.cw.EventBus",
     "aws.event-rule": "c7n.resources.cw.EventRule",
     "aws.event-rule-target": "c7n.resources.cw.EventRuleTarget",
     "aws.firehose": "c7n.resources.kinesis.DeliveryStream",

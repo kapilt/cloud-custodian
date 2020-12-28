@@ -67,8 +67,8 @@ class AlarmDelete(BaseAction):
                 AlarmNames=[r['AlarmName'] for r in resource_set])
 
 
-@resources.register('event-bridge')
-class EventBridge(QueryResourceManager):
+@resources.register('event-bus')
+class EventBus(QueryResourceManager):
 
     class resource_type(TypeInfo):
         service = 'events'
@@ -79,6 +79,10 @@ class EventBridge(QueryResourceManager):
         universal_taggable = object()
 
     augment = universal_augment
+
+
+EventBus.filter_registry.register(
+    'cross-account', CrossAccountAccessFilter)
 
 
 @resources.register('event-rule')
