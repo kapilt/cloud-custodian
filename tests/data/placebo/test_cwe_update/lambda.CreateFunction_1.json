@@ -1,0 +1,30 @@
+{
+    "status_code": 201,
+    "data": {
+        "ResponseMetadata": {},
+        "FunctionName": "custodian-s3-bucket-policy",
+        "FunctionArn": "arn:aws:lambda:us-east-1:644160558196:function:custodian-s3-bucket-policy",
+        "Runtime": "python2.7",
+        "Role": "arn:aws:iam::644160558196:role/custodian-mu",
+        "Handler": "custodian_policy.run",
+        "CodeSize": 462161,
+        "Description": "cloud-custodian lambda policy",
+        "Timeout": 900,
+        "MemorySize": 512,
+        "LastModified": "2020-12-28T21:30:18.718+0000",
+        "CodeSha256": "jJURRZC3ZN3zP8foNZZKFvpeLUv8jXq/xPzCUfKXY0U=",
+        "Version": "45",
+        "VpcConfig": {
+            "SubnetIds": [],
+            "SecurityGroupIds": [],
+            "VpcId": ""
+        },
+        "TracingConfig": {
+            "Mode": "PassThrough"
+        },
+        "RevisionId": "4ad89667-a698-4853-8cea-d759b848ae2f",
+        "State": "Active",
+        "LastUpdateStatus": "Successful",
+        "PackageType": "Zip"
+    }
+}

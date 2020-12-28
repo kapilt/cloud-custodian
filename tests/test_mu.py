@@ -398,11 +398,12 @@ class PolicyLambdaProvision(BaseTest):
         # the function code / which invalidate the recorded data and
         # the focus of the test.
 
-        session_factory = self.replay_flight_data("test_cwe_update", zdata=True)
+        session_factory = self.replay_flight_data("test_cwe_update")
         p = self.load_policy({
             "resource": "s3",
             "name": "s3-bucket-policy",
             "mode": {"type": "cloudtrail",
+                     "tags": {"App": "Custodian"},
                      "events": ["CreateBucket"], 'runtime': 'python2.7'},
             "filters": [
                 {"type": "missing-policy-statement",
@@ -415,12 +416,22 @@ class PolicyLambdaProvision(BaseTest):
         result = mgr.publish(pl, "Dev", role=ROLE)
         self.addCleanup(mgr.remove, pl)
 
+        if self.recording:
+            time.sleep(1)
+
+        assert session_factory().client('events').list_tags_for_resource(
+            ResourceARN=(
+                'arn:aws:events:us-east-1:644160558196'
+                ':rule/custodian-s3-bucket-policy')).get('Tags') == [
+                    {'Key': 'App', 'Value': 'Custodian'}]
+
         p = self.load_policy(
             {
                 "resource": "s3",
                 "name": "s3-bucket-policy",
                 "mode": {
                     "type": "cloudtrail",
+                    'tags': {'Env': 'Dev'},
                     "memory": 256,
                     'runtime': 'python2.7',
                     "events": [
@@ -450,13 +461,15 @@ class PolicyLambdaProvision(BaseTest):
         self.assertTrue(
             "Updating function: custodian-s3-bucket-policy config MemorySize" in lines)
         self.assertEqual(result["FunctionName"], result2["FunctionName"])
-        # drive by coverage
-        functions = [
-            i
-            for i in mgr.list_functions()
-            if i["FunctionName"] == "custodian-s3-bucket-policy"
-        ]
-        self.assertTrue(len(functions), 1)
+
+        if self.recording:
+            time.sleep(1)
+
+        resource_tags = session_factory().client('events').list_tags_for_resource(
+            ResourceARN=(
+                'arn:aws:events:us-east-1:644160558196'
+                ':rule/custodian-s3-bucket-policy')).get('Tags')
+        assert resource_tags == [{'Key': 'Env', 'Value': 'Dev'}]
 
     def test_cwe_trail(self):
         session_factory = self.replay_flight_data("test_cwe_trail", zdata=True)

@@ -387,10 +387,12 @@ class ResourceTags:
         changed = bool(tadd) or bool(tremove)
         if tadd and not update:
             log.debug("Updating resource tags: %s" % resource_arn)
-            self.client.tag_resource(Resource=resource_arn, Tags=tadd)
+            self.client.tag_resource(**{
+                self.arn_param: resource_arn, 'Tags': tadd})
         if tremove:
             log.debug("Removing stale resource tags: %s" % resource_arn)
-            self.client.untag_resource(Resource=resource_arn, TagKeys=tremove)
+            self.client.untag_resource(**{
+                self.arn_param: resource_arn, 'TagKeys': tremove})
         if update:
             return tadd
         return changed
@@ -414,16 +416,19 @@ class ResourceTags:
         for k in old_tags:
             if k not in new_tags:
                 remove.add(k)
-        return {}, ()
+        return add, list(remove)
+
 
 class KVResourceTags(ResourceTags):
 
     def diff(self, old_tags, new_tags):
         add, remove = super().diff(old_tags, new_tags)
-        return [{'Key': k, 'Value': v} for t in add.items()], list(remove)
+        return [{'Key': k, 'Value': v} for k, v in add.items()], remove
 
 
 class LambdaTags(ResourceTags):
+
+    arn_param = 'Resource'
 
     def _get_arn(self, resource):
         base_arn = resource['Configuration']['FunctionArn']
@@ -1178,8 +1183,9 @@ class CloudWatchEventSource(AWSEventBase):
         rule = self.get(func.name)
         if rule and self.delta(rule, params):
             log.debug("Updating cwe rule for %s" % func.name)
-            tupdate = tagger.process(rule, func.tags, update=True)
-            params['Tags'] = tupdate
+            # work around a bug in event bridge, put rule supports
+            # tags on create but not on update.
+            tagger.process(rule, func.tags)
             response = self.client.put_rule(**params)
         elif not rule:
             log.debug("Creating cwe rule for %s" % (self))
