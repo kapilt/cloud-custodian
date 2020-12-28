@@ -17,8 +17,9 @@ def test_event_bus_describe(test, event_bridge_bus):
         'resource': 'aws.event-bus',
         'filters': [
             {'tag:Env': 'Sandbox'},
-            'cross-account',],
-        }, session_factory=factory)
+            'cross-account'
+        ],
+    }, session_factory=factory)
     resources = p.run()
     assert len(resources) == 1
     resources[0]['Name'] == event_bridge_bus[
