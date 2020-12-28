@@ -1740,7 +1740,7 @@ class ConfigRule(AWSEventBase):
         if rule and self.delta(rule, params):
             log.debug("Updating config rule for %s" % self)
             rule.update(params)
-            rule = LambdaRetry(self.client.put_config_rule, ConfigRule=rule)
+            LambdaRetry(self.client.put_config_rule, ConfigRule=rule)
             tagger.process(rule, func.tags)
             return rule
         elif rule:
@@ -1760,7 +1760,9 @@ class ConfigRule(AWSEventBase):
 
         log.debug("Adding config rule for %s" % func.name)
 
-        rule = LambdaRetry(self.client.put_config_rule, ConfigRule=params)
+
+        LambdaRetry(self.client.put_config_rule, ConfigRule=params)
+        rule = self.get(func.name)
         tagger.process(rule, func.tags, created=True)
         return rule
 
