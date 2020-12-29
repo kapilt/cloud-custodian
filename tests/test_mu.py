@@ -14,6 +14,7 @@ import time
 import unittest
 import zipfile
 
+import pytest
 import mock
 
 from c7n.config import Config
@@ -83,6 +84,22 @@ class Publish(BaseTest):
         self.addCleanup(archive.remove)
         return LambdaFunction(func_data, archive)
 
+    def test_lambda_missing_required(self):
+        with pytest.raises(ValueError):
+            LambdaFunction({'name': 'foo', 'handler': 'bar'}, None)
+
+    def test_lambda_env(self):
+        func = self.make_func(environment={'Variables': {'PROXY': 'http://localhost'}})
+        assert 'Environment' in func.get_config()
+
+    def test_lambda_vpc(self):
+        func = self.make_func(subnets=['subnet-abc'], security_groups=['sg-123', 'sg-456'])
+        assert 'VpcConfig' in func.get_config()
+
+    def test_lambda_attributes(self):
+        func = self.make_func()
+        assert func.security_groups is None
+
     def test_publishes_a_lambda(self):
         session_factory = self.replay_flight_data("test_publishes_a_lambda")
         mgr = LambdaManager(session_factory)
@@ -134,6 +151,14 @@ class PolicyLambdaProvision(BaseTest):
     def assert_items(self, result, expected):
         for k, v in expected.items():
             self.assertEqual(v, result[k])
+
+    def test_policy_lambda_attributes(self):
+        p = self.load_policy({
+            'name': 'security-group',
+            'resource': 'security-group',
+            'mode': {'type': 'config-rule'}})
+        pl = PolicyLambda(p)
+        assert pl.security_groups is None
 
     def test_config_rule_provision(self):
         session_factory = self.replay_flight_data("test_config_rule")
@@ -607,6 +632,22 @@ class PolicyLambdaProvision(BaseTest):
             },
         )
 
+    def test_cwe_delta(self):
+        cwe = CloudWatchEventSource(None, None)
+        assert cwe.delta({}, {}) is False
+        assert cwe.delta({'ScheduleExpression': 'rate(1 hour)'}, {}) is True
+
+    def test_cwe_render_hub_finding(self):
+        cwe = CloudWatchEventSource({'type': 'hub-finding'}, None)
+        assert json.loads(cwe.render_event_pattern()) == {
+            'source': ['aws.securityhub'],
+            'detail-type': ['Security Hub Findings - Imported']}
+
+    def test_cwe_render_unknown(self):
+        cwe = CloudWatchEventSource({'type': 'something-different'}, None)
+        with pytest.raises(ValueError):
+            cwe.render_event_pattern()
+
     def test_cwe_security_hub_action(self):
         factory = self.replay_flight_data('test_mu_cwe_sechub_action')
         p = self.load_policy({
@@ -1008,10 +1049,15 @@ class PythonArchiveTest(unittest.TestCase):
 
     def test_can_add_additional_files_while_open(self):
         archive = self.make_open_archive()
+
+        with pytest.raises(ValueError):
+            assert archive.size > 10
+
         archive.add_file(__file__)
         archive.close()
         filenames = archive.get_filenames()
         self.assertTrue(os.path.basename(__file__) in filenames)
+        assert archive.size > 100
 
     def test_can_set_path_when_adding_files(self):
         archive = self.make_open_archive()
