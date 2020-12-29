@@ -1,28 +1,30 @@
 {
-    "status_code": 201, 
+    "status_code": 201,
     "data": {
-        "CodeSha256": "vqAV02+Y32G/5caCzRoUoerCSrPwKvtkZIsDs+WZ+Vg=", 
-        "FunctionName": "custodian-sg-modified", 
-        "ResponseMetadata": {
-            "HTTPStatusCode": 201, 
-            "RequestId": "9a40d721-5d56-11e6-92c6-23096fa97432", 
-            "HTTPHeaders": {
-                "date": "Mon, 08 Aug 2016 10:55:26 GMT", 
-                "x-amzn-requestid": "9a40d721-5d56-11e6-92c6-23096fa97432", 
-                "content-length": "532", 
-                "content-type": "application/json", 
-                "connection": "keep-alive"
-            }
-        }, 
-        "CodeSize": 418010, 
-        "MemorySize": 512, 
-        "FunctionArn": "arn:aws:lambda:us-west-2:619193117841:function:custodian-sg-modified", 
-        "Version": "15", 
-        "Role": "arn:aws:iam::619193117841:role/lambda_basic_execution", 
-        "Timeout": 60, 
-        "LastModified": "2016-08-08T10:55:26.537+0000", 
-        "Handler": "custodian_policy.run", 
-        "Runtime": "python2.7", 
-        "Description": "cloud-custodian lambda policy"
+        "ResponseMetadata": {},
+        "FunctionName": "custodian-sg-modifyable",
+        "FunctionArn": "arn:aws:lambda:us-east-1:644160558196:function:custodian-sg-modifyable",
+        "Runtime": "python3.8",
+        "Role": "arn:aws:iam::644160558196:role/custodian-mu",
+        "Handler": "custodian_policy.run",
+        "CodeSize": 462022,
+        "Description": "cloud-custodian lambda policy",
+        "Timeout": 900,
+        "MemorySize": 512,
+        "LastModified": "2020-12-29T05:07:35.219+0000",
+        "CodeSha256": "6oofkN1P2kVeckc3meQSWwu9qdwkSknnZI++qEaXZ20=",
+        "Version": "1",
+        "VpcConfig": {
+            "SubnetIds": [],
+            "SecurityGroupIds": [],
+            "VpcId": ""
+        },
+        "TracingConfig": {
+            "Mode": "PassThrough"
+        },
+        "RevisionId": "1cbbcbe4-1d06-4bd7-80f5-76c8b967a9d7",
+        "State": "Active",
+        "LastUpdateStatus": "Successful",
+        "PackageType": "Zip"
     }
 }

@@ -140,19 +140,25 @@ class PolicyLambdaProvision(BaseTest):
         p = self.load_policy(
             {
                 "resource": "security-group",
-                "name": "sg-modified",
-                "mode": {"type": "config-rule"},
+                "name": "sg-modifyable",
+                "mode": {"type": "config-rule", 'tags': {'Env': 'Dev'}},
             },
             session_factory=session_factory
         )
         pl = PolicyLambda(p)
         mgr = LambdaManager(session_factory)
         result = mgr.publish(pl, "Dev", role=ROLE)
-        self.assertEqual(result["FunctionName"], "custodian-sg-modified")
+        self.assertEqual(result["FunctionName"], "custodian-sg-modifyable")
         self.addCleanup(mgr.remove, pl)
+        client = session_factory().client('config')
+        rules = client.describe_config_rules(
+            ConfigRuleNames=['custodian-sg-modifyable']).get('ConfigRules')
+        assert len(rules) == 1
+        tags = client.list_tags_for_resource(ResourceArn=rules[0]['ConfigRuleArn']).get('Tags')
+        assert tags == [{'Key': 'Env', 'Value': 'Dev'}]
 
     def test_config_poll_rule_evaluation(self):
-        session_factory = self.record_flight_data("test_config_poll_rule_provision")
+        session_factory = self.replay_flight_data("test_config_poll_rule_provision")
         p = self.load_policy({
             'name': 'configx',
             'resource': 'aws.kinesis',
@@ -399,7 +405,7 @@ class PolicyLambdaProvision(BaseTest):
         # the function code / which invalidate the recorded data and
         # the focus of the test.
 
-        session_factory = self.record_flight_data("test_cwe_update")
+        session_factory = self.replay_flight_data("test_cwe_update")
         p = self.load_policy({
             "resource": "s3",
             "name": "s3-bucket-policy",
@@ -472,7 +478,8 @@ class PolicyLambdaProvision(BaseTest):
                 ':rule/custodian-s3-bucket-policy')).get('Tags')
         assert resource_tags == [{'Key': 'Env', 'Value': 'Dev'}]
 
-        resource_tags = session_factory().client('lambda').get_function(FunctionName=result2['FunctionName'])
+        resource_tags = session_factory().client('lambda').get_function(
+            FunctionName=result2['FunctionName'])
         assert resource_tags['Tags'] == {'Env': 'Dev'}
 
     def test_cwe_trail(self):
