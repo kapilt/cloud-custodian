@@ -431,7 +431,7 @@ class LambdaTags(ResourceTags):
     arn_param = 'Resource'
 
     def _get_arn(self, resource):
-        base_arn = resource['Configuration']['FunctionArn']
+        base_arn = resource.get('Configuration', resource)['FunctionArn']
         if base_arn.count(':') > 6:  # trim version/alias
             base_arn = base_arn.rsplit(':', 1)[0]
         return base_arn
@@ -459,8 +459,7 @@ class LambdaManager:
                     yield f
 
     def publish(self, func, alias=None, role=None, s3_uri=None):
-        result, changed = self._create_or_update(
-            func, role, s3_uri, qualifier=alias)
+        result, changed = self._create_or_update(func, role, s3_uri)
         func.arn = result['FunctionArn']
         if alias and changed:
             func.alias = self.publish_alias(result, alias)
@@ -503,6 +502,8 @@ class LambdaManager:
                 elif set(old_config[k]['SecurityGroupIds']) != set(
                         new_config[k]['SecurityGroupIds']):
                     changed.append(k)
+            elif k == 'Tags':
+                continue
             elif k not in old_config:
                 if k in LAMBDA_EMPTY_VALUES and LAMBDA_EMPTY_VALUES[k] == new_config[k]:
                     continue
@@ -516,23 +517,12 @@ class LambdaManager:
                 changed.append(k)
         return changed
 
-    @staticmethod
-    def diff_tags(old_tags, new_tags):
-        add = {}
-        remove = set()
-        for k, v in new_tags.items():
-            if k not in old_tags or old_tags[k] != v:
-                add[k] = v
-        for k in old_tags:
-            if k not in new_tags:
-                remove.add(k)
-        return add, list(remove)
-
     def _create_or_update(self, func, role=None, s3_uri=None, qualifier=None):
         role = func.role or role
         assert role, "Lambda function role must be specified"
         archive = func.get_archive()
         existing = self.get(func.name, qualifier)
+        tagger = LambdaTags(self.client)
 
         if s3_uri:
             # TODO: support versioned buckets
@@ -557,13 +547,13 @@ class LambdaManager:
             new_config = func.get_config()
             new_config['Role'] = role
 
-            if self._update_tags(existing, new_config.pop('Tags', {})):
-                changed = True
+            changed = tagger.process(existing, func.tags)
 
             config_changed = self.delta_function(old_config, new_config)
             if config_changed:
                 log.debug("Updating function: %s config %s",
                           func.name, ", ".join(sorted(config_changed)))
+                new_config.pop('Tags', None)
                 result = self.client.update_function_configuration(**new_config)
                 changed = True
             if self._update_concurrency(existing, func):
@@ -574,6 +564,7 @@ class LambdaManager:
             params.update({'Publish': True, 'Code': code_ref, 'Role': role})
             result = self.client.create_function(**params)
             self._update_concurrency(None, func)
+            tagger.process(result, func.tags, created=True)
             changed = True
 
         return result, changed
@@ -594,10 +585,6 @@ class LambdaManager:
         self.client.put_function_concurrency(
             FunctionName=func.name,
             ReservedConcurrentExecutions=func.concurrency)
-
-    def _update_tags(self, existing, new_tags):
-        tagger = LambdaTags(self.client)
-        return tagger.process(existing, new_tags)
 
     def _upload_func(self, s3_uri, func, archive):
         from boto3.s3.transfer import S3Transfer, TransferConfig
