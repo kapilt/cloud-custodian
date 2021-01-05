@@ -50,6 +50,8 @@ class ConfigCrossAccountFilter(CrossAccountAccessFilter):
         whitelist_from=ValuesFrom.schema,
         whitelist={'type': 'array', 'items': {'type': 'string'}})
 
+    permissions = ('config:DescribeAggregationAuthorizations',)
+
     def process(self, resources, event=None):
         client = local_session(self.manager.session_factory).client('config')
 
