@@ -61,14 +61,14 @@ class ConfigCrossAccountFilter(CrossAccountAccessFilter):
 
         for a in auths:
             if (a['AuthorizedAccountId'] not in allowed_accounts or
-                (allowed_regions and a['AuthorizedAwsRegion'] not in allowed_regions)):
+                    (allowed_regions and a['AuthorizedAwsRegion'] not in allowed_regions)):
                 matched.append(a)
 
         # only 1 config recorder per account
         resources[0][self.annotation_key] = matched
         return resources
-            
-        
+
+
 @resources.register('config-rule')
 class ConfigRule(QueryResourceManager):
 

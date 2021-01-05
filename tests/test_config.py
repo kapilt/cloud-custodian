@@ -30,11 +30,10 @@ class ConfigRecorderTest(BaseTest):
         resources = p.run()
         assert len(resources) == 1
         assert 'CrossAccountViolations' in resources[0]
-        assert [(cav['AuthorizedAwsRegion'], cav['AuthorizedAccountId']) 
-         for cav in  resources[0]['CrossAccountViolations']] == [
-                 ('us-east-1', '123456890123'),
-                 ('us-east-2', '123456890123')]
-                 
+        assert [(cav['AuthorizedAwsRegion'], cav['AuthorizedAccountId'])
+                for cav in resources[0]['CrossAccountViolations']] == [
+                    ('us-east-1', '123456890123'),
+                    ('us-east-2', '123456890123')]
 
 
 class ConfigComplianceTest(BaseTest):
