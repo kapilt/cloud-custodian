@@ -303,7 +303,6 @@ class PolicyMetaLint(BaseTest):
             'AWS::ServiceCatalog::CloudFormationProduct',
             'AWS::SSM::FileData'}
 
-
         resource_map = {}
         for k, v in manager.resources.items():
             if not v.resource_type.config_type:
