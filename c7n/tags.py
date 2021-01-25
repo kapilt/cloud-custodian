@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from dateutil import tz as tzutil
 from dateutil.parser import parse
 
-import itertools
 import jmespath
 import time
 
