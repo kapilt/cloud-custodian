@@ -83,11 +83,10 @@ def universal_augment(self, resources):
     paginator = client.get_paginator('get_resources')
     paginator.PAGE_ITERATOR_CLS = RetryPageIterator
 
-    m = self.get_model()
-    resource_type = "%s:%s" % (m.arn_service or m.service, m.arn_type)
+    rfetch = [r for r in resources if 'Tags' not in r]
 
     for arn_resource_set in utils.chunks(
-            zip(self.get_arns(resources), resources), 100):
+            zip(self.get_arns(rfetch), rfetch), 100):
         arn_resource_map = dict(arn_resource_set)
         resource_tag_results = client.get_resources(
             ResourceARNList=list(arn_resource_map.keys())).get(
@@ -95,8 +94,6 @@ def universal_augment(self, resources):
         resource_tag_map = {
             r['ResourceARN']: r['Tags'] for r in resource_tag_results}
         for arn, r in arn_resource_map.items():
-            if 'Tags' in r:
-                continue
             r['Tags'] = resource_tag_map.get(arn, [])
 
     return resources
