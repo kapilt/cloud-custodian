@@ -90,7 +90,6 @@ def universal_augment(self, resources):
             zip(self.get_arns(resources), resources), 100):
         arn_resource_map = dict(arn_resource_set)
         resource_tag_results = client.get_resources(
-            ResourceTypeFilters=[resource_type],
             ResourceARNList=list(arn_resource_map.keys())).get(
                 'ResourceTagMappingList', ())
         resource_tag_map = {
