@@ -222,11 +222,12 @@ class DescribeUser(DescribeSource):
         client = local_session(self.manager.session_factory).client('iam')
         results = []
         for r in resources:
-            results.append(
-                self.manager.retry(
-                    client.get_user, UserName=r['UserName'],
-                    ignore_err_codes=client.exceptions.NoSuchEntityException))
-        return [r for r in resources if r is not None]
+            ru = self.manager.retry(
+                client.get_user, UserName=r['UserName'],
+                ignore_err_codes=client.exceptions.NoSuchEntityException)
+            if ru:
+                results.append(ru['User'])
+        return list(filter(None, results))
 
     def get_resources(self, resource_ids, cache=True):
         client = local_session(self.manager.session_factory).client('iam')
