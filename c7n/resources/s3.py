@@ -3320,12 +3320,16 @@ class SetBucketEncryption(KMSKeyResolverMixin, BucketActionBase):
         if self.data.get('enabled', True):
             self.resolve_keys(buckets)
 
+        error = None
         with self.executor_factory(max_workers=3) as w:
             futures = {w.submit(self.process_bucket, b): b for b in buckets}
             for future in as_completed(futures):
                 if future.exception():
                     self.log.error('Message: %s Bucket: %s', future.exception(),
                                    futures[future]['Name'])
+                    error = future.exception()
+        if error:
+            raise error
 
     def process_bucket(self, bucket):
         s3 = bucket_client(local_session(self.manager.session_factory), bucket)
