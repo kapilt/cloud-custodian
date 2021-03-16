@@ -440,6 +440,12 @@ class LambdaTags(ResourceTags):
         return resource.get('Tags', ())
 
 
+def format_alias_arn(arn, alias):
+    if arn.count(':') > 6:
+        arn, version = arn.rsplit(':', 1)
+    return "%s:%s" % (arn, alias)
+
+
 class LambdaManager:
     """ Provides CRUD operations around lambda functions
     """
@@ -458,13 +464,14 @@ class LambdaManager:
                 elif f['FunctionName'].startswith(prefix):
                     yield f
 
-    def publish(self, func, alias=None, role=None, s3_uri=None):
+    def publish(self, func, alias='prod', role=None, s3_uri=None):
         result, changed = self._create_or_update(func, role, s3_uri)
         func.arn = result['FunctionArn']
+
         if alias and changed:
             func.alias = self.publish_alias(result, alias)
         elif alias:
-            func.alias = "%s:%s" % (func.arn, alias)
+            func.alias = format_alias_arn(func.arn, alias)
         else:
             func.alias = func.arn
 
@@ -1170,8 +1177,9 @@ class CloudWatchEventSource(AWSEventBase):
         rule = self.get(func.name)
         if rule and self.delta(rule, params):
             log.debug("Updating cwe rule for %s" % func.name)
-            # work around a bug in event bridge, put rule supports
-            # tags on create but not on update.
+            # work around a bug (documented though) in event bridge,
+            # put rule supports tags parameters on create but ignores
+            # on update.
             tagger.process(rule, func.tags)
             response = self.client.put_rule(**params)
         elif not rule:
@@ -1183,10 +1191,13 @@ class CloudWatchEventSource(AWSEventBase):
             tagger.process(rule, func.tags)
 
         client = self.session.client('lambda')
+
+        func_id = func.alias or func.name
+        sid = "%s%s" % (func.name, func.alias and "-%s" % func.alias.split(':')[-1] or "")
         try:
             client.add_permission(
-                FunctionName=func.name,
-                StatementId=func.name,
+                FunctionName=func_id,
+                StatementId=sid,
                 SourceArn=response['RuleArn'],
                 Action='lambda:InvokeFunction',
                 Principal='events.amazonaws.com')
@@ -1197,11 +1208,12 @@ class CloudWatchEventSource(AWSEventBase):
         # Add Targets
         found = False
         response = RuleRetry(self.client.list_targets_by_rule, Rule=func.name)
-        # CloudWatchE seems to be quite picky about function arns (no aliases/versions)
-        func_arn = func.arn
 
-        if func_arn.count(':') > 6:
-            func_arn, version = func_arn.rsplit(':', 1)
+# CloudWatch seems to be quite picky about function arns (no aliases/version)
+#        if func_arn.count(':') > 6:
+#            func_arn, version = func_arn.rsplit(':', 1)
+
+        func_arn = func.alias or func.arn
         for t in response['Targets']:
             if func_arn == t['Arn']:
                 found = True
