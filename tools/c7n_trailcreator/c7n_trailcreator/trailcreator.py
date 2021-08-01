@@ -399,7 +399,7 @@ def process_bucket(session_factory, bucket_name, prefix, db_path):
 
     log.info("Processing workers:%d cloud-trail:%s page_size:%d", workers, prefix, bsize)
     for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-        objects = page.get('Contents', ())
+        objects = [o for o in page.get('Contents', ()) if o['Key'].endswith('.json.gz')]
         page_stats = Counter()
         page_stats['ObjectCount'] += len(objects)
         page_stats['ObjectSize'] += sum([o['Size'] for o in objects])
