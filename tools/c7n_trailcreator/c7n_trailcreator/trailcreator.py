@@ -415,7 +415,7 @@ def process_bucket(session_factory, bucket_name, prefix, db_path):
             for f in as_completed(futures):
                 if f.exception():
                     log.error("err processing records %s %s", f.exception(), futures[f])
-
+                    continue
                 results = f.result()
                 page_stats['records'] += len(results['records'])
                 page_stats.update(results['stats'])
