@@ -326,8 +326,10 @@ def test_cli_output_github(tmp_path):
     )
     assert result.exit_code == 1
     assert result.output == (
-        "::error file=tests/terraform/aws_s3_encryption_audit/main.tf line=25 lineEnd=28"
-        " title=terraform.aws_s3_bucket - policy:check-bucket::\n"
+        "::error file=tests/terraform/aws_s3_encryption_audit/main.tf line=25 "
+        "lineEnd=28 title=terraform.aws_s3_bucket - policy:check-bucket::\n"
+        "::error file=tests/terraform/aws_s3_encryption_audit/main.tf line=30 "
+        "lineEnd=33 title=terraform.aws_s3_bucket - policy:check-bucket::\n"
     )
 
 
@@ -348,16 +350,11 @@ def test_cli_output_json_query(tmp_path):
             "--output-file",
             str(tmp_path / "output.json"),
             "--output-query",
-            "[].file_path",
+            "[].resource.__tfmeta.path",
         ],
     )
-
     results = json.loads((tmp_path / "output.json").read_text())
-    assert results == {
-        "results": [
-            "tests/terraform/aws_s3_encryption_audit/main.tf",
-        ]
-    }
+    assert results["results"] == ["aws_s3_bucket.example_c", "aws_s3_bucket.example_d"]
 
 
 def test_cli_output_json(tmp_path):
@@ -414,5 +411,86 @@ def test_cli_output_json(tmp_path):
                 "c7n:MatchedFilters": ["server_side_encryption_configuration"],
                 "id": ANY,
             },
-        }
+        },
+        {
+            "code_block": [
+                [30, 'resource "aws_s3_bucket" "example_d" {'],
+                [31, '  bucket = "c7n-aws-s3-encryption-audit-test-d"'],
+                [32, '  acl    = "private"'],
+                [33, "}"],
+            ],
+            "file_line_end": 33,
+            "file_line_start": 30,
+            "file_path": "tests/terraform/aws_s3_encryption_audit/main.tf",
+            "policy": {
+                "filters": [{"server_side_encryption_configuration": "absent"}],
+                "mode": {"type": "terraform-source"},
+                "name": "check-bucket",
+                "resource": "terraform.aws_s3_bucket",
+            },
+            "resource": {
+                "__tfmeta": {
+                    "filename": "main.tf",
+                    "label": "aws_s3_bucket",
+                    "line_end": 33,
+                    "line_start": 30,
+                    "path": "aws_s3_bucket.example_d",
+                    "src_dir": "tests/terraform/aws_s3_encryption_audit",
+                    "type": "resource",
+                },
+                "acl": "private",
+                "bucket": "c7n-aws-s3-encryption-audit-test-d",
+                "c7n:MatchedFilters": ["server_side_encryption_configuration"],
+                "id": ANY,
+            },
+        },
     ]
+
+
+def test_related_filter_s3_encryption(tmp_path):
+    (tmp_path / "policy.json").write_text(
+        json.dumps(
+            {
+                "policies": [
+                    {
+                        "name": "check-related-bucket",
+                        "resource": "terraform.aws_s3_bucket",
+                        "filters": [
+                            {
+                                "type": "link",
+                                "resources": [
+                                    "aws_s3_bucket_server_side_encryption_configuration",
+                                ],
+                                "attrs": [
+                                    {
+                                        "rule.apply_server_side_encryption_by_default.sse_algorithm": "AES256",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.cli,
+        [
+            "run",
+            "-p",
+            str(tmp_path),
+            "-d",
+            str(terraform_dir / "aws_s3_encryption_audit"),
+            "-o",
+            "json",
+            "--output-file",
+            str(tmp_path / "output.json"),
+            "--output-query",
+            "[].resource.__tfmeta.path",
+        ],
+        catch_exceptions=False,
+    )
+    results = json.loads((tmp_path / "output.json").read_text())
+    assert results["results"] == ["aws_s3_bucket.example_d"]
