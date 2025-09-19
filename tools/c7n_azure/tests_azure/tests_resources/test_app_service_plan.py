@@ -1,19 +1,5 @@
-# Copyright 2015-2018 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from azure.mgmt.web import WebSiteManagementClient
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 from ..azure_common import BaseTest, arm_template, cassette_name
 from c7n_azure.session import Session
 from mock import patch
@@ -28,7 +14,7 @@ class AppServicePlanTest(BaseTest):
         super(AppServicePlanTest, self).setUp()
         self.session = local_session(Session)
         self.client = local_session(Session).client(
-            'azure.mgmt.web.WebSiteManagementClient')  # type: WebSiteManagementClient
+            'azure.mgmt.web.WebSiteManagementClient')
         self.update_mock_path =\
             'azure.mgmt.web.v{}.operations._app_service_plans_operations.' \
             'AppServicePlansOperations.update'\
@@ -90,7 +76,7 @@ class AppServicePlanTest(BaseTest):
             resources = p.run()
             self.assertEqual(1, len(resources))
 
-            name, args, kwargs = update_mock.mock_calls[0]
+            _, args, _ = update_mock.mock_calls[0]
             self.assertEqual('cctest-appserviceplan-win', args[1])
             self.assertEqual('B1', args[2].sku.name)
             self.assertEqual('BASIC', args[2].sku.tier)
@@ -122,7 +108,7 @@ class AppServicePlanTest(BaseTest):
             resources = p.run()
             self.assertEqual(1, len(resources))
 
-            name, args, kwargs = update_mock.mock_calls[0]
+            _, args, _ = update_mock.mock_calls[0]
             self.assertEqual('cctest-appserviceplan-linux', args[1])
             self.assertEqual('B1', args[2].sku.name)
             self.assertEqual('BASIC', args[2].sku.tier)
@@ -151,7 +137,7 @@ class AppServicePlanTest(BaseTest):
             resources = p.run()
             self.assertEqual(1, len(resources))
 
-            name, args, kwargs = update_mock.mock_calls[0]
+            _, args, _ = update_mock.mock_calls[0]
             self.assertEqual('cctest-appserviceplan-win', args[1])
             self.assertEqual('B1', args[2].sku.name)
             self.assertEqual('BASIC', args[2].sku.tier)
@@ -233,8 +219,64 @@ class AppServicePlanTest(BaseTest):
             resources = p.run()
             self.assertEqual(1, len(resources))
 
-            name, args, kwargs = update_mock.mock_calls[0]
+            _, args, _ = update_mock.mock_calls[0]
             self.assertEqual('cctest-appserviceplan-win', args[1])
             self.assertEqual('S1', args[2].sku.name)
             self.assertEqual('Standard', args[2].sku.tier)
             self.assertEqual(3, args[2].sku.capacity)
+
+
+class AppServicePlanWebAppsFilterTest(BaseTest):
+    def test_plan_with_running_apps_below_threshold(self):
+        p = self.load_policy({
+            'name': 'test-app-service-plan-running-app',
+            'resource': 'azure.appserviceplan',
+            'filters': [{
+                'type': 'webapp',
+                'attrs': [{
+                    'type': 'value',
+                    'key': 'properties.state',
+                    'value': 'Running'
+                }]
+            }]
+        })
+
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(len(resources[0]['c7n:WebApps']), 1)
+        self.assertEqual(resources[0]['c7n:ListItemMatches'][0], '"c7n:WebApps"[0]')
+        self.assertEqual(resources[0]['name'], 'cctest-appserviceplan-win')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['name'],
+                         'example-app-service-1234fasd142')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['resourceGroup'],
+                         'test_appserviceplan')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['location'],
+                         'East US')
+
+    def test_plan_with_running_apps_above_threshold(self):
+        with patch('c7n_azure.resources.appserviceplan.AppServicePlanWebAppsFilter.FetchThreshold',
+                   1):
+            p = self.load_policy({
+                'name': 'test-app-service-plan-running-app',
+                'resource': 'azure.appserviceplan',
+                'filters': [{
+                    'type': 'webapp',
+                    'attrs': [{
+                        'type': 'value',
+                        'key': 'properties.state',
+                        'value': 'Running'
+                    }]
+                }]
+            })
+            resources = p.run()
+
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(len(resources[0]['c7n:WebApps']), 1)
+        self.assertEqual(resources[0]['c7n:ListItemMatches'][0], '"c7n:WebApps"[0]')
+        self.assertEqual(resources[0]['name'], 'cctest-appserviceplan-win')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['name'],
+                         'example-app-service-1234fasd142')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['resourceGroup'],
+                         'test_appserviceplan')
+        self.assertEqual(resources[0]['c7n:WebApps'][0]['location'],
+                         'East US')

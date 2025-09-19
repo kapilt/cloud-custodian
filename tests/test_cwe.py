@@ -1,46 +1,20 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
+import json
 import jmespath
+import jmespath.parser
 from unittest import TestCase
 
-from .common import event_data, BaseTest
+from .common import event_data
 
 from c7n.cwe import CloudWatchEvents
 
 
-class CloudWatchRuleTarget(BaseTest):
-
-    def test_target_cross_account_remove(self):
-        session_factory = self.replay_flight_data("test_cwe_rule_target_cross")
-        client = session_factory().client("events")
-        policy = self.load_policy(
-            {
-                "name": "cwe-cross-account",
-                "resource": "event-rule-target",
-                "filters": [{"type": "cross-account"}],
-                "actions": ["delete"],
-            },
-            session_factory=session_factory,
-        )
-        resources = policy.run()
-        self.assertEqual(len(resources), 1)
-        targets = client.list_targets_by_rule(Rule=resources[0]["c7n:parent-id"]).get(
-            "Targets"
-        )
-        self.assertEqual(targets, [])
+class JmespathEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, jmespath.parser.ParsedResult):
+            return obj.parsed
+        return json.JSONEncoder.default(self, obj)
 
 
 class CloudWatchEventsFacadeTest(TestCase):
@@ -168,10 +142,13 @@ class CloudWatchEventsFacadeTest(TestCase):
             self.assertFalse(CloudWatchEvents.match(event_data(event)))
 
     def test_cloud_trail_resource(self):
+        matched_event = CloudWatchEvents.match(event_data("event-cloud-trail-s3.json"))
+        expected_event = {
+            "source": "s3.amazonaws.com",
+            "ids": jmespath.compile("detail.requestParameters.bucketName"),
+        }
+
         self.assertEqual(
-            CloudWatchEvents.match(event_data("event-cloud-trail-s3.json")),
-            {
-                "source": "s3.amazonaws.com",
-                "ids": jmespath.compile("detail.requestParameters.bucketName"),
-            },
+            json.dumps(matched_event, sort_keys=True, cls=JmespathEncoder),
+            json.dumps(expected_event, sort_keys=True, cls=JmespathEncoder),
         )

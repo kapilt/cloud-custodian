@@ -1,23 +1,14 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
+import yaml
 
 from .common import BaseTest
 
+import time
+import json
+
 
 class TestCFN(BaseTest):
-
     def test_delete(self):
         factory = self.replay_flight_data("test_cfn_delete")
         p = self.load_policy(
@@ -36,13 +27,97 @@ class TestCFN(BaseTest):
             ["sphere11-db-1", "sphere11-db-2", "sphere11-db-3"],
         )
 
+    def test_delete_with_protection(self):
+        stack_name = "c7n-test-delete-with-protection"
+
+        factory = self.replay_flight_data("test_cfn_delete_with_protection")
+        client = factory().client("cloudformation")
+        cfn_template = {"Resources": {"MyTopic": {"Type": "AWS::SNS::Topic"}}}
+        client.create_stack(
+            StackName=stack_name,
+            TemplateBody=json.dumps(cfn_template),
+            EnableTerminationProtection=True,
+        )
+        self.addCleanup(client.delete_stack, StackName=stack_name)
+        self.addCleanup(
+            client.update_termination_protection,
+            StackName=stack_name,
+            EnableTerminationProtection=False,
+        )
+        if self.recording:
+            time.sleep(30)
+
+        stacks = client.describe_stacks(StackName=stack_name).get("Stacks")
+        self.assertEqual(stacks[0].get("EnableTerminationProtection"), True)
+        p = self.load_policy(
+            {
+                "name": "cfn-delete-force",
+                "resource": "cfn",
+                "filters": [{"StackName": stack_name}],
+                "actions": ["delete"],
+            },
+            session_factory=factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        # this should have done nothing.
+        stacks = client.describe_stacks(StackName=stack_name).get(
+            "Stacks"
+        )
+        self.assertEqual(stacks[0].get("EnableTerminationProtection"), True)
+        self.assertEqual(stacks[0].get("StackStatus"), "CREATE_COMPLETE")
+
+    def test_delete_force(self):
+        stack_name = "c7n-test-delete-force"
+
+        factory = self.replay_flight_data("test_cfn_delete_force")
+        client = factory().client("cloudformation")
+        cfn_template = {"Resources": {"MyTopic": {"Type": "AWS::SNS::Topic"}}}
+        client.create_stack(
+            StackName=stack_name,
+            TemplateBody=json.dumps(cfn_template),
+            EnableTerminationProtection=True,
+        )
+        if self.recording:
+            time.sleep(30)
+
+        stacks = client.describe_stacks(StackName=stack_name).get("Stacks")
+        self.assertEqual(stacks[0].get("EnableTerminationProtection"), True)
+        p = self.load_policy(
+            {
+                "name": "cfn-delete-force",
+                "resource": "cfn",
+                "filters": [{"StackName": stack_name}],
+                "actions": [{"type": "delete", "force": True}],
+            },
+            session_factory=factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        # make sure delete has time to complete
+        if self.recording:
+            time.sleep(30)
+
+        # deleted stacks must be referenced by StackId
+        stacks = client.describe_stacks(StackName=resources[0]["StackId"]).get(
+            "Stacks"
+        )
+        self.assertEqual(stacks[0].get("StackStatus"), "DELETE_COMPLETE")
+
     def test_query(self):
         factory = self.replay_flight_data("test_cfn_query")
         p = self.load_policy(
             {"name": "cfn-query", "resource": "cfn"}, session_factory=factory
         )
         resources = p.run()
-        self.assertEqual(resources, [])
+        self.assertEqual(len(resources), 1)
+        for r in resources:
+            self.assertTrue("arn" in r['StackId'])
+            self.assertTrue("StackName" in r)
+            self.assertTrue("Tags" in r)
+            self.assertEqual(r["Tags"], [])
 
     def test_disable_protection(self):
         factory = self.replay_flight_data("test_cfn_disable_protection")
@@ -73,20 +148,22 @@ class TestCFN(BaseTest):
                 "name": "cfn-add-tag",
                 "resource": "cfn",
                 "filters": [{"StackName": "mosdef2"}],
-                "actions": [
-                    {"type": "tag", "tags": {'App': 'Ftw'}}
-                ],
+                "actions": [{"type": "tag", "tags": {"App": "Ftw"}}],
             },
             session_factory=session_factory,
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
         client = session_factory(region="us-east-1").client("cloudformation")
-        rtags = {t['Key']: t['Value'] for t in resources[0]['Tags']}
-        self.assertEqual(rtags, {'Env': 'Dev'})
-        tags = {t['Key']: t['Value'] for t in client.describe_stacks(
-            StackName=resources[0]["StackName"])["Stacks"][0]["Tags"]}
-        self.assertEqual(tags, {'Env': 'Dev', 'App': 'Ftw'})
+        rtags = {t["Key"]: t["Value"] for t in resources[0]["Tags"]}
+        self.assertEqual(rtags, {"Env": "Dev"})
+        tags = {
+            t["Key"]: t["Value"]
+            for t in client.describe_stacks(StackName=resources[0]["StackName"])[
+                "Stacks"
+            ][0]["Tags"]
+        }
+        self.assertEqual(tags, {"Env": "Dev", "App": "Ftw"})
 
     def test_cfn_add_tag(self):
         session_factory = self.replay_flight_data("test_cfn_add_tag")
@@ -129,3 +206,74 @@ class TestCFN(BaseTest):
             "Tags"
         ]
         self.assertEqual(len(tags), 0)
+
+    def test_cfn_template_filter(self):
+        session_factory = self.replay_flight_data("test_cfn_template_filter")
+        client = session_factory().client("cloudformation")
+
+        stack_name = "c7n-test-template-filter"
+
+        template_body = yaml.dump({
+            "Resources": {
+                "MyBucket": {
+                    "Type": "AWS::S3::Bucket",
+                    "Properties": {
+                        "BucketName": "c7n-access-key-test-bucket"
+                    }
+                }
+            },
+            "Metadata": {
+                "API_KEY": "API_KEY123456789"
+            }
+        })
+
+        client.create_stack(
+            StackName=stack_name,
+            TemplateBody=template_body,
+            Capabilities=["CAPABILITY_NAMED_IAM"]
+        )
+        self.addCleanup(client.delete_stack, StackName=stack_name)
+
+        if self.recording:
+            time.sleep(30)
+
+        stacks = client.describe_stacks(StackName=stack_name)["Stacks"]
+        self.assertEqual(len(stacks), 1)
+        self.assertEqual(stacks[0]["StackName"], stack_name)
+
+        policy = self.load_policy(
+            {
+                "name": "test-cfn-template-filter",
+                "resource": "cfn",
+                "filters": [
+                    {
+                        "type": "template",
+                        "pattern": "API_KEY[0-9A-Z]",
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+        resources = policy.run()
+
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["StackName"], stack_name)
+
+    def test_cfn_topic_filter(self):
+        session_factory = self.replay_flight_data("test_cfn_topic_filter")
+        p = self.load_policy({
+            'name': 'test-cfn-topic-filter',
+            'resource': 'aws.cfn',
+            'filters': [{
+                'type': 'topic',
+                'attrs': [{
+                    'type': 'value',
+                    'key': 'SubscriptionsConfirmed',
+                    'value': 0,
+                    'value_type': 'integer'
+                }]
+            }]
+        }, session_factory=session_factory)
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['c7n:SnsTopics'][0]['SubscriptionsConfirmed'], '0')

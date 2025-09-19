@@ -1,18 +1,5 @@
-# Copyright 2015-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 from collections import Counter
 import logging
 import itertools
@@ -22,27 +9,31 @@ import time
 from botocore.exceptions import ClientError
 from concurrent.futures import as_completed
 from dateutil.parser import parse as parse_date
-import six
 
 from c7n.actions import BaseAction
 from c7n.exceptions import PolicyValidationError
 from c7n.filters import (
     CrossAccountAccessFilter, Filter, AgeFilter, ValueFilter,
-    ANNOTATION_KEY)
+    ANNOTATION_KEY, ListItemFilter)
 from c7n.filters.health import HealthEventFilter
+from c7n.filters.related import RelatedResourceFilter
 
 from c7n.manager import resources
 from c7n.resources.kms import ResourceKmsKeyAlias
+from c7n.resources.securityhub import PostFinding
 from c7n.query import QueryResourceManager, TypeInfo
-from c7n.tags import Tag
+from c7n.tags import Tag, coalesce_copy_user_tags
 from c7n.utils import (
     camelResource,
     chunks,
     get_retry,
     local_session,
+    select_keys,
     set_annotation,
     type_schema,
     QueryParser,
+    get_support_region,
+    group_by
 )
 from c7n.resources.ami import AMI
 
@@ -58,6 +49,7 @@ class Snapshot(QueryResourceManager):
         enum_spec = (
             'describe_snapshots', 'Snapshots', None)
         id = 'SnapshotId'
+        id_prefix = 'snap-'
         filter_name = 'SnapshotIds'
         filter_type = 'list'
         name = 'SnapshotId'
@@ -79,6 +71,8 @@ class Snapshot(QueryResourceManager):
             query['Filters'] = qfilters
         if query.get('OwnerIds') is None:
             query['OwnerIds'] = ['self']
+        if 'MaxResults' not in query:
+            query['MaxResults'] = 1000
         return super(Snapshot, self).resources(query=query)
 
     def get_resources(self, ids, cache=True, augment=True):
@@ -98,7 +92,7 @@ class Snapshot(QueryResourceManager):
         return []
 
 
-class ErrorHandler(object):
+class ErrorHandler:
 
     @staticmethod
     def remove_snapshot(rid, resource_set):
@@ -124,21 +118,35 @@ class ErrorHandler(object):
             log.warning("Snapshot id malformed %s" % e_snap_id)
         return e_snap_id
 
+    @staticmethod
+    def extract_bad_volume(e):
+        """Handle various client side errors when describing volumes"""
+        msg = e.response['Error']['Message']
+        error = e.response['Error']['Code']
+        e_vol_id = None
+        if error == 'InvalidVolume.NotFound':
+            e_vol_id = msg[msg.find("'") + 1:msg.rfind("'")]
+            log.warning("Volume not found %s" % e_vol_id)
+        elif error == 'InvalidVolumeID.Malformed':
+            e_vol_id = msg[msg.find('"') + 1:msg.rfind('"')]
+            log.warning("Volume id malformed %s" % e_vol_id)
+        return e_vol_id
+
 
 class SnapshotQueryParser(QueryParser):
 
     QuerySchema = {
-        'description': six.string_types,
+        'description': str,
         'owner-alias': ('amazon', 'amazon-marketplace', 'microsoft'),
-        'owner-id': six.string_types,
-        'progress': six.string_types,
-        'snapshot-id': six.string_types,
-        'start-time': six.string_types,
+        'owner-id': str,
+        'progress': str,
+        'snapshot-id': str,
+        'start-time': str,
         'status': ('pending', 'completed', 'error'),
-        'tag': six.string_types,
-        'tag-key': six.string_types,
-        'volume-id': six.string_types,
-        'volume-size': six.string_types,
+        'tag': str,
+        'tag-key': str,
+        'volume-id': str,
+        'volume-size': str,
     }
 
     type_name = 'EBS'
@@ -231,12 +239,19 @@ class SnapshotCrossAccountAccess(CrossAccountAccessFilter):
 
     def process_resource_set(self, client, resource_set):
         results = []
+        everyone_only = self.data.get('everyone_only', False)
         for r in resource_set:
             attrs = self.manager.retry(
                 client.describe_snapshot_attribute,
                 SnapshotId=r['SnapshotId'],
                 Attribute='createVolumePermission')['CreateVolumePermissions']
-            shared_accounts = {
+            shared_accounts = set()
+            if everyone_only:
+                for g in attrs:
+                    if g.get('Group') == 'all':
+                        shared_accounts = {g.get('Group')}
+            else:
+                shared_accounts = {
                 g.get('Group') or g.get('UserId') for g in attrs}
             delta_accounts = shared_accounts.difference(self.accounts)
             if delta_accounts:
@@ -358,6 +373,37 @@ class SnapshotSkipAmiSnapshots(Filter):
         return resources
 
 
+@Snapshot.filter_registry.register('volume')
+class SnapshotVolumeFilter(RelatedResourceFilter):
+    """
+    Filter EBS snapshots by their volume attributes.
+
+    .. code-block:: yaml
+
+        policies:
+          - name: snapshot-with-no-volume
+            description: Find any snapshots that do not have a corresponding volume.
+            resource: aws.ebs-snapshot
+            filters:
+              - type: volume
+                key: VolumeId
+                value: absent
+          - name: find-snapshots-from-volume
+            resource: aws.ebs-snapshot
+            filters:
+              - type: volume
+                key: VolumeId
+                value: vol-foobarbaz
+    """
+
+    RelatedResource = 'c7n.resources.ebs.EBS'
+    RelatedIdsExpression = 'VolumeId'
+    AnnotationKey = 'Volume'
+
+    schema = type_schema(
+        'volume', rinherit=ValueFilter.schema)
+
+
 @Snapshot.action_registry.register('delete')
 class SnapshotDelete(BaseAction):
     """Deletes EBS snapshots
@@ -393,19 +439,20 @@ class SnapshotDelete(BaseAction):
                  post, pre - post)
 
         client = local_session(self.manager.session_factory).client('ec2')
+        deleted_snapshots = []
         with self.executor_factory(max_workers=2) as w:
             futures = []
             for snapshot_set in chunks(reversed(snapshots), size=50):
                 futures.append(
-                    w.submit(self.process_snapshot_set, client, snapshot_set))
+                    w.submit(self.process_snapshot_set, client, snapshot_set, deleted_snapshots))
             for f in as_completed(futures):
                 if f.exception():
                     self.log.error(
                         "Exception deleting snapshot set \n %s" % (
                             f.exception()))
-        return snapshots
+        return deleted_snapshots
 
-    def process_snapshot_set(self, client, snapshots_set):
+    def process_snapshot_set(self, client, snapshots_set, deleted_snapshots):
         retry = get_retry((
             'RequestLimitExceeded', 'Client.RequestLimitExceeded'))
 
@@ -416,6 +463,7 @@ class SnapshotDelete(BaseAction):
                 retry(client.delete_snapshot,
                       SnapshotId=s['SnapshotId'],
                       DryRun=self.manager.config.dryrun)
+                deleted_snapshots.append(s)
             except ClientError as e:
                 if e.response['Error']['Code'] == "InvalidSnapshot.NotFound":
                     continue
@@ -465,11 +513,6 @@ class CopySnapshot(BaseAction):
         return self
 
     def process(self, resources):
-        if self.data['target_region'] == self.manager.config.region:
-            self.log.info(
-                "Source and destination region are the same, skipping")
-            return
-
         with self.executor_factory(max_workers=2) as w:
             list(w.map(self.process_resource_set, chunks(resources, 20)))
 
@@ -477,8 +520,7 @@ class CopySnapshot(BaseAction):
         client = self.manager.session_factory(
             region=self.data['target_region']).client('ec2')
 
-        if self.data['target_region'] != self.manager.config.region:
-            cross_region = True
+        cross_region = self.data['target_region'] != self.manager.config.region
 
         params = {}
         params['Encrypted'] = self.data.get('encrypted', True)
@@ -511,6 +553,95 @@ class CopySnapshot(BaseAction):
                 "Cross region copy complete %s", ",".join(copy_ids))
 
 
+@Snapshot.action_registry.register('set-permissions')
+class SetPermissions(BaseAction):
+    """Action to set permissions for creating volumes from a snapshot
+
+    Use the 'add' and 'remove' parameters to control which accounts to
+    add or remove respectively.  The default is to remove any create
+    volume permissions granted to other AWS accounts.
+
+    Combining this action with the 'cross-account' filter allows you
+    greater control over which accounts will be removed, e.g. using a
+    whitelist:
+
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: ebs-dont-share-cross-account
+                resource: ebs-snapshot
+                filters:
+                  - type: cross-account
+                    whitelist:
+                    - '112233445566'
+                actions:
+                  - type: set-permissions
+                    remove: matched
+    """
+    schema = type_schema(
+        'set-permissions',
+        remove={
+            'oneOf': [
+                {'enum': ['matched']},
+                {'type': 'array', 'items': {
+                    'type': 'string', 'minLength': 12, 'maxLength': 12}},
+            ]},
+        add={
+            'type': 'array', 'items': {
+                'type': 'string', 'minLength': 12, 'maxLength': 12}},
+    )
+
+    permissions = ('ec2:ModifySnapshotAttribute',)
+
+    def validate(self):
+        if self.data.get('remove') == 'matched':
+            found = False
+            for f in self.manager.iter_filters():
+                if isinstance(f, SnapshotCrossAccountAccess):
+                    found = True
+                    break
+            if not found:
+                raise PolicyValidationError(
+                    "policy:%s filter:%s with matched requires cross-account filter" % (
+                        self.manager.ctx.policy.name, self.type))
+
+    def process(self, snapshots):
+        client = local_session(self.manager.session_factory).client('ec2')
+        for i in snapshots:
+            self.process_image(client, i)
+
+    def process_image(self, client, snapshot):
+        add_accounts = self.data.get('add', [])
+        remove_accounts = self.data.get('remove', [])
+        if not add_accounts and not remove_accounts:
+            return client.reset_snapshot_attribute(
+                SnapshotId=snapshot['SnapshotId'], Attribute="createVolumePermission")
+        if remove_accounts == 'matched':
+            remove_accounts = snapshot.get(
+                'c7n:' + SnapshotCrossAccountAccess.annotation_key)
+
+        remove = []
+        remove.extend([{'UserId': a} for a in remove_accounts if a != 'all'])
+        if 'all' in remove_accounts:
+            remove.append({'Group': 'all'})
+            remove_accounts.remove('all')
+
+        add = [{'UserId': a} for a in add_accounts]
+
+        if remove:
+            client.modify_snapshot_attribute(
+                SnapshotId=snapshot['SnapshotId'],
+                CreateVolumePermission={'Remove': remove},
+                OperationType='remove')
+        if add:
+            client.modify_snapshot_attribute(
+                SnapshotId=snapshot['SnapshotId'],
+                CreateVolumePermission={'Add': add},
+                OperationType='add')
+
+
 @resources.register('ebs')
 class EBS(QueryResourceManager):
 
@@ -519,12 +650,13 @@ class EBS(QueryResourceManager):
         arn_type = 'volume'
         enum_spec = ('describe_volumes', 'Volumes', None)
         name = id = 'VolumeId'
+        id_prefix = 'vol-'
         filter_name = 'VolumeIds'
         filter_type = 'list'
         date = 'createTime'
         dimension = 'VolumeId'
         metrics_namespace = 'AWS/EBS'
-        config_type = "AWS::EC2::Volume"
+        cfn_type = config_type = "AWS::EC2::Volume"
         default_report_fields = (
             'VolumeId',
             'Attachments[0].InstanceId',
@@ -532,6 +664,110 @@ class EBS(QueryResourceManager):
             'VolumeType',
             'KmsKeyId'
         )
+
+    def get_resources(self, ids, cache=True, augment=True):
+        if cache:
+            resources = self._get_cached_resources(ids)
+            if resources is not None:
+                return resources
+        while ids:
+            try:
+                return self.source.get_resources(ids)
+            except ClientError as e:
+                bad_vol = ErrorHandler.extract_bad_volume(e)
+                if bad_vol:
+                    ids.remove(bad_vol)
+                    continue
+                raise
+        return []
+
+
+@EBS.filter_registry.register('snapshots')
+class EBSSnapshotsFilter(ListItemFilter):
+    """
+    Filter volumes by all their snapshots.
+
+    :example:
+
+    .. code-block:: yaml
+
+        policies:
+          - name: ebs-volumes
+            resource: aws.ebs
+            filters:
+              - not:
+                - type: snapshots
+                  attrs:
+                    - type: value
+                      key: StartTime
+                      value_type: age
+                      value: 2
+                      op: less-than
+    """
+    schema = type_schema(
+        'snapshots',
+        attrs={'$ref': '#/definitions/filters_common/list_item_attrs'},
+        count={'type': 'number'},
+        count_op={'$ref': '#/definitions/filters_common/comparison_operators'}
+    )
+    permissions = ('ec2:DescribeSnapshots', )
+    item_annotation_key = 'c7n:Snapshots'
+    annotate_items = True
+
+    def _process_resources_set(self, client, resources):
+        snapshots = client.describe_snapshots(
+            Filters=[{
+                'Name': 'volume-id',
+                'Values': [r['VolumeId'] for r in resources]
+            }]
+        ).get('Snapshots') or []
+        grouped = group_by(snapshots, 'VolumeId')
+        for res in resources:
+            res[self.item_annotation_key] = grouped.get(res['VolumeId']) or []
+
+    def process(self, resources, event=None):
+        client = local_session(self.manager.session_factory).client('ec2')
+        with self.manager.executor_factory(max_workers=3) as w:
+            futures = []
+            # 200 max value for a single call
+            for resources_set in chunks(resources, 30):
+                futures.append(w.submit(self._process_resources_set, client,
+                                        resources_set))
+            for f in as_completed(futures):
+                if f.exception():
+                    self.log.error(
+                        "Exception getting snapshots by volume ids \n %s" % (
+                            f.exception())
+                    )
+                    continue
+        return super().process(resources, event)
+
+    def get_item_values(self, resource):
+        if self.annotate_items:
+            return resource[self.item_annotation_key]
+        return resource.pop(self.item_annotation_key)
+
+
+@EBS.action_registry.register('post-finding')
+class EBSPostFinding(PostFinding):
+
+    resource_type = 'AwsEc2Volume'
+
+    def format_resource(self, r):
+        envelope, payload = self.format_envelope(r)
+        details = select_keys(
+            r, ['KmsKeyId', 'Size', 'SnapshotId', 'Status', 'CreateTime', 'Encrypted'])
+        details['CreateTime'] = details['CreateTime'].isoformat()
+        self.filter_empty(details)
+        for attach in r.get('Attachments', ()):
+            details.setdefault('Attachments', []).append(
+                self.filter_empty({
+                    'AttachTime': attach['AttachTime'].isoformat(),
+                    'InstanceId': attach.get('InstanceId'),
+                    'DeleteOnTermination': attach['DeleteOnTermination'],
+                    'Status': attach['State']}))
+        payload.update(details)
+        return envelope
 
 
 @EBS.action_registry.register('detach')
@@ -648,7 +884,9 @@ class FaultTolerantSnapshots(Filter):
 
     def pull_check_results(self):
         result = set()
-        client = local_session(self.manager.session_factory).client('support')
+        support_region = get_support_region(self.manager)
+        client = local_session(self.manager.session_factory).client(
+            'support', region_name=support_region)
         client.refresh_trusted_advisor_check(checkId=self.check_id)
         results = client.describe_trusted_advisor_check_result(
             checkId=self.check_id, language='en')['result']
@@ -834,7 +1072,7 @@ class CopyInstanceTags(BaseAction):
             (t['Key'], t['Value']) for t in volume.get('Tags', [])])
 
         for t in instance.get('Tags', ()):
-            if only_tags and not t['Key'] in only_tags:
+            if only_tags and t['Key'] not in only_tags:
                 continue
             if t['Key'] in extant_tags and t['Value'] == extant_tags[t['Key']]:
                 continue
@@ -1035,6 +1273,7 @@ class EncryptInstanceVolumes(BaseAction):
         return False
 
     def create_encrypted_volume(self, ec2, v, key_id, instance_id):
+        unencrypted_volume_tags = v.get('Tags', [])
         # Create a current snapshot
         results = ec2.create_snapshot(
             VolumeId=v['VolumeId'],
@@ -1074,7 +1313,7 @@ class EncryptInstanceVolumes(BaseAction):
                 {'Key': 'maid-crypt-remediation', 'Value': instance_id},
                 {'Key': 'maid-origin-volume', 'Value': v['VolumeId']},
                 {'Key': 'maid-instance-device',
-                 'Value': v['Attachments'][0]['Device']}])
+                 'Value': v['Attachments'][0]['Device']}] + unencrypted_volume_tags)
 
         # Wait on encrypted volume creation
         self.wait_on_resource(ec2, volume_id=results['VolumeId'])
@@ -1137,7 +1376,20 @@ class EncryptInstanceVolumes(BaseAction):
 
 @EBS.action_registry.register('snapshot')
 class CreateSnapshot(BaseAction):
-    """Snapshot an EBS volume
+    """Snapshot an EBS volume.
+
+    Tags may be optionally added to the snapshot during creation.
+
+    - `copy-volume-tags` copies all the tags from the specified
+      volume to the corresponding snapshot.
+    - `copy-tags` copies the listed tags from each volume
+      to the snapshot.  This is mutually exclusive with
+      `copy-volume-tags`.
+    - `tags` allows new tags to be added to each snapshot.  If
+      no tags are specified, then the tag `custodian_snapshot`
+      is added.
+
+    The default behavior is `copy-volume-tags: true`.
 
     :example:
 
@@ -1153,11 +1405,15 @@ class CreateSnapshot(BaseAction):
                   - type: snapshot
                     copy-tags:
                       - Name
+                    tags:
+                        custodian_snapshot: True
     """
     schema = type_schema(
         'snapshot',
         **{'copy-tags': {'type': 'array', 'items': {'type': 'string'}},
-           'copy-volume-tags': {'type': 'boolean'}})
+           'copy-volume-tags': {'type': 'boolean'},
+           'tags': {'type': 'object'},
+           'description': {'type': 'string'}})
     permissions = ('ec2:CreateSnapshot', 'ec2:CreateTags',)
 
     def validate(self):
@@ -1177,27 +1433,25 @@ class CreateSnapshot(BaseAction):
             retry(self.process_volume, client=client, volume=vol_id, tags=tags)
 
     def process_volume(self, client, volume, tags):
+        description = self.data.get('description')
+        if not description:
+            description = "Automated snapshot by c7n - %s" % (self.manager.ctx.policy.name)
+
         try:
-            client.create_snapshot(VolumeId=volume, TagSpecifications=tags)
+            client.create_snapshot(
+                VolumeId=volume,
+                Description=description,
+                TagSpecifications=tags
+            )
         except ClientError as e:
             if e.response['Error']['Code'] == 'InvalidVolume.NotFound':
                 return
             raise
 
     def get_snapshot_tags(self, resource):
-        tags = [
-            {'Key': 'custodian_snapshot', 'Value': ''}]
-        copy_keys = self.data.get('copy-tags', [])
-        copy_tags = []
-        if copy_keys:
-            for t in resource.get('Tags', []):
-                if t['Key'] in copy_keys:
-                    copy_tags.append(t)
-            tags.extend(copy_tags)
-            return tags
-        if self.data.get('copy-volume-tags', True):
-            tags.extend(resource.get('Tags', []))
-        return tags
+        user_tags = self.data.get('tags', {}) or {'custodian_snapshot': ''}
+        copy_tags = self.data.get('copy-tags', []) or self.data.get('copy-volume-tags', True)
+        return coalesce_copy_user_tags(resource, copy_tags, user_tags)
 
 
 @EBS.action_registry.register('delete')
@@ -1275,14 +1529,14 @@ class ModifyableVolume(Filter):
 
     schema = type_schema('modifyable')
 
-    older_generation = set((
+    older_generation = {
         'm1.small', 'm1.medium', 'm1.large', 'm1.xlarge',
         'c1.medium', 'c1.xlarge', 'cc2.8xlarge',
         'm2.xlarge', 'm2.2xlarge', 'm2.4xlarge', 'cr1.8xlarge',
         'hi1.4xlarge', 'hs1.8xlarge', 'cg1.4xlarge', 't1.micro',
         # two legs good, not all current gen work either.
         'm3.large', 'm3.xlarge', 'm3.2xlarge'
-    ))
+    }
 
     permissions = ("ec2:DescribeInstances",)
 
@@ -1380,7 +1634,7 @@ class ModifyVolume(BaseAction):
               resource: ebs
               filters:
                - type: value
-                 key: CreateDate
+                 key: CreateTime
                  value_type: age
                  value: 7
                  op: greater-than
@@ -1397,9 +1651,9 @@ class ModifyVolume(BaseAction):
                  volume-type: gp2
 
     `iops-percent` and `size-percent` can be used to modify
-    respectively iops on io1 volumes and volume size.
+    respectively iops on io1/io2 volumes and volume size.
 
-    When converting to io1, `iops-percent` is used to set the iops
+    When converting to io1/io2, `iops-percent` is used to set the iops
     allocation for the new volume against the extant value for the old
     volume.
 
@@ -1429,7 +1683,7 @@ class ModifyVolume(BaseAction):
 
     schema = type_schema(
         'modify',
-        **{'volume-type': {'enum': ['io1', 'gp2', 'st1', 'sc1']},
+        **{'volume-type': {'enum': ['io1', 'io2', 'gp2', 'gp3', 'st1', 'sc1']},
            'shrink': False,
            'size-percent': {'type': 'number'},
            'iops-percent': {'type': 'number'}})
@@ -1459,7 +1713,8 @@ class ModifyVolume(BaseAction):
 
         for r in resource_set:
             params = {'VolumeId': r['VolumeId']}
-            if piops and ('io1' in (vtype, r['VolumeType'])):
+            if piops and ('io1' in (vtype, r['VolumeType']) or
+                          'io2' in (vtype, r['VolumeType'])):
                 # default here if we're changing to io1
                 params['Iops'] = max(int(r.get('Iops', 10) * piops / 100.0), 100)
             if psize:

@@ -1,19 +1,8 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 
 
-import mock
+from unittest import mock
 from .common import BaseTest
 
 
@@ -73,3 +62,40 @@ class ShieldTest(BaseTest):
                     self.assertTrue(
                         mock.call(ProtectionId=str(i)) in delete.call_args_list
                     )
+
+    def test_tag_protection(self):
+        session_factory = self.replay_flight_data("test_shield_tag_protection")
+        p = self.load_policy(
+            {
+                "name": "tag-shield-protection",
+                "resource": "shield-protection",
+                "filters": [{"tag:Owner": "c7n"}],
+                "actions": [{"type": "tag", "key": "c7n", "value": "test"}],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        client = session_factory().client("shield")
+        tags = client.list_tags_for_resource(ResourceARN=resources[0]["ResourceArn"])["Tags"]
+        self.assertEqual(tags[1]["Value"], "test")
+
+    def test_untag_protection(self):
+        session_factory = self.replay_flight_data("test_shield_untag_protection")
+        p = self.load_policy(
+            {
+                "name": "untag-shield-protection",
+                "resource": "shield-protection",
+                "filters": [{"tag:c7n": "test"}],
+                "actions": [{"type": "remove-tag", "tags": ["c7n"]}],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        client = session_factory().client("shield")
+        tags = client.list_tags_for_resource(ResourceARN=resources[0]["ResourceArn"])["Tags"]
+        self.assertEqual(len(tags), 1)
+        self.assertTrue(tags[0]["Key"] != "c7n")

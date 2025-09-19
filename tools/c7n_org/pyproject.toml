@@ -1,0 +1,36 @@
+[project]
+authors = [
+    {name = "Cloud Custodian Project"},
+]
+license = "Apache-2.0"
+requires-python = "<4.0.0,>=3.9.2"
+dependencies = [
+    "c7n",
+    "click>=8.0",
+]
+name = "c7n_org"
+version = "0.6.46"
+description = "Cloud Custodian - Parallel Execution"
+readme = "README.md"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: System :: Systems Administration",
+    "Topic :: System :: Distributed Computing",
+]
+
+[project.urls]
+homepage = "https://cloudcustodian.io"
+repository = "https://github.com/cloud-custodian/cloud-custodian"
+documentation = "https://cloudcustodian.io/docs/tools/c7n-org.html"
+
+[project.scripts]
+c7n-org = "c7n_org.cli:cli"
+
+[dependency-groups]
+dev = [
+    "pytest<8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

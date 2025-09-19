@@ -1,23 +1,11 @@
-# Copyright 2019 Microsoft Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 
 import datetime
 import logging
 from abc import abstractmethod
 from email.utils import parseaddr
 
-import jmespath
 from c7n_azure import constants
 from c7n_azure.actions.base import AzureBaseAction, AzureEventAction
 from c7n_azure.tags import TagHelper
@@ -29,7 +17,7 @@ from c7n import utils
 from c7n.exceptions import PolicyValidationError
 from c7n.filters import FilterValidationError
 from c7n.filters.offhours import Time
-from c7n.utils import type_schema
+from c7n.utils import type_schema, jmespath_compile
 from c7n.lookup import Lookup
 
 
@@ -80,7 +68,7 @@ class Tag(AzureBaseAction):
 
     def _process_resource(self, resource):
         new_tags = self._get_tags(resource)
-        TagHelper.add_tags(self, resource, new_tags)
+        return TagHelper.add_tags(self, resource, new_tags)
 
     def _get_tags(self, resource):
         return self.data.get('tags') or {Lookup.extract(
@@ -122,7 +110,7 @@ class RemoveTag(AzureBaseAction):
         self.tags_to_delete = self.data.get('tags')
 
     def _process_resource(self, resource):
-        TagHelper.remove_tags(self, resource, self.tags_to_delete)
+        return TagHelper.remove_tags(self, resource, self.tags_to_delete)
 
 
 class AutoTagBase(AzureEventAction):
@@ -181,7 +169,7 @@ class AutoTagBase(AzureEventAction):
         else:
             tag_value = self._get_tag_value_from_resource(resource) or tag_value
 
-        TagHelper.add_tags(self, resource, {self.tag_key: tag_value})
+        return TagHelper.add_tags(self, resource, {self.tag_key: tag_value})
 
     def _get_first_event(self, resource):
 
@@ -256,19 +244,25 @@ class AutoTagUser(AutoTagBase):
 
     """
 
-    schema = type_schema('auto-tag-user', rinherit=AutoTagBase.schema)
+    schema = type_schema('auto-tag-user',
+                         rinherit=AutoTagBase.schema,
+                         **{
+                             'default-claim': {'enum': ['upn', 'name']}
+                         })
     log = logging.getLogger('custodian.azure.tagging.AutoTagUser')
 
     # compiled JMES paths
-    service_admin_jmes_path = jmespath.compile(constants.EVENT_GRID_SERVICE_ADMIN_JMES_PATH)
-    sp_jmes_path = jmespath.compile(constants.EVENT_GRID_SP_NAME_JMES_PATH)
-    upn_jmes_path = jmespath.compile(constants.EVENT_GRID_UPN_CLAIM_JMES_PATH)
-    principal_role_jmes_path = jmespath.compile(constants.EVENT_GRID_PRINCIPAL_ROLE_JMES_PATH)
-    principal_type_jmes_path = jmespath.compile(constants.EVENT_GRID_PRINCIPAL_TYPE_JMES_PATH)
+    service_admin_jmes_path = jmespath_compile(constants.EVENT_GRID_SERVICE_ADMIN_JMES_PATH)
+    sp_jmes_path = jmespath_compile(constants.EVENT_GRID_SP_NAME_JMES_PATH)
+    upn_jmes_path = jmespath_compile(constants.EVENT_GRID_UPN_CLAIM_JMES_PATH)
+    name_jmes_path = jmespath_compile(constants.EVENT_GRID_NAME_CLAIM_JMES_PATH)
+    principal_role_jmes_path = jmespath_compile(constants.EVENT_GRID_PRINCIPAL_ROLE_JMES_PATH)
+    principal_type_jmes_path = jmespath_compile(constants.EVENT_GRID_PRINCIPAL_TYPE_JMES_PATH)
 
     def __init__(self, data=None, manager=None, log_dir=None):
         super(AutoTagUser, self).__init__(data, manager, log_dir)
         self.query_select = "eventTimestamp, operationName, caller, claims"
+        self.default_claim = self.data.get('default-claim', 'upn')
 
     def _get_tag_value_from_event(self, event):
         principal_role = self.principal_role_jmes_path.search(event)
@@ -281,21 +275,27 @@ class AutoTagUser(AutoTagBase):
         elif StringUtils.equal(principal_type, 'ServicePrincipal'):
             user = self.sp_jmes_path.search(event)
 
-        # Other types and main fallback (e.g. User, Office 365 Groups, and Security Groups)
-        if not user and self.upn_jmes_path.search(event):
-            user = self.upn_jmes_path.search(event)
+        if not user:
+            known_claims = {'upn': self.upn_jmes_path.search(event),
+                            'name': self.name_jmes_path.search(event)}
+            if known_claims[self.default_claim]:
+                user = known_claims[self.default_claim]
+            elif self.default_claim == 'upn' and known_claims['name']:
+                user = known_claims['name']
+            elif self.default_claim == 'name' and known_claims['upn']:
+                user = known_claims['upn']
 
         # Last effort search for an email address in the claims
         if not user:
-            claims = event['data']['claims']
+            claims = event['data'].get('claims', [])
             for c in claims:
                 value = claims[c]
                 if self._is_email(value):
                     user = value
+                    break
 
         if not user:
             self.log.error('Principal could not be determined.')
-
         return user
 
     def _is_email(self, target):
@@ -308,7 +308,11 @@ class AutoTagUser(AutoTagBase):
 
     def _get_tag_value_from_resource(self, resource):
         first_op = self._get_first_event(resource)
-        return first_op.caller if first_op else None
+
+        if not first_op:
+            return None
+
+        return self._get_tag_value_from_event({'data': first_op.serialize(True)})
 
 
 class AutoTagDate(AutoTagBase):
@@ -341,7 +345,7 @@ class AutoTagDate(AutoTagBase):
     schema = type_schema('auto-tag-date', rinherit=AutoTagBase.schema,
                          **{'format': {'type': 'string'}})
 
-    event_time_path = jmespath.compile(constants.EVENT_GRID_EVENT_TIME_PATH)
+    event_time_path = jmespath_compile(constants.EVENT_GRID_EVENT_TIME_PATH)
     log = logging.getLogger('custodian.azure.tagging.AutoTagDate')
 
     def __init__(self, data=None, manager=None, log_dir=None):
@@ -370,7 +374,7 @@ class AutoTagDate(AutoTagBase):
 
 class TagTrim(AzureBaseAction):
     """Automatically remove tags from an azure resource.
-    Azure Resources and Resource Groups have a limit of 15 tags.
+    Azure Resources and Resource Groups have a limit of 50 tags.
     In order to make additional tag space on a set of resources,
     this action can be used to remove enough tags to make the
     desired amount of space while preserving a given set of tags.
@@ -384,22 +388,22 @@ class TagTrim(AzureBaseAction):
        policies:
          - name: azure-tag-trim
            comment: |
-             Any instances with 14 or more tags get tags removed until
-             they match the target tag count, in this case 13, so
+             Any instances with 49 or more tags get tags removed until
+             they match the target tag count, in this case 48, so
              that we free up tag slots for another usage.
            resource: azure.resourcegroup
            filters:
                # Filter down to resources that do not have the space
                # to add additional required tags. For example, if an
                # additional 2 tags need to be added to a resource, with
-               # 15 tags as the limit, then filter down to resources that
-               # have 14 or more tags since they will need to have tags
+               # 50 tags as the limit, then filter down to resources that
+               # have 49 or more tags since they will need to have tags
                # removed for the 2 extra. This also ensures that metrics
                # reporting is correct for the policy.
               - type: value
                 key: "length(Tags)"
                 op: ge
-                value: 14
+                value: 49
            actions:
               - type: tag-trim
                 space: 2
@@ -410,7 +414,7 @@ class TagTrim(AzureBaseAction):
                  - custodian_status
 
     """
-    max_tag_count = 15
+    max_tag_count = 50
 
     schema = utils.type_schema(
         'tag-trim',
@@ -425,8 +429,8 @@ class TagTrim(AzureBaseAction):
         self.space = self.data.get('space', 1)
 
     def validate(self):
-        if self.space < 0 or self.space > 15:
-            raise FilterValidationError("Space must be between 0 and 15")
+        if self.space < 0 or self.space > self.max_tag_count:
+            raise FilterValidationError("Space must be between 0 and %i" % self.max_tag_count)
         return self
 
     def _process_resource(self, resource):
@@ -451,7 +455,7 @@ class TagTrim(AzureBaseAction):
                 "Could not find any candidates to trim %s" % resource['id'])
             return
 
-        TagHelper.remove_tags(self, resource, candidates)
+        return TagHelper.remove_tags(self, resource, candidates)
 
 
 DEFAULT_TAG = "custodian_status"
@@ -487,8 +491,8 @@ class TagDelayedAction(AzureBaseAction):
         'mark-for-op',
         tag={'type': 'string'},
         msg={'type': 'string'},
-        days={'type': 'integer', 'minimum': 0, 'exclusiveMinimum': False},
-        hours={'type': 'integer', 'minimum': 0, 'exclusiveMinimum': False},
+        days={'type': 'number', 'minimum': 0, 'exclusiveMinimum': False},
+        hours={'type': 'number', 'minimum': 0, 'exclusiveMinimum': False},
         tz={'type': 'string'},
         op={'type': 'string'})
     schema_alias = True
@@ -548,3 +552,4 @@ class TagDelayedAction(AzureBaseAction):
         tags[self.tag] = self.msg
 
         TagHelper.update_resource_tags(self, resource, tags)
+        return {self.tag: self.msg}

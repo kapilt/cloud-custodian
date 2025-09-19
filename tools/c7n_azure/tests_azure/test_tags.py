@@ -1,18 +1,5 @@
-# Copyright 2015-2018 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 from .azure_common import BaseTest
 from mock import patch, Mock
 
@@ -58,28 +45,17 @@ class TagsTest(BaseTest):
         self.assertEqual(tools.get_tags_parameter(update_resource_tags), expected_tags)
 
     def test_update_tags(self):
-        resource = tools.get_resource({})
-        resource_group = tools.get_resource_group_resource({})
+        for resource_type, resource in {
+            "vm": tools.get_resource({}),
+            "resourcegroup": tools.get_resource_group_resource({})
+        }.items():
+            client_mock = Mock()
+            action = Mock()
+            action.manager.type = resource_type
+            action.session.client.return_value = client_mock
 
-        client_mock = Mock()
-
-        action = Mock()
-        action.manager.type = 'resourcegroup'
-        action.session.client.return_value = client_mock
-
-        TagHelper.update_resource_tags(action, resource_group, self.existing_tags)
-        client_mock.resource_groups.update.assert_called_once()
-        args = client_mock.resource_groups.update.call_args[0]
-        self.assertEqual(args[0], resource_group['name'])
-        self.assertEqual(args[1].tags, self.existing_tags)
-        # Only PATCH tags
-        self.assertListEqual(['tags'], [x for x in args[1].as_dict() if x is not None])
-
-        action.manager.type = 'vm'
-        TagHelper.update_resource_tags(action, resource, self.existing_tags)
-        client_mock.resources.update_by_id.assert_called_once()
-        args = client_mock.resources.update_by_id.call_args[0]
-        self.assertEqual(args[0], resource['id'])
-        self.assertEqual(args[2].tags, self.existing_tags)
-        # Only PATCH tags
-        self.assertListEqual(['tags'], [x for x in args[2].as_dict() if x is not None])
+            TagHelper.update_resource_tags(action, resource, self.existing_tags)
+            client_mock.tags.begin_update_at_scope.assert_called_once()
+            args = client_mock.tags.begin_update_at_scope.call_args[0]
+            self.assertEqual(args[0], resource['id'])
+            self.assertEqual(args[1].properties['tags'], self.existing_tags)

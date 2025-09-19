@@ -1,22 +1,10 @@
-# Copyright 2017-2018 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 import itertools
-import jmespath
-import six
 
 from c7n.exceptions import PolicyExecutionError, PolicyValidationError
 from c7n import utils
+import jmespath
 
 from .core import Action
 
@@ -39,7 +27,29 @@ class ModifyVpcSecurityGroupsAction(Action):
         add: []
         remove: [] | matched | network-location
         isolation-group: sg-xyz
+        add-by-tag: {}
 
+    :example:
+
+    .. code-block:: yaml
+
+            policies:
+              - name: set-prod-security-groups
+                resource: ec2
+                filters:
+                  - type: value
+                    key: 'tag:env'
+                    value: 'prod'
+                actions:
+                  - type: modify-security-groups
+                    add: prod-default-sg
+                    remove:
+                      - launch-wizard-1
+                      - launch-wizard-2
+                    add-by-tag:
+                      key: environment
+                      values:
+                        - production
     """
     schema_alias = True
     schema = {
@@ -60,14 +70,25 @@ class ModifyVpcSecurityGroupsAction(Action):
             'isolation-group': {'oneOf': [
                 {'type': 'string'},
                 {'type': 'array', 'items': {
-                    'type': 'string'}}]}},
+                    'type': 'string'}}]},
+            'add-by-tag': {
+                'type': 'object',
+                'additionalProperties': False,
+                'properties': {
+                    'key': {'type': 'string'},
+                    'values': {'type': 'array', 'items': {'type': 'string'}}
+                },
+                'required': ['key', 'values']
+            }
+        },
         'anyOf': [
             {'required': ['isolation-group', 'remove', 'type']},
             {'required': ['add', 'remove', 'type']},
-            {'required': ['add', 'type']}]
+            {'required': ['add', 'type']},
+            {'required': ['add-by-tag', 'type']}]
     }
 
-    SYMBOLIC_SGS = set(('all', 'matched', 'network-location'))
+    SYMBOLIC_SGS = {'all', 'matched', 'network-location'}
 
     sg_expr = None
     vpc_expr = None
@@ -84,9 +105,9 @@ class ModifyVpcSecurityGroupsAction(Action):
                 raise PolicyValidationError(self._format_error((
                     "policy:{policy} resource:{resource_type} does not support "
                     "security-group names only ids in action:{action_type}")))
-            self.vpc_expr = jmespath.compile(vpc_filter.RelatedIdsExpression)
+            self.vpc_expr = utils.jmespath_compile(vpc_filter.RelatedIdsExpression)
         if self.sg_expr is None:
-            self.sg_expr = jmespath.compile(
+            self.sg_expr = utils.jmespath_compile(
                 self.manager.filter_registry.get('security-group').RelatedIdsExpression)
         if 'all' in self._get_array('remove') and not self._get_array('isolation-group'):
             raise PolicyValidationError(self._format_error((
@@ -121,7 +142,7 @@ class ModifyVpcSecurityGroupsAction(Action):
 
     def _get_array(self, k):
         v = self.data.get(k, [])
-        if isinstance(v, six.string_types):
+        if isinstance(v, (str, bytes)):
             return [v]
         return v
 
@@ -147,6 +168,17 @@ class ModifyVpcSecurityGroupsAction(Action):
                 "policy:{policy} security groups not found "
                 "requested: {names}, found: {groups}",
                 names=list(unresolved), groups=[g['GroupId'] for g in sgs]))
+        return sgs
+
+    def get_groups_by_tag(self, key, values):
+        """Get security groups that match tag values."""
+        client = utils.local_session(
+            self.manager.session_factory).client('ec2')
+        sgs = self.manager.retry(
+            client.describe_security_groups,
+            Filters=[{
+                'Name': 'tag:' + key, 'Values': values}]).get(
+                    'SecurityGroups', [])
         return sgs
 
     def resolve_group_names(self, r, target_group_ids, groups):
@@ -201,8 +233,8 @@ class ModifyVpcSecurityGroupsAction(Action):
         """Return lists of security groups to set on each resource
 
         For each input resource, parse the various add/remove/isolation-
-        group policies for 'modify-security-groups' to find the resulting
-        set of VPC security groups to attach to that resource.
+        group/add-by-tag policies for 'modify-security-groups' to find the
+        resulting set of VPC security groups to attach to that resource.
 
         Returns a list of lists containing the resulting VPC security groups
         that should end up on each resource passed in.
@@ -213,6 +245,12 @@ class ModifyVpcSecurityGroupsAction(Action):
         """
         resolved_groups = self.get_groups_by_names(self.get_action_group_names())
         return_groups = []
+
+        tag = self._get_array('add-by-tag')
+        if tag:
+            tag_filtered_groups = self.get_groups_by_tag(tag['key'], tag['values'])
+        else:
+            tag_filtered_groups = []
 
         for idx, r in enumerate(resources):
             rgroups = self.sg_expr.search(r) or []
@@ -225,6 +263,11 @@ class ModifyVpcSecurityGroupsAction(Action):
                 rgroups)
             isolation_groups = self.resolve_group_names(
                 r, self._get_array('isolation-group'), resolved_groups)
+
+            for sg in tag_filtered_groups:
+                if sg['VpcId'] == jmespath.search(
+                    self.manager.filter_registry.get('vpc').RelatedIdsExpression, r):
+                    add_groups.append(sg['GroupId'])
 
             for g in remove_groups:
                 if g in rgroups:

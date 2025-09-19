@@ -1,16 +1,5 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 """
 Jsonschema validation of cloud custodian config.
 
@@ -25,48 +14,77 @@ allowedProperties and enum extension).
 All filters and actions are annotated with schema typically using
 the utils.type_schema function.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from collections import Counter
 import json
 import inspect
 import logging
 
-from jsonschema import Draft4Validator as JsonSchemaValidator
+from jsonschema import Draft7Validator as JsonSchemaValidator
 from jsonschema.exceptions import best_match
 
 from c7n.policy import execution
 from c7n.provider import clouds
+from c7n.query import sources
 from c7n.resources import load_available
 from c7n.resolver import ValuesFrom
-from c7n.filters.core import ValueFilter, EventFilter, AgeFilter, OPERATORS, VALUE_TYPES
+from c7n.filters.core import (
+    ValueFilter,
+    EventFilter,
+    ReduceFilter,
+    OPERATORS,
+    VALUE_TYPES,
+)
 from c7n.structure import StructureParser # noqa
 
 
-def validate(data, schema=None):
+def is_c7n_placeholder(instance):
+    """Is this schema element a Custodian variable placeholder?
+
+    Because policy validation can happen before we interpolate
+    variable values, there are cases where we validate non-string
+    types against variable placeholders. If a policy element is a string
+    that starts and ends with curly braces, we should avoid failing
+    failing type checks.
+    """
+    return (
+        isinstance(instance, str)
+        and instance.startswith('{')
+        and instance.endswith('}')
+    )
+
+
+def validate(data, schema=None, resource_types=()):
     if schema is None:
-        schema = generate()
+        schema = generate(resource_types)
         JsonSchemaValidator.check_schema(schema)
 
     validator = JsonSchemaValidator(schema)
-    errors = list(validator.iter_errors(data))
+    errors = []
+    for error in validator.iter_errors(data):
+        try:
+            error = specific_error(error)
+
+            # ignore type checking errors against variable references that
+            # haven't yet been expanded
+            if error.validator == "type" and is_c7n_placeholder(error.instance):
+                continue
+
+            resp = policy_error_scope(error, data)
+            name = (
+                isinstance(error.instance, dict)
+                and error.instance.get('name', 'unknown') or 'unknown'
+            )
+            return [resp, name]
+        except Exception:
+            logging.exception(
+                "specific_error failed, traceback, followed by fallback")
+            errors.append(error)
     if not errors:
         return check_unique(data) or []
-    try:
-        resp = policy_error_scope(specific_error(errors[0]), data)
-        name = isinstance(
-            errors[0].instance,
-            dict) and errors[0].instance.get(
-            'name',
-            'unknown') or 'unknown'
-        return [resp, name]
-    except Exception:
-        logging.exception(
-            "specific_error failed, traceback, followed by fallback")
 
     return list(filter(None, [
         errors[0],
-        best_match(validator.iter_errors(data)),
+        best_match(errors),
     ]))
 
 
@@ -111,7 +129,7 @@ def specific_error(error):
         t = error.instance.get('type')
         r = error.instance.get('resource')
 
-    if r is not None:
+    if r is not None and not isinstance(r, list):
         found = None
         for idx, v in enumerate(error.validator_value):
             if '$ref' in v and v['$ref'].rsplit('/', 2)[1].endswith(r):
@@ -135,7 +153,7 @@ def specific_error(error):
                     v['$ref'].rsplit('/', 2)[-1].rsplit('.', 1)[-1] == t):
                 found = idx
                 break
-            elif 'type' in v and t in v['properties']['type']['enum']:
+            elif 'type' in v and t in v['properties'].get('type', {}).get('enum', []):
                 found = idx
                 break
 
@@ -149,10 +167,60 @@ def specific_error(error):
     return error
 
 
-def generate(resource_types=()):
-    resource_defs = {}
-    definitions = {
+def _get_attr_schema():
+    base_filters = [
+        {'$ref': '#/definitions/filters/value'},
+        {'$ref': '#/definitions/filters/valuekv'},
+    ]
+    any_of = []
+    any_of.extend(base_filters)
+
+    for op in ('and', 'or', 'not',):
+        any_of.append(
+            {
+                'additional_properties': False,
+                'properties': {
+                    op: {
+                        'type': 'array',
+                        'items': {
+                            'anyOf': base_filters
+                        }
+                    }
+                },
+                'type': 'object'
+            }
+        )
+
+    attr_schema = {
+        'items': {
+            'anyOf': any_of
+        },
+        'type': 'array',
+    }
+    return attr_schema
+
+
+def get_default_definitions(resource_defs):
+    return {
         'resources': resource_defs,
+        'string_dict': {
+            "type": "object",
+            "patternProperties": {
+                "": {"type": "string"},
+            },
+        },
+        'basic_dict': {
+            "type": "object",
+            "patternProperties": {
+                "": {
+                    'oneOf': [
+                        {"type": "string"},
+                        {"type": "boolean"},
+                        {"type": "number"},
+                    ],
+                }
+            },
+        },
         'iam-statement': {
             'additionalProperties': False,
             'type': 'object',
@@ -185,16 +253,22 @@ def generate(resource_types=()):
         'filters': {
             'value': ValueFilter.schema,
             'event': EventFilter.schema,
-            'age': AgeFilter.schema,
+            'reduce': ReduceFilter.schema,
             # Shortcut form of value filter as k=v
             'valuekv': {
                 'type': 'object',
-                'additionalProperties': {'oneOf': [{'type': 'number'}, {'type': 'null'},
-                    {'type': 'array', 'maxItems': 0}, {'type': 'string'}, {'type': 'boolean'}]},
+                'additionalProperties': {'oneOf': [
+                    {'type': 'number'},
+                    {'type': 'null'},
+                    {'type': 'array', 'maxItems': 0},
+                    {'type': 'string'},
+                    {'type': 'boolean'}
+                ]},
                 'minProperties': 1,
                 'maxProperties': 1},
         },
         'filters_common': {
+            'list_item_attrs': _get_attr_schema(),
             'comparison_operators': {
                 'enum': list(OPERATORS.keys())},
             'value_types': {'enum': VALUE_TYPES},
@@ -214,11 +288,29 @@ def generate(resource_types=()):
                 'name': {
                     'type': 'string',
                     'pattern': "^[A-z][A-z0-9]*(-[A-z0-9]+)*$"},
+                'conditions': {
+                    'type': 'array',
+                    'items': {'anyOf': [
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'or': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'not': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
+                        {'type': 'object', 'additionalProperties': False,
+                         'properties': {'and': {
+                             '$ref': '#/definitions/policy/properties/conditions'}}},
+                        {'$ref': '#/definitions/filters/value'},
+                        {'$ref': '#/definitions/filters/event'},
+                        {'$ref': '#/definitions/filters/valuekv'}]}},
+                # these should be deprecated for conditions
                 'region': {'type': 'string'},
                 'tz': {'type': 'string'},
                 'start': {'format': 'date-time'},
                 'end': {'format': 'date-time'},
-                'resource': {'type': 'string'},
+                'resource': {'oneOf': [
+                    {'type': 'string'},
+                    {'type': 'array', 'items': {'type': 'string'}}]},
                 'max-resources': {'anyOf': [
                     {'type': 'integer', 'minimum': 1},
                     {'$ref': '#/definitions/max-resources-properties'}
@@ -228,8 +320,9 @@ def generate(resource_types=()):
                 'comments': {'type': 'string'},
                 'description': {'type': 'string'},
                 'tags': {'type': 'array', 'items': {'type': 'string'}},
+                'metadata': {'type': 'object'},
                 'mode': {'$ref': '#/definitions/policy-mode'},
-                'source': {'enum': ['describe', 'config', 'resource-graph']},
+                'source': {'enum': list(sources.keys())},
                 'actions': {
                     'type': 'array',
                 },
@@ -262,18 +355,21 @@ def generate(resource_types=()):
         }
     }
 
+
+def generate(resource_types=()):
+    resource_defs = {}
+    definitions = get_default_definitions(resource_defs)
+
     resource_refs = []
-    for cloud_name, cloud_type in clouds.items():
-        for type_name, resource_type in cloud_type.resources.items():
+    for cloud_name, cloud_type in sorted(clouds.items()):
+        for type_name, resource_type in sorted(cloud_type.resources.items()):
             r_type_name = "%s.%s" % (cloud_name, type_name)
             if resource_types and r_type_name not in resource_types:
                 if not resource_type.type_aliases:
                     continue
-                # atm only azure is using type aliases.
-                elif not set([
-                        "%s.%s" % (cloud_name, ralias) for ralias
-                        in resource_type.type_aliases]).intersection(
-                            resource_types):
+                elif not {"%s.%s" % (cloud_name, ralias) for ralias
+                        in resource_type.type_aliases}.intersection(
+                        resource_types):
                     continue
 
             aliases = []
@@ -314,6 +410,9 @@ def generate(resource_types=()):
         }
     }
 
+    # allow empty policies with lazy load
+    if not resource_refs:
+        schema['properties']['policies']['items'] = {'type': 'object'}
     return schema
 
 
@@ -322,6 +421,12 @@ def process_resource(
         definitions=None, provider_name=None):
 
     r = resource_defs.setdefault(type_name, {'actions': {}, 'filters': {}})
+
+    if getattr(resource_type, "get_schema", None):
+        resource_type.get_schema(
+            type_name, resource_defs, definitions, provider_name
+        )
+        return {'$ref': '#/definitions/resources/%s/policy' % type_name}
 
     action_refs = []
     for a in ElementSchema.elements(resource_type.action_registry):
@@ -408,9 +513,25 @@ def process_resource(
     return {'$ref': '#/definitions/resources/%s/policy' % type_name}
 
 
-def resource_vocabulary(cloud_name=None, qualify_name=True):
+def resource_outline(provider=None):
+    outline = {}
+    for cname, ctype in sorted(clouds.items()):
+        if provider and provider != cname:
+            continue
+        cresources = outline[cname] = {}
+        for rname, rtype in sorted(ctype.resources.items()):
+            cresources['%s.%s' % (cname, rname)] = rinfo = {}
+            rinfo['filters'] = sorted(rtype.filter_registry.keys())
+            rinfo['actions'] = sorted(rtype.action_registry.keys())
+    return outline
+
+
+def resource_vocabulary(cloud_name=None, qualify_name=True, aliases=True):
     vocabulary = {}
     resources = {}
+
+    if aliases:
+        vocabulary['aliases'] = {}
 
     for cname, ctype in clouds.items():
         if cloud_name is not None and cloud_name != cname:
@@ -441,6 +562,15 @@ def resource_vocabulary(cloud_name=None, qualify_name=True):
             'classes': classes,
         }
 
+        if aliases and resource_type.type_aliases:
+            provider = type_name.split('.', 1)[0]
+            for type_alias in resource_type.type_aliases:
+                vocabulary['aliases'][
+                    "{}.{}".format(provider, type_alias)] = vocabulary[type_name]
+                if provider == 'aws':
+                    vocabulary['aliases'][type_alias] = vocabulary[type_name]
+            vocabulary[type_name]['resource_type'] = type_name
+
     vocabulary["mode"] = {}
     for mode_name, cls in execution.items():
         vocabulary["mode"][mode_name] = cls
@@ -448,7 +578,7 @@ def resource_vocabulary(cloud_name=None, qualify_name=True):
     return vocabulary
 
 
-class ElementSchema(object):
+class ElementSchema:
     """Utility functions for working with resource's filters and actions.
     """
 
@@ -553,7 +683,7 @@ def pprint_schema_summary(vocabulary):
         if '.' not in type_name:
             non_providers[type_name] = len(rv)
         else:
-            provider, name = type_name.split('.', 1)
+            provider, _ = type_name.split('.', 1)
             stats = providers.setdefault(provider, {
                 'resources': 0, 'actions': Counter(), 'filters': Counter()})
             stats['resources'] += 1

@@ -9,7 +9,7 @@ in these buckets from being set to public-read, public-read-write
 ,or authenticated-read (Any authenticated AWS user, not just local to account).
 Being that S3 object permissions can be hard to track and restrict due to the huge
 amount of S3 objects usually present in accounts, this policy allows you to prevent
-the issue from occuring in the first place and helps maintain tighter S3 security
+the issue from occurring in the first place and helps maintain tighter S3 security
 to avoid accidentally setting sensitive S3 objects to public.  Note the S3 bucket
 policy has a NotPrincipal statement with several "AWS": arns.  These arns are owned
 by AWS and they are used for the AWS logging services for Log Delivery Group, ELB Logs,
@@ -67,10 +67,10 @@ ELB Log Accounts: https://docs.aws.amazon.com/elasticloadbalancing/latest/classi
          role: arn:aws:iam::{account_id}:role/Cloud_Custodian_Role
          timeout: 200
        description: |
-         Appends a bucket policy statement to an s3 bucket when it detects
-         a policy change to the bucket or a new bucket is created which
-         will deny anyone except some AWS logging services from setting
-         s3 objects in the bucket to public-read, public-read-write, or
+         Appends a bucket policy to an S3 bucket when it detects
+         a policy change or a new bucket is created which
+         will deny anyone except AWS logging services from setting
+         S3 objects in the bucket to public-read, public-read-write, or
          any authenticated AWS user.
        actions:
          - type: set-statements

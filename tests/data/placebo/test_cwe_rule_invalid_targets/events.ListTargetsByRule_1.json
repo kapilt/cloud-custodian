@@ -1,0 +1,12 @@
+{
+    "status_code": 200,
+    "data": {
+        "Targets": [
+            {
+                "Id": "Ida356d160-176b-41a5-acb1-e3e3c0b02d37",
+                "Arn": "arn:aws:sns:us-west-1:644160558196:MyTopic"
+            }
+        ],
+        "ResponseMetadata": {}
+    }
+}

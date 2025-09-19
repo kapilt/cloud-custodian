@@ -1,24 +1,11 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 import json
 import logging
 import os
 
 
-from c7n.query import ResourceQuery, RetryPageIterator
+from c7n.query import ResourceQuery, RetryPageIterator, TypeInfo
 from c7n.resources.vpc import InternetGateway
 
 from botocore.config import Config
@@ -108,6 +95,9 @@ class ResourceQueryTest(BaseTest):
         resources = q.get(p.resource_manager, ["igw-3d9e3d56"])
         self.assertEqual(len(resources), 1)
 
+    def test_type_info(self):
+        assert repr(TypeInfo) == "<TypeInfo TypeInfo>"
+
 
 class ConfigSourceTest(BaseTest):
 
@@ -133,7 +123,7 @@ class ConfigSourceTest(BaseTest):
         # default query construction
         self.assertTrue(
             source.get_query_params(None)['expr'].startswith(
-                'select configuration, supplementaryConfiguration where resourceType'))
+                'select resourceId, configuration, supplementaryConfiguration where resourceType'))
 
         p.data['query'] = [{'clause': "configuration.imageId = 'xyz'"}]
         self.assertIn("imageId = 'xyz'", source.get_query_params(None)['expr'])
@@ -174,3 +164,35 @@ class QueryResourceManagerTest(BaseTest):
         self.assertEqual(len(resources), 1)
         resources = p.resource_manager.get_resources(["igw-5bce113f"])
         self.assertEqual(resources, [])
+
+    def test_detail_spec_resource_not_found(self):
+        # Test the case where List* API returns a resource that
+        # is not found with the Get* API.
+
+        # This test case has two CoreNetworks returned by the ListCoreNetworks API
+        # but only one of them is found by the GetCoreNetwork API, since one is a Shared
+        # resource from RAM and returns a 404.
+        # So the policy should return only 1 CoreNetwork and log a message
+        session_factory = self.replay_flight_data("test_networkmanager_core_networks_not_found")
+        p = self.load_policy(
+            {
+                "name": "list-core-networks-not-found",
+                "resource": "networkmanager-core",
+            },
+            session_factory=session_factory,
+        )
+        # Capture logging to check the output
+        output = self.capture_logging(
+            name=p.resource_manager.log.name, level=logging.WARNING
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        for r in resources:
+            self.assertTrue(r["CoreNetworkArn"])
+            self.assertTrue("Segments" in r)
+            self.assertTrue("Edges" in r)
+
+        # Check that the warning message was logged
+        self.assertTrue("Resource not found: get_core_network using" in output.getvalue())
+        self.assertTrue(resources[0]["CoreNetworkArn"] not in output.getvalue())

@@ -1,16 +1,5 @@
-# Copyright 2016-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 """
 IAM Resource Policy Checker
 ---------------------------
@@ -33,14 +22,13 @@ References
 - IAM Policy Reference
   https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements.html
 
-"""
-from __future__ import absolute_import, division, print_function, unicode_literals
+- IAM Global Condition Context Keys
+  https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html
 
+"""
 import fnmatch
 import logging
 import json
-
-import six
 
 from c7n.filters import Filter
 from c7n.resolver import ValuesFrom
@@ -52,16 +40,17 @@ log = logging.getLogger('custodian.iamaccess')
 def _account(arn):
     # we could try except but some minor runtime cost, basically flag
     # invalids values
-    if ':' not in arn:
+    if arn.count(":") < 4:
         return arn
     return arn.split(':', 5)[4]
 
 
-class PolicyChecker(object):
+class PolicyChecker:
     """
     checker_config:
       - check_actions: only check one of the specified actions
       - everyone_only: only check for wildcard permission grants
+      - return_allowed: if true, return the statements that are allowed
       - allowed_accounts: permission grants to these accounts are okay
       - whitelist_conditions: a list of conditions that are considered
             sufficient enough to whitelist the statement.
@@ -70,6 +59,10 @@ class PolicyChecker(object):
         self.checker_config = checker_config
 
     # Config properties
+    @property
+    def return_allowed(self):
+        return self.checker_config.get('return_allowed', False)
+
     @property
     def allowed_accounts(self):
         return self.checker_config.get('allowed_accounts', ())
@@ -84,7 +77,7 @@ class PolicyChecker(object):
 
     @property
     def whitelist_conditions(self):
-        return self.checker_config.get('whitelist_conditions', ())
+        return set(v.lower() for v in self.checker_config.get('whitelist_conditions', ()))
 
     @property
     def allowed_vpce(self):
@@ -100,16 +93,19 @@ class PolicyChecker(object):
 
     # Policy statement handling
     def check(self, policy_text):
-        if isinstance(policy_text, six.string_types):
+        if isinstance(policy_text, str):
             policy = json.loads(policy_text)
         else:
             policy = policy_text
 
-        violations = []
+        allowlist_statements, violations = [], []
+
         for s in policy.get('Statement', ()):
             if self.handle_statement(s):
                 violations.append(s)
-        return violations
+            else:
+                allowlist_statements.append(s)
+        return allowlist_statements if self.return_allowed else violations
 
     def handle_statement(self, s):
         if (all((self.handle_principal(s),
@@ -120,7 +116,7 @@ class PolicyChecker(object):
     def handle_action(self, s):
         if self.check_actions:
             actions = s.get('Action')
-            actions = isinstance(actions, six.string_types) and (actions,) or actions
+            actions = isinstance(actions, str) and (actions,) or actions
             for a in actions:
                 if fnmatch.filter(self.check_actions, a):
                     return True
@@ -134,28 +130,24 @@ class PolicyChecker(object):
     def handle_principal(self, s):
         if 'NotPrincipal' in s:
             return True
-        if 'Principal' not in s:
-            return True
-        # Skip service principals
-        if 'Service' in s['Principal']:
-            s['Principal'].pop('Service')
-            if not s['Principal']:
-                return False
 
-        assert len(s['Principal']) == 1, "Too many principals %s" % s
-
-        if isinstance(s['Principal'], six.string_types):
-            p = s['Principal']
-        elif 'AWS' in s['Principal']:
-            p = s['Principal']['AWS']
-        elif 'Federated' in s['Principal']:
-            p = s['Principal']['Federated']
-        else:
+        principals = s.get('Principal')
+        if not principals:
             return True
+        if not isinstance(principals, dict):
+            principals = {'AWS': principals}
+
+        # Ignore service principals, merge the rest into a single set
+        non_service_principals = set()
+        for principal_type in set(principals) - {'Service'}:
+            p = principals[principal_type]
+            non_service_principals.update({p} if isinstance(p, str) else p)
+
+        if not non_service_principals:
+            return False
 
         principal_ok = True
-        p = isinstance(p, six.string_types) and (p,) or p
-        for pid in p:
+        for pid in non_service_principals:
             if pid == '*':
                 principal_ok = False
             elif self.everyone_only:
@@ -208,30 +200,27 @@ class PolicyChecker(object):
         set_conditions = ('ForAllValues', 'ForAnyValues')
 
         for s_cond_op in list(s['Condition'].keys()):
-            cond = {'op': s_cond_op}
-
             if s_cond_op not in conditions:
                 if not any(s_cond_op.startswith(c) for c in set_conditions):
                     continue
 
-            cond['key'] = list(s['Condition'][s_cond_op].keys())[0]
-            cond['values'] = s['Condition'][s_cond_op][cond['key']]
-            cond['values'] = (
-                isinstance(cond['values'],
-                           six.string_types) and (cond['values'],) or cond['values'])
-            cond['key'] = cond['key'].lower()
-            s_cond.append(cond)
+            # Loop over all keys under each operator
+            for key, value in s['Condition'][s_cond_op].items():
+                cond = {'op': s_cond_op}
+                cond['key'] = key.lower()
+                cond['values'] = (value,) if isinstance(value, str) else value
+                s_cond.append(cond)
 
         return s_cond
 
     # Condition handlers
 
-    # kms specific
-    def handle_kms_calleraccount(self, s, c):
-        return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
-
     # sns default policy
     def handle_aws_sourceowner(self, s, c):
+        return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
+
+    # AWS Connect default policy on Lex
+    def handle_aws_sourceaccount(self, s, c):
         return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
 
     # s3 logging
@@ -253,8 +242,28 @@ class PolicyChecker(object):
 
     def handle_aws_principalorgid(self, s, c):
         if not self.allowed_orgid:
-            return False
+            return True
         return bool(set(map(_account, c['values'])).difference(self.allowed_orgid))
+
+    def handle_aws_principalarn(self, s, c):
+        """Handle the aws:PrincipalArn condition key."""
+
+        return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
+
+    def handle_aws_resourceorgid(self, s, c):
+        """Handle the aws:resourceOrgID condition key."""
+
+        return bool(set(map(_account, c['values'])).difference(self.allowed_orgid))
+
+    def handle_aws_principalaccount(self, s, c):
+        """Handle the aws:PrincipalAccount condition key."""
+
+        return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
+
+    def handle_s3_dataaccesspointaccount(self, s, c):
+        """Handle the s3:DataAccessPointAccount condition key."""
+
+        return bool(set(map(_account, c['values'])).difference(self.allowed_accounts))
 
 
 class CrossAccountAccessFilter(Filter):
@@ -267,6 +276,8 @@ class CrossAccountAccessFilter(Filter):
         actions={'type': 'array', 'items': {'type': 'string'}},
         # only consider policies which grant to *
         everyone_only={'type': 'boolean'},
+        # only consider policies which grant to the specified accounts
+        return_allowed={'type': 'boolean'},
         # disregard statements using these conditions.
         whitelist_conditions={'type': 'array', 'items': {'type': 'string'}},
         # white list accounts
@@ -281,11 +292,13 @@ class CrossAccountAccessFilter(Filter):
 
     policy_attribute = 'Policy'
     annotation_key = 'CrossAccountViolations'
+    allowlist_key = 'CrossAccountAllowlists'
 
     checker_factory = PolicyChecker
 
     def process(self, resources, event=None):
         self.everyone_only = self.data.get('everyone_only', False)
+        self.return_allowed = self.data.get('return_allowed', False)
         self.conditions = set(self.data.get(
             'whitelist_conditions',
             ("aws:userid", "aws:username")))
@@ -302,7 +315,8 @@ class CrossAccountAccessFilter(Filter):
              'allowed_orgid': self.orgid,
              'check_actions': self.actions,
              'everyone_only': self.everyone_only,
-             'whitelist_conditions': self.conditions})
+             'whitelist_conditions': self.conditions,
+             'return_allowed': self.return_allowed})
         self.checker = self.checker_factory(self.checker_config)
         return super(CrossAccountAccessFilter, self).process(resources, event)
 
@@ -343,7 +357,11 @@ class CrossAccountAccessFilter(Filter):
         p = self.get_resource_policy(r)
         if p is None:
             return False
-        violations = self.checker.check(p)
-        if violations:
-            r[self.annotation_key] = violations
+        results = self.checker.check(p)
+        if self.return_allowed and results:
+            r[self.allowlist_key] = results
+            return True
+
+        if not self.return_allowed and results:
+            r[self.annotation_key] = results
             return True

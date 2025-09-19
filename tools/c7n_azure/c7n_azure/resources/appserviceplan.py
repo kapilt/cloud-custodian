@@ -1,22 +1,14 @@
-# Copyright 2018 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 
 from azure.mgmt.web import models
 from c7n.lookup import Lookup
+from c7n.filters import ListItemFilter
 from c7n_azure.actions.base import AzureBaseAction
 from c7n_azure.provider import resources
 from c7n_azure.resources.arm import ArmResourceManager
+from c7n.utils import type_schema, group_by
+from c7n_azure.utils import ResourceIdParser
 
 
 @resources.register('appserviceplan')
@@ -45,7 +37,7 @@ class AppServicePlan(ArmResourceManager):
 
         service = 'azure.mgmt.web'
         client = 'WebSiteManagementClient'
-        enum_spec = ('app_service_plans', 'list', None)
+        enum_spec = ('app_service_plans', 'list', {'detailed': True})
         default_report_fields = (
             'name',
             'location',
@@ -54,6 +46,77 @@ class AppServicePlan(ArmResourceManager):
             'sku.[name, tier, capacity]'
         )
         resource_type = 'Microsoft.Web/serverfarms'
+
+
+@AppServicePlan.filter_registry.register("webapp")
+class AppServicePlanWebAppsFilter(ListItemFilter):
+    """
+    Filter service plans based on their associated WebApps
+
+    :example:
+
+    This policy will find all App Service Plans with at least one app running.
+
+    .. code-block: yaml
+
+        policies:
+          - name: appservice-plan-with-running-apps
+            resource: azure.appserviceplan
+            filters:
+              - type: webapp
+                attrs:
+                  - type: value
+                    key: properties.state
+                    value: Running
+
+    """
+    schema = type_schema(
+        "webapp",
+        attrs={"$ref": "#/definitions/filters_common/list_item_attrs"},
+        count={"type": "number"},
+        count_op={"$ref": "#/definitions/filters_common/comparison_operators"}
+    )
+    annotation_key = "c7n:WebApps"
+    FetchThreshold = 5
+
+    def __init__(self, data, manager=None):
+        data['key'] = f'"{self.annotation_key}"'
+        super().__init__(data, manager)
+
+    @staticmethod
+    def _get_web_apps_by_resource(client, resource):
+        """
+        Queries all web apps by a specific resource and expands them with
+        some additional attributes to match with JSONs returned by azure.webapp
+        resource manager
+        """
+        it = client.app_service_plans.list_web_apps(
+            resource_group_name=ResourceIdParser.get_resource_group(resource["id"]),
+            name=resource["name"]
+        )
+        for app in it:
+            serialized = app.serialize(True)
+            serialized["properties"].setdefault('serverFarmId', resource["id"])
+            serialized.setdefault("location", resource["location"])
+            yield serialized
+
+    def process(self, resources, event=None):
+
+        webapp = self.manager.get_resource_manager("azure.webapp")
+
+        if len(resources) < self.FetchThreshold:
+            client = self.manager.get_client()
+            for r in resources:
+                r[self.annotation_key] = webapp.augment(list(
+                    self._get_web_apps_by_resource(client, r)
+                ))
+        else:
+            all_web_apps = self.manager.get_resource_manager("azure.webapp").resources()
+            web_apps_by_asp = group_by(all_web_apps, 'properties.serverFarmId')
+            for r in resources:
+                r[self.annotation_key] = web_apps_by_asp.get(r["id"], [])
+
+        return super().process(resources, event)
 
 
 @AppServicePlan.action_registry.register('resize-plan')
@@ -110,8 +173,7 @@ class ResizePlan(AzureBaseAction):
                     type: resource
                     key: sku.name
               - type: resize-plan
-                size:
-                    size: S1
+                size: S1
 
     """
 
@@ -133,7 +195,6 @@ class ResizePlan(AzureBaseAction):
         },
         'additionalProperties': False
     }
-    schema_alias = True
 
     def _prepare_processing(self):
         self.client = self.manager.get_client()  # type azure.mgmt.web.WebSiteManagementClient

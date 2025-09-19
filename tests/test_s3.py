@@ -1,38 +1,31 @@
-# Copyright 2015-2017 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 import datetime
 import functools
 import json
+import logging
 import os
 import io
 import shutil
 import tempfile
 import time  # NOQA needed for some recordings
+from unittest import mock
 
 from unittest import TestCase
 
+from contextlib import suppress
 from botocore.exceptions import ClientError
 from dateutil.tz import tzutc
+import pytest
+from pytest_terraform import terraform
 
-from c7n.exceptions import PolicyValidationError
+from c7n.exceptions import PolicyExecutionError, PolicyValidationError
 from c7n.executor import MainThreadExecutor
 from c7n.resources import s3
 from c7n.mu import LambdaManager
 from c7n.ufuncs import s3crypt
-from c7n.utils import get_account_alias_from_sts
+from c7n.utils import get_account_alias_from_sts, jmespath_search
+import vcr
 
 from .common import (
     BaseTest,
@@ -41,6 +34,147 @@ from .common import (
     skip_if_not_validating,
     functional,
 )
+
+
+def test_s3_assembly_validate(test):
+
+    for tcase in ('all', 'none', 'detect', ['Website', 'Replication']):
+        policy = test.load_policy(
+            {'name': 's3-attrs',
+             'resource': 's3',
+             'query': [{'augment-keys': tcase}]
+             }
+        )
+        policy.validate()
+
+    for tcase in ('random', ['Garbage'], {}):
+        with pytest.raises(PolicyValidationError):
+            policy = test.load_policy(
+                {'name': 's3-attrs',
+                 'resource': 's3',
+                 'query': [{'augment-keys': tcase}],
+                 'filters': [{'tag:Owner': 'xyz'}],
+                 },
+                validate=True
+            )
+
+
+def test_s3_assembly_none(test):
+    # noting even with none we will still get location and tags to
+    # ensure other s3 filters/actions work.
+    policy = test.load_policy(
+        {'name': 's3-attrs',
+         'resource': 's3',
+         'query': [{'augment-keys': 'none'}],
+         'filters': [
+             {'tag:Owner': 'xyz'},
+         ]
+         }
+    )
+    assembly = s3.BucketAssembly(policy.resource_manager)
+    assert assembly.detect_augment_fields() == []
+
+
+def test_s3_assembly_website(test):
+    policy = test.load_policy(
+        {'name': 's3-attrs',
+         'resource': 's3',
+         'query': [{'augment-keys': ['Website', 'Replication']}],
+         'filters': [
+             {'tag:Owner': 'xyz'},
+         ]
+         }
+    )
+    assembly = s3.BucketAssembly(policy.resource_manager)
+    assert assembly.detect_augment_fields() == ['Website', 'Replication']
+
+
+def test_s3_assembly_detect(test):
+
+    policy = test.load_policy(
+        {'name': 's3-attrs',
+         'resource': 's3',
+         'query': [{'augment-keys': 'detect'}],
+         'filters': [
+             {'tag:Owner': 'xyz'},
+             {'type': 'cross-account'},
+             {'SomethingRandom': 'xyz'},
+             {'Replication.ReplicationConfiguation.Rules[].Destination.StorageClass': 'Standard'},
+             {'type': 'value',
+              'value': 'not-null',
+              'key': 'Website.ErrorDocument'}]
+         }
+    )
+    assembly = s3.BucketAssembly(policy.resource_manager)
+    assert assembly.detect_augment_fields() == ['Tags', 'Replication', 'Website']
+
+
+def test_s3_assembly_detect_denied(test):
+    policy = test.load_policy(
+        {'name': 's3-attrs',
+         'resource': 's3',
+         'query': [{'augment-keys': 'detect'}],
+         'filters': [
+             {'c7n:DeniedMethods': 'not-null'},
+         ]}
+    )
+    assembly = s3.BucketAssembly(policy.resource_manager)
+    assert assembly.detect_augment_fields() == [
+        'Location', 'Tags', 'Policy', 'Acl', 'Replication', 'Versioning', 'Website',
+        'Logging', 'Notification', 'Lifecycle']
+
+
+def test_s3_express(test):
+    session_factory = test.replay_flight_data('test_s3_express')
+    p = test.load_policy(
+        {'name': 's3-xpress',
+         'resource': 's3-directory'},
+        config={'account_id': '644160558196', 'region': 'us-east-1'},
+        session_factory=session_factory)
+    resources = p.run()
+    assert len(resources) == 1
+    assert p.resource_manager.get_arns(resources) == [
+        'arn:aws:s3express:us-east-1:644160558196:bucket/test-zone--use1-az4--x-s3'
+    ]
+
+
+@pytest.mark.audited
+@terraform('s3_tag')
+def test_s3_tag(test, s3_tag):
+    test.patch(s3.S3, "executor_factory", MainThreadExecutor)
+    test.patch(s3.EncryptExtantKeys, "executor_factory", MainThreadExecutor)
+    test.patch(
+        s3, "S3_AUGMENT_TABLE", [("get_bucket_tagging", "Tags", [], "TagSet")]
+    )
+    session_factory = test.replay_flight_data("test_s3_tag")
+    session = session_factory()
+    client = session.client("s3")
+    bucket_name = s3_tag['aws_s3_bucket.example.bucket']
+
+    p = test.load_policy(
+        {
+            "name": "s3-tagger",
+            "resource": "s3",
+            "filters": [{"Name": bucket_name}],
+            "actions": [
+                {
+                    "type": "tag",
+                    "tags": {"new-tag": "new-value"},
+                }
+            ],
+        },
+        session_factory=session_factory,
+    )
+
+    resources = p.run()
+    test.assertEqual(len(resources), 1)
+    tags = {
+        t["Key"]: t["Value"]
+        for t in client.get_bucket_tagging(Bucket=bucket_name)["TagSet"]
+    }
+    test.assertEqual(
+        {"original-tag": "original-value", "new-tag": "new-value"}, tags
+    )
 
 
 class RestoreCompletionTest(TestCase):
@@ -91,14 +225,8 @@ def destroyVersionedBucket(client, bucket):
 
 
 def destroyBucketIfPresent(client, bucket):
-    try:
+    with suppress(client.exceptions.NoSuchBucket):
         destroyVersionedBucket(client, bucket)
-    except Exception as exc:
-        response = getattr(
-            exc, "response", {"ResponseMetadata": {"HTTPStatusCode": None}}
-        )
-        if response["ResponseMetadata"]["HTTPStatusCode"] != 404:
-            raise
 
 
 def generateBucketContents(s3, bucket, contents=None):
@@ -136,6 +264,7 @@ class BucketMetrics(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertIn('c7n.metrics', resources[0])
+        assert p.resource_manager.get_arns(resources) == ['arn:aws:s3:::c7n-ssm-build']
 
     def test_metrics(self):
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
@@ -160,7 +289,7 @@ class BucketMetrics(BaseTest):
         self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]["Name"], "custodian-skunk-trails")
         self.assertTrue("c7n.metrics" in resources[0])
-        self.assertTrue("AWS/S3.NumberOfObjects.Average" in resources[0]["c7n.metrics"])
+        self.assertTrue("AWS/S3.NumberOfObjects.Average.14" in resources[0]["c7n.metrics"])
 
 
 class BucketEncryption(BaseTest):
@@ -199,7 +328,19 @@ class BucketEncryption(BaseTest):
         self.assertEqual(resources[0]["Name"], bname)
 
     def test_s3_bucket_encryption_filter_kms(self):
-        bname = "c7n-bucket-with-encryption"
+        def _get_encryption_config(key_id):
+            default_encryption = {
+                "SSEAlgorithm": "aws:kms"
+            }
+            if key_id:
+                default_encryption["KMSMasterKeyID"] = key_id
+            return {
+                "Rules": [{
+                    "ApplyServerSideEncryptionByDefault": default_encryption
+                }]
+            }
+
+        bname_base = "c7n-bucket-with-encryption"
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
         self.patch(s3, "S3_AUGMENT_TABLE", [])
 
@@ -208,23 +349,32 @@ class BucketEncryption(BaseTest):
         )
 
         client = session_factory().client("s3")
-        client.create_bucket(Bucket=bname)
-        self.addCleanup(client.delete_bucket, Bucket=bname)
 
-        aws_alias = "arn:aws:kms:us-east-1:108891588060:key/079a6f7d-5f8a-4da1-a465-30aa099b9688"
-        enc = {
-            "Rules": [
-                {
-                    "ApplyServerSideEncryptionByDefault": {
-                        "SSEAlgorithm": "aws:kms", "KMSMasterKeyID": aws_alias
-                    }
-                }
-            ]
+        key_alias = "alias/aws/s3"
+        key_meta = session_factory().client("kms").describe_key(KeyId=key_alias)["KeyMetadata"]
+        key_arn = key_meta.get('Arn')
+        alias_arn = ''.join((*key_arn.rpartition(':')[:2], key_alias))
+
+        # Create separate buckets to test five ways of specifying the AWS-managed
+        # KMS key for default server-side encryption.
+        key_attrs = {
+            'default': None,
+            'aliasname': key_alias,
+            'aliasarn': alias_arn,
+            'keyid': key_meta.get('KeyId'),
+            'keyarn': key_arn
         }
 
-        client.put_bucket_encryption(
-            Bucket=bname, ServerSideEncryptionConfiguration=enc
-        )
+        for attr, value in key_attrs.items():
+            # Create test buckets. Set a default encryption rule for each
+            # one, using different attributes of the same key.
+            bname = f'{bname_base}-by-{attr}'
+            client.create_bucket(Bucket=bname)
+            client.put_bucket_encryption(
+                Bucket=bname,
+                ServerSideEncryptionConfiguration=_get_encryption_config(value)
+            )
+            self.addCleanup(client.delete_bucket, Bucket=bname)
 
         p = self.load_policy(
             {
@@ -232,17 +382,22 @@ class BucketEncryption(BaseTest):
                 "resource": "s3",
                 "filters": [
                     {
+                        "type": "value",
+                        "key": "Name",
+                        "op": "glob",
+                        "value": f"{bname_base}*",
+                    },
+                    {
                         "type": "bucket-encryption",
                         "crypto": "aws:kms",
-                        "key": "alias/aws/s3",
+                        "key": key_alias,
                     }
                 ],
             },
             session_factory=session_factory,
         )
         resources = p.run() or []
-        self.assertEqual(len(resources), 1)
-        self.assertEqual(resources[0]["Name"], bname)
+        self.assertEqual(len(resources), len(key_attrs))
 
     def test_s3_filter_bucket_encryption_disabled(self):
         bname = "c7n-bucket-without-default-encryption"
@@ -291,6 +446,61 @@ class BucketEncryption(BaseTest):
         )
         resources = p.run()
         self.assertEqual(len(resources), 0)
+
+    def test_s3_filter_bucket_encryption_disabled_malformed_statement(self):
+        bname = "xcc-services-alb-access-logs-prod-eu-central-1"
+        self.patch(s3.S3, "executor-factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data(
+            "test_s3_filter_bucket_encryption_disabled_malformed_statement"
+        )
+
+        p = self.load_policy(
+            {
+                "name": "s3-disabled-encryption-malformed-statement",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname}, {"type": "bucket-encryption", "state": False}
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_s3_bucket_encryption_bucket_key(self):
+        session_factory = self.replay_flight_data("test_s3_bucket_encryption_bucket_key")
+
+        bname = "custodian-test-bucket-encryption-key"
+
+        self.patch(s3.S3, "executor-factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        policy = self.load_policy(
+            {
+                "name": "test_s3_bucket_encryption_bucket_key",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "Name": bname
+                    },
+                    {
+                        "type": "bucket-encryption",
+                        "state": False
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-bucket-encryption"
+                    }
+                ]
+            }, session_factory=session_factory
+        )
+        resources = policy.run()
+        self.assertEqual(len(resources), 1)
+        client = session_factory().client("s3")
+        resp = client.get_bucket_encryption(Bucket=bname)
+        self.assertTrue(resp['ServerSideEncryptionConfiguration']['Rules'][0]['BucketKeyEnabled'])
 
 
 class BucketInventory(BaseTest):
@@ -547,7 +757,7 @@ class BucketDelete(BaseTest):
 
         session = session_factory()
         client = session.client("s3")
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertFalse(bname in buckets)
 
     @functional
@@ -597,7 +807,7 @@ class BucketDelete(BaseTest):
         if self.recording:
             time.sleep(60)
         self.assertEqual(len(resources), 1)
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertFalse(bname in buckets)
 
     @functional
@@ -628,7 +838,7 @@ class BucketDelete(BaseTest):
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertFalse(bname in buckets)
 
     def test_delete_bucket_with_failure(self):
@@ -666,11 +876,12 @@ class BucketDelete(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "delete", "remove-contents": True}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertIn(bname, buckets)
 
         # Make sure file got written
@@ -682,68 +893,51 @@ class BucketDelete(BaseTest):
         client.delete_bucket_policy(Bucket=bname)
         resources = p.run()
         self.assertEqual(len(resources), 1)
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertFalse(bname in buckets)
-
-
-class BucketTag(BaseTest):
-
-    @functional
-    def test_tag_bucket(self):
-        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
-        self.patch(s3.EncryptExtantKeys, "executor_factory", MainThreadExecutor)
-        self.patch(
-            s3, "S3_AUGMENT_TABLE", [("get_bucket_tagging", "Tags", [], "TagSet")]
-        )
-        session_factory = self.replay_flight_data("test_s3_tag")
-        session = session_factory()
-        client = session.client("s3")
-        bname = "custodian-tagger"
-        if self.recording:
-            destroyBucketIfPresent(client, bname)
-        client.create_bucket(
-            Bucket=bname, CreateBucketConfiguration={"LocationConstraint": "us-east-2"}
-        )
-        self.addCleanup(destroyBucket, client, bname)
-        client.put_bucket_tagging(
-            Bucket=bname,
-            Tagging={
-                "TagSet": [
-                    {"Key": "rudolph", "Value": "reindeer"},
-                    {"Key": "platform", "Value": "lxwee"},
-                ]
-            },
-        )
-
-        p = self.load_policy(
-            {
-                "name": "s3-tagger",
-                "resource": "s3",
-                "filters": [{"Name": bname}],
-                "actions": [
-                    {
-                        "type": "tag",
-                        "tags": {"borrowed": "new", "platform": "serverless"},
-                    }
-                ],
-            },
-            session_factory=session_factory,
-        )
-
-        resources = p.run()
-        self.assertEqual(len(resources), 1)
-        tags = {
-            t["Key"]: t["Value"]
-            for t in client.get_bucket_tagging(Bucket=bname)["TagSet"]
-        }
-        self.assertEqual(
-            {"rudolph": "reindeer", "platform": "serverless", "borrowed": "new"}, tags
-        )
 
 
 class S3ConfigSource(ConfigTest):
 
     maxDiff = None
+
+    def test_normalize_initial_state(self):
+        """Check for describe/config parity after bucket creation, before changing properties"""
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        augments = list(s3.S3_AUGMENT_TABLE)
+        augments.remove((
+            "get_bucket_location", "Location", {}, None, 's3:GetBucketLocation'))
+        self.patch(s3, "S3_AUGMENT_TABLE", augments)
+
+        bname = "custodian-test-s3confignormalize"
+        session_factory = self.replay_flight_data("test_s3_normalize_initstate", region="us-east-1")
+        session = session_factory()
+
+        queue_url = self.initialize_config_subscriber(session)
+        client = session.client("s3")
+        if self.recording:
+            destroyBucketIfPresent(client, bname)
+        client.create_bucket(Bucket=bname)
+        self.addCleanup(destroyBucket, client, bname)
+        p = self.load_policy(
+            {"name": "s3-inv", "resource": "s3", "filters": [{"Name": bname}]},
+            session_factory=session_factory,
+        )
+
+        manager = p.load_resource_manager()
+        resource_a = manager.get_resources([bname])[0]
+        results = self.wait_for_config(session, queue_url, bname)
+        resource_b = s3.ConfigS3(manager).load_resource(results[0])
+        self.maxDiff = None
+        self.assertEqual(s3.get_region(resource_b), 'us-east-1')
+        for k in ("Logging", "Policy", "Versioning", "Name", "Website"):
+            self.assertEqual(resource_a[k], resource_b[k])
+
+        self.assertEqual(
+            {t["Key"]: t["Value"] for t in resource_a.get("Tags")},
+            {t["Key"]: t["Value"] for t in resource_b.get("Tags")},
+        )
 
     @functional
     def test_normalize(self):
@@ -954,6 +1148,16 @@ class S3ConfigSource(ConfigTest):
             },
         )
 
+    def test_config_handle_missing_attr(self):
+        # test for bug of
+        # https://github.com/cloud-custodian/cloud-custodian/issues/7808
+        event = event_data("s3-from-rule-sans-accelerator.json", "config")
+        p = self.load_policy({"name": "s3cfg", "resource": "s3"})
+        source = p.resource_manager.get_source("config")
+        resource_config = json.loads(event["invokingEvent"])["configurationItem"]
+        resource = source.load_resource(resource_config)
+        assert resource['Name'] == 'c7n-fire-logs'
+
     def test_config_normalize_lifecycle_null_predicate(self):
         event = event_data("s3-lifecycle-null-predicate.json", "config")
         p = self.load_policy({"name": "s3cfg", "resource": "s3"})
@@ -1025,7 +1229,9 @@ class S3ConfigSource(ConfigTest):
                         {
                             u"Status": "Enabled",
                             u"Prefix": "",
-                            u"Destination": {u"Bucket": "arn:aws:s3:::testing-west"},
+                            u"Destination": {
+                                u"Account": "000111222333",
+                                u"Bucket": "arn:aws:s3:::testing-west"},
                             u"ID": "testing-99",
                         }
                     ],
@@ -1153,13 +1359,13 @@ class S3ConfigSource(ConfigTest):
                 ),
                 u"Lifecycle": None,
                 u"Location": {},
-                u"Logging": None,
+                u"Logging": {},
                 u"Name": u"c7n-fire-logs",
                 u"Notification": {},
                 u"Policy": None,
                 u"Replication": None,
                 u"Tags": [],
-                u"Versioning": None,
+                u"Versioning": {},
                 u"Website": None,
             },
         )
@@ -1271,6 +1477,7 @@ class S3Test(BaseTest):
             tags, {
                 'Application': 'test', 'Env': 'Dev', 'Owner': 'nicholase',
                 'Retention': '2', 'Retention2': '3', 'test': 'test'})
+        self.assertTrue("CreationDate" in resources[0])
 
     def test_multipart_large_file(self):
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
@@ -1285,7 +1492,7 @@ class S3Test(BaseTest):
         client.create_bucket(Bucket=bname)
         self.addCleanup(destroyBucket, client, bname)
 
-        class wrapper(object):
+        class wrapper:
 
             def __init__(self, d, length):
                 self.d = d
@@ -1327,6 +1534,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -1538,6 +1746,480 @@ class S3Test(BaseTest):
         )
         resources = p.run()
         self.assertEqual(len(resources), 1)
+
+    def test_has_statement_policy_action_star(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(
+            s3.MissingPolicyStatementFilter, "executor_factory", MainThreadExecutor
+        )
+        self.patch(
+            s3, "S3_AUGMENT_TABLE", [("get_bucket_policy", "Policy", None, "Policy")]
+        )
+        session_factory = self.replay_flight_data("test_s3_has_statement")
+        bname = "custodian-policy-test1"
+        p = self.load_policy(
+            {
+                "name": "s3-has-policy",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "has-statement",
+                        "statements": [
+                            {
+                                "Effect": "Deny",
+                                "Action": "*",
+                                "Principal": "*",
+                                "Resource": "arn:aws:s3:::{bucket_name}/*"
+                            }
+                        ],
+                    },
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_has_statement_policy_partial(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(
+            s3.MissingPolicyStatementFilter, "executor_factory", MainThreadExecutor
+        )
+        self.patch(
+            s3, "S3_AUGMENT_TABLE", [("get_bucket_policy", "Policy", None, "Policy")]
+        )
+        session_factory = self.replay_flight_data("test_s3_has_statement")
+        bname = "custodian-policy-test"
+        p = self.load_policy(
+            {
+                "name": "s3-has-policy",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "has-statement",
+                        "statements": [
+                            {
+                                "Effect": "Deny",
+                                "Action": ["s3:PutObject"],
+                                "PartialMatch": ["Action"]
+                            }
+                        ],
+                    },
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_bucket_replication_policy_remove(self):
+        replicated_from_name = "replication-from-12345"
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+
+        # only augment with logging info to minimize API calls
+        self.patch(
+            s3,
+            "S3_AUGMENT_TABLE",
+            [("get_bucket_replication", 'Replication',
+            None, None, 's3:GetReplicationConfiguration')],
+        )
+
+        # and ignore any other buckets we might have in this test account
+        # to minimize the placebo data and API calls
+        # Inspired by #5206, thanks tjstansell!
+        self.patch(
+            s3.S3.resource_type,
+            "enum_spec",
+            ('list_buckets', "Buckets[?Name=='{}']".format(replicated_from_name), None)
+        )
+        session_factory = self.replay_flight_data("test_s3_replication_policy_remove")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "s3-has-replica-policy",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "type": "value",
+                        "key": "Replication.ReplicationConfiguration.Rules[].Destination",
+                        "value": "present"
+                    },
+                    {
+                        "type": "value",
+                        "key": "Replication.ReplicationConfiguration.Rules[].Status",
+                        "value": "Enabled",
+                        "op": "contains"
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-replication",
+                        "state": "remove"
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with an enabled replication policy
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+        # Test to make sure that the replication policy removed from the buckets
+        self.assertRaises(ClientError, client.get_bucket_replication, Bucket=replicated_from_name)
+
+    def test_bucket_replication_policy_disable(self):
+        bname = "repela"
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(
+            s3,
+            "S3_AUGMENT_TABLE",
+            [("get_bucket_replication", 'Replication',
+            None, None, 's3:GetReplicationConfiguration')],
+        )
+        self.patch(
+            s3.S3.resource_type,
+            "enum_spec",
+            ('list_buckets', "Buckets[?Name=='{}']".format(bname), None)
+        )
+        session_factory = self.replay_flight_data("test_s3_replication_policy_disable")
+        session = session_factory()
+        client = session.client("s3")
+        p = self.load_policy(
+            {
+                "name": "s3-has-replica-policy",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "value",
+                        "key": "Replication.ReplicationConfiguration.Rules[].Destination",
+                        "value": "present"
+                    },
+                    {
+                        "type": "value",
+                        "key": "Replication.ReplicationConfiguration.Rules[].Status",
+                        "value": "Enabled",
+                        "op": "contains"
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-replication",
+                        "state": "disable"
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+
+        # Test that there was a bucket with an enabled replication policy
+        self.assertEqual(len(resources), 1)
+
+        # Test that there is a disbled policy on the bucket now
+        response = client.get_bucket_replication(Bucket=bname)
+        for rule in response['ReplicationConfiguration']['Rules']:
+            self.assertEqual(rule['Status'], 'Disabled')
+
+    def test_check_public_block(self):
+        """Handle cases where public block details are missing or unavailable
+
+        The default check-public-block filter should match buckets
+        in any of the following conditions:
+
+        - There is a public block configuration, but some settings are not
+          enabled
+        - There is no public block configuration set
+        - A strict bucket policy prevents Custodian from reading the public block configuration
+        """
+        self.patch(s3.FilterPublicBlock, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_check_public_block")
+        p = self.load_policy(
+            {
+                "name": "check-public-block",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "type": "check-public-block",
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+
+        resources = {bucket["Name"]: bucket for bucket in p.run()}
+        self.assertEqual(len(resources), 3)
+        locked_down_bucket = resources["my-locked-down-bucket"]
+        self.assertIn("GetPublicAccessBlock", locked_down_bucket["c7n:DeniedMethods"])
+
+    def test_set_public_block_enable_all(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_enable_all")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Absent",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-public-block"
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with missing public blocks
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+
+        # Make sure that all blocks are set to on/enabled now
+        response = client.get_public_access_block(
+            Bucket=bname)['PublicAccessBlockConfiguration']
+        for key in response.keys():
+            self.assertEqual(response[key], True)
+
+    def test_set_public_block_disable_all(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_disable_all")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Present",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                        "BlockPublicAcls": True
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-public-block",
+                        "BlockPublicAcls": False,
+                        "IgnorePublicAcls": False,
+                        "BlockPublicPolicy": False,
+                        "RestrictPublicBuckets": False
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with missing public blocks
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+
+        # Make sure that the public blocks are disabled on the buckets
+        response = client.get_public_access_block(
+            Bucket=bname)['PublicAccessBlockConfiguration']
+        for key in response.keys():
+            self.assertEqual(response[key], False)
+
+    def test_set_public_block_disable_all_via_state(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_disable_all")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Present",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                        "BlockPublicAcls": True
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-public-block",
+                        "state": False
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with missing public blocks
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+
+        # Make sure that the public blocks are disabled on the buckets
+        response = client.get_public_access_block(
+            Bucket=bname)['PublicAccessBlockConfiguration']
+        for key in response.keys():
+            self.assertEqual(response[key], False)
+
+    def test_set_public_block_enable_one(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_enable_one")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Absent",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                        "BlockPublicPolicy": False
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-public-block",
+                        "BlockPublicPolicy": True
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with BlockPublicAcls public block turned off
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+        self.assertEqual(resources[0]["c7n:PublicAccessBlock"]["BlockPublicPolicy"], False)
+
+        # Make sure that BlockPublicAcls public block turned on now
+        assert client.get_public_access_block(
+            Bucket=bname)['PublicAccessBlockConfiguration'] == {
+                "BlockPublicAcls": False,
+                "IgnorePublicAcls": False,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": False}
+
+    def test_set_public_block_disable_one(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_disable_one")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Absent",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                        "IgnorePublicAcls": True
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-public-block",
+                        "IgnorePublicAcls": False
+                    }
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with the IgnorePublicAcls public block set to on
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+        self.assertEqual(resources[0]["c7n:PublicAccessBlock"]["IgnorePublicAcls"], True)
+
+        # Make sure that the IgnorePublicAcls public block set to off
+        assert client.get_public_access_block(
+            Bucket=bname)['PublicAccessBlockConfiguration'] == {
+                'BlockPublicAcls': False,
+                'BlockPublicPolicy': True,
+                'IgnorePublicAcls': False,
+                'RestrictPublicBuckets': False}
+
+    def test_set_public_block_throws_errors(self):
+        bname = 'mypublicblock'
+
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+
+        session_factory = self.replay_flight_data("test_s3_public_block_throws_errors")
+        session = session_factory()
+        client = session.client("s3")
+
+        p = self.load_policy(
+            {
+                "name": "CheckForPublicBlocks-Absent",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "check-public-block",
+                        "BlockPublicAcls": False,
+                        "IgnorePublicAcls": False,
+                        "BlockPublicPolicy": False,
+                        "RestrictPublicBuckets": False
+                    }
+                ],
+                "actions": [
+                    {"type": "set-public-block"}
+                ]
+            },
+            session_factory=session_factory,
+        )
+
+        # Test that there was a bucket with no public blocks
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]["Name"], bname)
+
+        # Because there are no public blocks we will get a client error
+        # We want this to throw for code cov
+        try:
+            client.get_public_access_block(Bucket=bname)['PublicAccessBlockConfiguration']
+        except ClientError as e:
+            # Assert that it is the proper error code
+            self.assertEqual(e.response['Error']['Code'], 'NoSuchPublicAccessBlockConfiguration')
 
     def test_has_statement_similar_policies(self):
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
@@ -1766,7 +2448,7 @@ class S3Test(BaseTest):
                     {
                         "type": "toggle-logging",
                         "target_bucket": bname,
-                        "target_prefix": "{account}/{source_bucket_name}",
+                        "target_prefix": "{account}/{source_bucket_region}/{source_bucket_name}/",
                     }
                 ],
             },
@@ -1775,6 +2457,10 @@ class S3Test(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]["Name"], bname)
+        self.assertEqual(
+            resources[0]["Logging"]["TargetPrefix"],
+            "{}/{}/{}/".format(account_name, client.meta.region_name, bname)
+        )
 
         if self.recording:
             time.sleep(5)
@@ -1812,6 +2498,9 @@ class S3Test(BaseTest):
         resources = p.run()
         self.assertEqual(len(resources), 1)
         self.assertEqual(resources[0]["Name"], bname)
+        self.assertEqual(
+            resources[0]["Logging"]["TargetPrefix"], "{}/{}/".format(self.account_id, bname)
+        )
 
         if self.recording:
             time.sleep(5)
@@ -2442,6 +3131,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2484,6 +3174,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2538,6 +3229,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "encrypt-keys", "report-only": True}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         report_resources = report_policy.run()
@@ -2551,6 +3243,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": ["encrypt-keys"],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2602,6 +3295,7 @@ class S3Test(BaseTest):
                 "filters": [{"Name": bname}],
                 "actions": [{"type": "encrypt-keys"}],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
 
@@ -2638,6 +3332,7 @@ class S3Test(BaseTest):
                     {"type": "encrypt-keys", "crypto": "aws:kms", "key-id": key_one}
                 ],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -2656,6 +3351,7 @@ class S3Test(BaseTest):
                     {"type": "encrypt-keys", "crypto": "aws:kms", "key-id": key_two}
                 ],
             },
+            output_dir=None,
             session_factory=session_factory,
         )
         p.run()
@@ -3023,6 +3719,9 @@ class S3Test(BaseTest):
         self.assertEqual(rules["SSEAlgorithm"], "aws:kms")
         self.assertEqual(rules["KMSMasterKeyID"], kms_alias_id)
 
+        bname = "custodian-enable-bucket-encryption-kms-bad-alias"
+        client.create_bucket(Bucket=bname)
+        self.addCleanup(destroyBucket, client, bname)
         p = self.load_policy(
             {
                 "name": "s3-enable-bucket-encryption-bad-alias",
@@ -3045,12 +3744,8 @@ class S3Test(BaseTest):
         if self.recording:
             time.sleep(5)
 
-        response = client.get_bucket_encryption(Bucket=bname)
-        rules = response["ServerSideEncryptionConfiguration"]["Rules"][0][
-            "ApplyServerSideEncryptionByDefault"
-        ]
-        self.assertEqual(rules["SSEAlgorithm"], "aws:kms")
-        self.assertIsNone(rules.get("KMSMasterKeyID"))
+        with self.assertRaises(ClientError):
+            client.get_bucket_encryption(Bucket=bname)
 
     def test_enable_bucket_encryption_aes256(self):
         self.patch(s3.S3, "executor_factory", MainThreadExecutor)
@@ -3157,6 +3852,61 @@ class S3Test(BaseTest):
         with self.assertRaises(Exception):
             client.get_bucket_encryption(Bucket=bname)
 
+    @mock.patch('c7n.actions.invoke.assumed_session')
+    def test_s3_invoke_lambda_assume_role_action(self, mock_assumed_session):
+
+        session_factory = self.replay_flight_data("test_s3_invoke_lambda_assume_role")
+
+        p = self.load_policy(
+            {
+                "name": "s3-invoke-lambda-assume-role",
+                "resource": "s3",
+                "actions": [{"type": "invoke-lambda",
+                             "function": "lambda-invoke-with-assume-role", "assume-role":
+                                 "arn:aws:iam::0123456789:role/service-role/lambda-assumed-role"}],
+            },
+            session_factory=session_factory,
+        )
+
+        p.resource_manager.actions[0].process([{
+            "FunctionName": "abc",
+            "payload": {},
+        }])
+
+        assert mock_assumed_session.call_count == 1
+
+    def test_s3_data_events(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        session_factory = self.replay_flight_data("test_s3_data_events")
+
+        p = self.load_policy(
+            {
+                "name": "s3-data-events",
+                "resource": "s3",
+                "filters": [{"type": "data-events"}],
+            },
+            session_factory=session_factory,
+        )
+
+        resources = p.run()
+        assert {bucket["Name"] for bucket in resources} == {"bucket-with-data-events"}
+
+    def test_s3_dataaccesspointaccount_cross_account(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        session_factory = self.replay_flight_data("test_s3_dataaccesspointaccount_cross_account")
+
+        p = self.load_policy(
+            {
+                "name": "s3-data-access-point-account-cross-account",
+                "resource": "s3",
+                "filters": [{"type": "cross-account"}],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
 
 class S3LifecycleTest(BaseTest):
 
@@ -3170,18 +3920,18 @@ class S3LifecycleTest(BaseTest):
         session_factory = self.replay_flight_data("test_s3_lifecycle")
         session = session_factory()
         client = session.client("s3")
-        bname = "custodian-lifecycle-test"
+        bname = "c7n-lifecycle-test-again3"
 
         # Make a bucket
         client.create_bucket(Bucket=bname)
         self.addCleanup(destroyBucket, client, bname)
-        buckets = set([b["Name"] for b in client.list_buckets()["Buckets"]])
+        buckets = {b["Name"] for b in client.list_buckets()["Buckets"]}
         self.assertIn(bname, buckets)
 
         def get_policy(**kwargs):
             rule = {
                 "Status": "Enabled",
-                "Prefix": "foo/",
+                "Filter": {"Prefix": "foo/"},
                 "Transitions": [{"Days": 60, "StorageClass": "GLACIER"}],
             }
             rule.update(**kwargs)
@@ -3215,34 +3965,34 @@ class S3LifecycleTest(BaseTest):
         # Now add another lifecycle rule to ensure it doesn't clobber the first one
         #
         lifecycle_id2 = "test-lifecycle-two"
-        policy = get_policy(ID=lifecycle_id2, Prefix="bar/")
+        policy = get_policy(ID=lifecycle_id2, Filter={"Prefix": "bar/"})
         run_policy(policy)
 
         # Verify the lifecycle
         lifecycle = client.get_bucket_lifecycle_configuration(Bucket=bname)
         self.assertEqual(len(lifecycle["Rules"]), 2)
         self.assertSetEqual(
-            set([x["ID"] for x in lifecycle["Rules"]]),
-            set([lifecycle_id1, lifecycle_id2]),
+            {x["ID"] for x in lifecycle["Rules"]},
+            {lifecycle_id1, lifecycle_id2},
         )
 
         #
         # Next, overwrite one of the lifecycles and make sure it changed
         #
-        policy = get_policy(ID=lifecycle_id2, Prefix="baz/")
+        policy = get_policy(ID=lifecycle_id2, Filter={"Prefix": "baz/"})
         run_policy(policy)
 
         # Verify the lifecycle
         lifecycle = client.get_bucket_lifecycle_configuration(Bucket=bname)
         self.assertEqual(len(lifecycle["Rules"]), 2)
         self.assertSetEqual(
-            set([x["ID"] for x in lifecycle["Rules"]]),
-            set([lifecycle_id1, lifecycle_id2]),
+            {x["ID"] for x in lifecycle["Rules"]},
+            {lifecycle_id1, lifecycle_id2},
         )
 
         for rule in lifecycle["Rules"]:
             if rule["ID"] == lifecycle_id2:
-                self.assertEqual(rule["Prefix"], "baz/")
+                self.assertEqual(rule["Filter"]["Prefix"], "baz/")
 
         #
         # Test deleting a lifecycle
@@ -3253,3 +4003,764 @@ class S3LifecycleTest(BaseTest):
         lifecycle = client.get_bucket_lifecycle_configuration(Bucket=bname)
         self.assertEqual(len(lifecycle["Rules"]), 1)
         self.assertEqual(lifecycle["Rules"][0]["ID"], lifecycle_id2)
+
+    def test_s3_remove_lifecycle_rule_id(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(
+            s3,
+            "S3_AUGMENT_TABLE",
+            [("get_bucket_lifecycle_configuration", "Lifecycle", None, None)],)
+        bname = 'c7n-test-1'
+        session_factory = self.replay_flight_data("test_s3_remove_lifecycle_rule_id")
+        session = session_factory()
+        client = session.client("s3")
+        lifecycle = client.get_bucket_lifecycle_configuration(Bucket=bname)
+        self.assertSetEqual(
+            {x["ID"] for x in lifecycle["Rules"]},
+            {'id2'},)
+        p = self.load_policy(
+            {
+                "name": "s3-remove-lc-rule-id",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "Name": bname
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "configure-lifecycle",
+                        "rules": [
+                            {
+                                "ID": "id2",
+                                "Status": "absent",
+                            },
+                            {
+                                "ID": "id1",
+                                "Status": "absent",
+                            },
+                        ]
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        with self.assertRaises(Exception):
+            client.get_bucket_lifecycle_configuration(Bucket=bname)
+
+
+@terraform('aws_s3_encryption_audit')
+def test_s3_encryption_audit(test, aws_s3_encryption_audit):
+    test.patch(s3.S3, "executor_factory", MainThreadExecutor)
+    test.patch(s3.BucketEncryption, "executor_factory", MainThreadExecutor)
+    test.patch(s3, "S3_AUGMENT_TABLE", [])
+    session_factory = test.replay_flight_data("test_s3_encryption_audit")
+
+    p = test.load_policy(
+        {
+            "name": "s3-audit",
+            "resource": "s3",
+            "filters": [
+                {"type": "value",
+                 "key": "Name",
+                 "op": "in",
+                 "value": [
+                     'c7n-aws-s3-encryption-audit-test-a',
+                     'c7n-aws-s3-encryption-audit-test-b',
+                     'c7n-aws-s3-encryption-audit-test-c',
+                 ]},
+                {
+                    "or": [
+                        {
+                            "type": "bucket-encryption",
+                            "state": False,
+                        },
+                        {
+                            "type": "bucket-encryption",
+                            "crypto": "aws:kms",
+                            "state": True,
+                        },
+                        {
+                            "type": "bucket-encryption",
+                            "crypto": "AES256",
+                            "state": True,
+                        },
+                    ]
+                },
+            ],
+        },
+        session_factory=session_factory,
+    )
+
+    resources = p.run()
+
+    assert len(resources) == 3
+
+    expected_names = [
+        'c7n-aws-s3-encryption-audit-test-a',
+        'c7n-aws-s3-encryption-audit-test-b',
+        'c7n-aws-s3-encryption-audit-test-c',
+    ]
+    actual_names = sorted([r.get('Name') for r in resources])
+
+    assert actual_names == expected_names
+
+
+# s3 changed behavior for new buckets in 2023
+# https://aws.amazon.com/blogs/aws/heads-up-amazon-s3-security-changes-are-coming-in-april-of-2023/
+
+@pytest.mark.skiplive
+@terraform('s3_ownership', scope='class')
+class TestBucketOwnership:
+    def test_s3_ownership_empty(self, test, s3_ownership):
+        test.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        test.patch(s3.BucketOwnershipControls, "executor_factory", MainThreadExecutor)
+        test.patch(
+            s3, "S3_AUGMENT_TABLE", []
+        )
+        session_factory = test.replay_flight_data("test_s3_ownership_empty")
+        bucket_name = s3_ownership['aws_s3_bucket.no_ownership_controls.bucket']
+        p = test.load_policy(
+            {
+                "name": "s3-ownership-empty",
+                "resource": "s3",
+                "filters": [
+                    {"type": "value",
+                     "op": "glob",
+                     "key": "Name",
+                     "value": "c7ntest*"},
+                    {"type": "ownership",
+                     "value": "empty"},
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        assert len(resources) == 1
+        assert resources[0]["Name"] == bucket_name
+
+    def test_s3_ownership_defined(self, test, s3_ownership):
+        test.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        test.patch(s3.BucketOwnershipControls, "executor_factory", MainThreadExecutor)
+        test.patch(
+            s3, "S3_AUGMENT_TABLE", []
+        )
+        session_factory = test.replay_flight_data("test_s3_ownership_defined")
+        bucket_names = {s3_ownership[f'aws_s3_bucket.{r}.bucket']
+                        for r in ('owner_preferred', 'owner_enforced')}
+        p = test.load_policy(
+            {
+                "name": "s3-ownership-defined",
+                "resource": "s3",
+                "filters": [
+                    {"type": "value",
+                     "op": "glob",
+                     "key": "Name",
+                     "value": "c7ntest*"},
+                    {"type": "ownership",
+                     "op": "in",
+                     "value": ["BucketOwnerPreferred", "BucketOwnerEnforced"]},
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        assert len(resources) == 2
+        assert {r["Name"] for r in resources} == bucket_names
+
+    def test_s3_access_analyzer_filter_with_no_results(self, test, s3_ownership):
+        test.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        test.patch(s3.BucketOwnershipControls, "executor_factory", MainThreadExecutor)
+        test.patch(s3, "S3_AUGMENT_TABLE", [])
+        factory = test.replay_flight_data("test_s3_iam_analyzers")
+        p = test.load_policy({
+            'name': 'check-s3',
+            'resource': 'aws.s3',
+            'filters': [
+                {
+                    'type': 'iam-analyzer',
+                    'key': 'isPublic',
+                    'value': True,
+                },
+            ]
+        }, session_factory=factory)
+        test.assertRaises(PolicyExecutionError, p.run)
+
+
+class IntelligentTieringConfiguration(BaseTest):
+
+    def test_set_intelligent_configuration_validation_error(self):
+        with self.assertRaises(PolicyValidationError) as e:
+            self.load_policy({
+                'name': 's3-apply-int-tier-config',
+                'resource': 'aws.s3',
+                'actions': [
+                    {
+                        'type': 'set-intelligent-tiering',
+                        'Id': 'xyz',
+                        'State': 'delete'
+                    }
+                ]
+            })
+        self.assertIn(
+            "may only be used in conjunction with `intelligent-tiering`", str(e.exception))
+
+    def test_s3_int_tiering_set_configurations(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        bname = "example-abc-123"
+        session_factory = self.replay_flight_data("test_s3_int_tiering_set_configurations")
+        session = session_factory()
+        client = session.client("s3")
+        configs = client.list_bucket_intelligent_tiering_configurations(Bucket=bname)
+        filtered_config = {
+            'Id': 'test-config',
+            'Filter': {'And': {'Prefix': 'test', 'Tags': [{'Key': 'Owner', 'Value': 'c7n'}]}},
+            'Status': 'Enabled',
+            'Tierings': [
+                {'Days': 100, 'AccessTier': 'ARCHIVE_ACCESS'}
+            ]
+        }
+        applied_config = {
+            'Id': 'c7n-default',
+            'Filter': {
+                'And': {
+                    'Prefix': 'test',
+                    'Tags': [
+                        {'Key': 'Owner', 'Value': 'c7n'},
+                        {"Key": "AnotherOnwer", "Value": "Enterprise"}]}},
+            'Status': 'Enabled',
+            'Tierings': [
+                {'Days': 150, 'AccessTier': 'ARCHIVE_ACCESS'},
+                {'Days': 200, 'AccessTier': 'DEEP_ARCHIVE_ACCESS'}
+            ]
+        }
+        self.assertTrue(filtered_config in configs.get('IntelligentTieringConfigurationList'))
+        p = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "intelligent-tiering",
+                        "attrs": [
+                          {"Status": "Enabled"},
+                          {"Filter": {
+                              "And": {
+                                  "Prefix": "test", "Tags": [{"Key": "Owner", "Value": "c7n"}]}}},
+                          {"Tierings": [{"Days": 100, "AccessTier": "ARCHIVE_ACCESS"}]}]
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-intelligent-tiering",
+                        "State": "delete",
+                        "Id": "matched",
+                    },
+                    {
+                        "type": "set-intelligent-tiering",
+                        "Id": "c7n-default",
+                        "IntelligentTieringConfiguration": {
+                            "Id": "c7n-default",
+                            "Status": "Enabled",
+                            "Filter": {
+                                "And": {
+                                    "Prefix": "test",
+                                    "Tags": [
+                                        {"Key": "Owner", "Value": "c7n"},
+                                        {"Key": "AnotherOnwer", "Value": "Enterprise"}]}},
+                            "Tierings": [
+                                {
+                                    "Days": 150,
+                                    "AccessTier": "ARCHIVE_ACCESS"
+                                },
+                                {
+                                    "Days": 200,
+                                    "AccessTier": "DEEP_ARCHIVE_ACCESS"
+                                }
+                            ]
+                        }
+                    }],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertTrue("c7n:IntelligentTiering" in resources[0])
+        self.assertEqual(len(resources[0].get("c7n:ListItemMatches")), 1)
+        self.assertEqual(resources[0].get("c7n:ListItemMatches")[0].get("Id"), "test-config")
+        check_config = client.list_bucket_intelligent_tiering_configurations(Bucket=bname)
+        self.assertFalse(filtered_config in check_config.get('IntelligentTieringConfigurationList'))
+        self.assertTrue(applied_config in check_config.get('IntelligentTieringConfigurationList'))
+
+    def test_s3_int_tiering_delete_configurations_id(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        bname = "example-abc-123"
+        session_factory = self.replay_flight_data("test_s3_int_tiering_delete_configurations_id")
+        session = session_factory()
+        client = session.client("s3")
+        ids = []
+        configs = client.list_bucket_intelligent_tiering_configurations(
+            Bucket=bname).get('IntelligentTieringConfigurationList')
+        self.assertEqual(len(configs), 2)
+        for config in configs:
+            ids.append(jmespath_search("Id", config))
+        self.assertTrue("c7n-default" in ids)
+        p = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "intelligent-tiering",
+                        "attrs": [
+                          {"Status": "Enabled"},
+                          {"Id": "c7n-default"}]
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-intelligent-tiering",
+                        "State": "delete",
+                        "Id": "c7n-default",
+                    }],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0].get("c7n:ListItemMatches")[0].get("Id"), "c7n-default")
+        check_config = client.list_bucket_intelligent_tiering_configurations(
+            Bucket=bname).get('IntelligentTieringConfigurationList')
+        self.assertEqual(len(check_config), 1)
+        self.assertFalse('c7n-default' in check_config[0].get('Id'))
+
+    def test_delete_int_tier_config_not_present(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        bname = "example-abc-123"
+        session_factory = self.replay_flight_data("test_delete_int_tier_config_not_present")
+        session = session_factory()
+        client = session.client("s3")
+        config = client.list_bucket_intelligent_tiering_configurations(
+            Bucket=bname).get('IntelligentTieringConfigurationList')
+        self.assertEqual(len(config), 1)
+        id = config[0].get('Id')
+        self.assertTrue("present" in id)
+        log_output = self.capture_logging('custodian.s3', level=logging.WARNING)
+        p = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "intelligent-tiering",
+                        "attrs": [{"Status": "Enabled"}]
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "set-intelligent-tiering",
+                        "State": "delete",
+                        "Id": "not-present",
+                    }],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        check_config = client.list_bucket_intelligent_tiering_configurations(
+            Bucket=bname).get('IntelligentTieringConfigurationList')
+        self.assertEqual(len(check_config), 1)
+        self.assertTrue('present' in check_config[0].get('Id'))
+        self.assertIn(
+          'No such configuration found:example-abc-123 while deleting '
+          'intelligent tiering configuration',
+            log_output.getvalue())
+
+    def test_s3_intel_tier_config_access_denied(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        bname = "example-abc-123"
+        session_factory = self.replay_flight_data("test_s3_intel_tier_config_access_denied")
+        log_output = self.capture_logging('custodian.s3', level=logging.WARNING)
+        p = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {"type": "intelligent-tiering"}],
+                "actions": [
+                    {
+                        "type": "set-intelligent-tiering",
+                        "State": "delete",
+                        "Id": "not-present",
+                    }],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertIn(
+          'Access Denied Bucket:example-abc-123 while deleting intelligent tiering configuration',
+            log_output.getvalue())
+
+        p1 = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {"type": "intelligent-tiering"}],
+                "actions": [
+                    {
+                        "type": "set-intelligent-tiering",
+                        "Id": "not-present",
+                        "IntelligentTieringConfiguration": {
+                        "Id": "not-present",
+                        "Status": "Enabled",
+                        "Filter": {
+                            "And": {
+                                "Prefix": "test",
+                                "Tags": [
+                                    {"Key": "Owner", "Value": "c7n"}]}},
+                            "Tierings": [{
+                                    "Days": 150,
+                                    "AccessTier": "ARCHIVE_ACCESS"
+                                }],
+                        }
+                    }],
+            },
+            session_factory=session_factory,
+        )
+        resources = p1.run()
+        self.assertEqual(len(resources), 1)
+        self.assertIn(
+          'Access Denied Bucket:example-abc-123 while applying intelligent tiering configuration',
+            log_output.getvalue())
+
+    def test_s3_intel_tier_config_filter_count(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        bname = "example-abc-123"
+        session_factory = self.replay_flight_data("test_s3_intel_tier_config_filter_count")
+        p = self.load_policy(
+            {
+                "name": "s3-filter-configs-and-apply",
+                "resource": "s3",
+                "filters": [
+                    {"Name": bname},
+                    {
+                        "type": "intelligent-tiering",
+                        "count": 2,
+                        "count_op": "eq"
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(len(resources[0]["c7n:IntelligentTiering"]), 2)
+
+    def test_set_intelligent_configuration_schema_validation(self):
+        with self.assertRaises(PolicyValidationError) as e:
+            self.load_policy({
+                'name': 's3-apply-int-tier-config',
+                'resource': 'aws.s3',
+                'filters': [{'type': 'intelligent-tiering'}],
+                'actions': [
+                    {
+                        'type': 'set-intelligent-tiering',
+                        'Id': 'xyz',
+                        'IntelligentTieringConfiguration': {
+                          'Id': 'xyz',
+                          'Status': 'Enabled'}
+                    }
+                ]
+            })
+        self.assertIn(
+            'Missing required parameter in IntelligentTieringConfiguration: "Tierings"', str(
+              e.exception))
+
+    def test_s3_list_tiering_config_denied_method(self):
+        b = {'Name': 'example-abc-123',
+            'c7n:DeniedMethods': ['list_bucket_intelligent_tiering_configurations']}
+        log_output = self.capture_logging('custodian.s3', level=logging.WARNING)
+        p = self.load_policy({'name': 's3-apply-int-tier-config-filter',
+                'resource': 'aws.s3',
+                'filters': [{'type': 'intelligent-tiering'}],
+                'actions': [{'type': 'set-intelligent-tiering', 'Id': 'test', 'State': 'delete'}]
+            },
+        )
+        action_set_config = p.resource_manager.actions[0]
+        self.assertEqual(action_set_config.process_bucket(b), None)
+        self.assertIn(
+          'Access Denied Bucket:example-abc-123 while reading intelligent tiering configurations',
+            log_output.getvalue())
+
+
+class BucketReplication(BaseTest):
+    def test_s3_bucket_replication_filter(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        self.patch(s3, "S3_AUGMENT_TABLE", [('get_bucket_replication',
+        'Replication', None, None, 's3:GetReplicationConfiguration')])
+        session_factory = self.replay_flight_data("test_s3_bucket_replication_filter")
+        p = self.load_policy(
+            {
+                "name": "s3-replication-rule",
+                "resource": "s3",
+                "filters": [
+                        {
+                            "type": "bucket-replication",
+                            "attrs": [
+                            {"Status": "Enabled"},
+                            {"Filter": {
+                                "And": {
+                                    "Prefix": "abc", "Tags": [{"Key": "Owner", "Value": "c7n"}]}}},
+                            {"DestinationRegion": "us-west-2"},
+                            {"CrossRegion": True}
+                            ]
+                        }
+                    ],
+                },
+            session_factory=session_factory,
+        )
+        with vcr.use_cassette(
+          'tests/data/vcr_cassettes/test_s3/replication_rule.yaml',
+           record_mode='none'
+        ):
+            resources = p.run()
+            self.assertEqual(len(resources), 1)
+            self.assertTrue("Replication" in resources[0])
+            self.assertEqual(len(resources[0].get("c7n:ListItemMatches")), 1)
+
+    def test_s3_bucket_replication_filter_count(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        self.patch(s3, "S3_AUGMENT_TABLE", [('get_bucket_replication',
+        'Replication', None, None, 's3:GetReplicationConfiguration')])
+        session_factory = self.replay_flight_data("test_s3_bucket_replication_filter_count")
+        p = self.load_policy(
+            {
+                "name": "s3-replication-filter-count",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "type": "bucket-replication",
+                        "count": 1,
+                        "count_op": "eq"
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+        with vcr.use_cassette(
+          'tests/data/vcr_cassettes/test_s3/replication_filter_count.yaml',
+           record_mode='none'
+        ):
+            resources = p.run()
+            self.assertEqual(len(resources), 1)
+            self.assertEqual(resources[0]['Name'], 'custodian-replication-test-1')
+
+    def test_s3_bucket_no_replication_rule(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        self.patch(s3, "S3_AUGMENT_TABLE", [('get_bucket_replication',
+        'Replication', None, None, 's3:GetReplicationConfiguration')])
+        session_factory = self.replay_flight_data("test_s3_bucket_no_replication_rule")
+        p = self.load_policy(
+            {
+                "name": "s3-no-replication-rule",
+                "resource": "s3",
+                "filters": [
+                    {
+                        "not": [
+                            "bucket-replication"
+                        ]
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+        with vcr.use_cassette(
+          'tests/data/vcr_cassettes/test_s3/no_replication_rule.yaml',
+           record_mode='none'
+        ):
+            resources = p.run()
+            self.assertEqual(len(resources), 1)
+            self.assertEqual(resources[0]['Name'], 'custodian-replication-west')
+
+    def test_s3_bucket_replication_no_bucket(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        self.patch(s3, "S3_AUGMENT_TABLE", [('get_bucket_replication',
+        'Replication', None, None, 's3:GetReplicationConfiguration')])
+        session_factory = self.replay_flight_data("test_s3_bucket_replication_no_bucket")
+        p = self.load_policy(
+            {
+                "name": "s3-replication-rule",
+                "resource": "s3",
+                "filters": [
+                        {
+                            "type": "bucket-replication",
+                            "attrs": [
+                            {"Status": "Enabled"},
+                            {"DestinationBucketAvailable": False}
+                            ]
+                        }
+                    ],
+                },
+            session_factory=session_factory,
+        )
+        with vcr.use_cassette(
+          'tests/data/vcr_cassettes/test_s3/replication_rule_no_bucket.yaml',
+           record_mode='none'
+        ):
+            resources = p.run()
+            self.assertEqual(len(resources), 1)
+            self.assertTrue("Replication" in resources[0])
+            self.assertEqual(len(resources[0].get("c7n:ListItemMatches")), 1)
+
+    def test_s3_bucket_key_enabled(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3.BucketEncryption, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        factory = self.replay_flight_data('test_s3_bucket_key_enabled')
+
+        p = self.load_policy(
+            {
+                'name': 'test-s3-bucket-key-enabled',
+                'resource': 'aws.s3',
+                'filters': [
+                    {
+                        'type': 'bucket-encryption',
+                        'bucket_key_enabled': True
+                    },
+                    {
+                        'type': 'value',
+                        'key': 'Name',
+                        'value': 'c7n-test-s3-bucket',
+                        'op': 'contains'
+                    }
+                ]
+            },
+            session_factory=factory
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_s3_bucket_key_disabled(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3.BucketEncryption, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        factory = self.replay_flight_data('test_s3_bucket_key_disabled')
+
+        p = self.load_policy(
+            {
+                'name': 'test-s3-bucket-key-disabled',
+                'resource': 'aws.s3',
+                'filters': [
+                    {
+                        'type': 'bucket-encryption',
+                        'bucket_key_enabled': False
+                    },
+                    {
+                        'type': 'value',
+                        'key': 'Name',
+                        'value': 'c7n-test-s3-bucket',
+                        'op': 'contains'
+                    }
+                ]
+            },
+            session_factory=factory
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_bucket_encryption_invalid(self):
+        self.assertRaises(
+            PolicyValidationError,
+            self.load_policy,
+            {
+                'name': 'test-s3-bucket-encryption-invalid',
+                'resource': 'aws.s3',
+                'filters': [
+                    {
+                        'type': 'bucket-encryption',
+                        'bucket_key_enabled': False,
+                        'key': 'alias/foobar'
+                    },
+                    {
+                        'type': 'value',
+                        'key': 'Name',
+                        'value': 'c7n-test-s3-bucket',
+                        'op': 'contains'
+                    }
+                ]
+            },
+        )
+
+
+class S3ObjectLockFilterTest(BaseTest):
+    def test_query(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3.S3LockConfigurationFilter, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        factory = self.replay_flight_data('test_s3_bucket_object_lock_configuration')
+
+        p = self.load_policy(
+            {
+                'name': 'test-s3-bucket-key-disabled',
+                'resource': 'aws.s3',
+                'filters': [
+                    {
+                        'type': 'lock-configuration',
+                        'key': 'Rule.DefaultRetention.Mode',
+                        'value': 'GOVERNANCE',
+                    }
+                ]
+            },
+            session_factory=factory
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0]['Name'], 'c7n-test-s3-bucket')
+        self.assertEqual(
+            resources[0]['c7n:ObjectLockConfiguration']['Rule']['DefaultRetention']['Mode'],
+            'GOVERNANCE'
+        )
+
+    def test_query_exception(self):
+        self.patch(s3.S3, "executor_factory", MainThreadExecutor)
+        self.patch(s3.S3LockConfigurationFilter, "executor_factory", MainThreadExecutor)
+        self.patch(s3, "S3_AUGMENT_TABLE", [])
+        log_mock = mock.MagicMock()
+        self.patch(s3.S3LockConfigurationFilter, "log", log_mock)
+
+        factory = self.replay_flight_data('test_s3_bucket_object_lock_configuration_exception')
+        p = self.load_policy(
+            {
+                'name': 'test-s3-bucket-key-disabled',
+                'resource': 'aws.s3',
+                'filters': [
+                    {
+                        'type': 'lock-configuration',
+                        'key': 'Rule.DefaultRetention.Mode',
+                        'value': 'GOVERNANCE',
+                    }
+                ]
+            },
+            session_factory=factory
+        )
+        resources = p.run()
+        self.assertEqual(len(resources), 1)
+        log_mock.error.assert_called()

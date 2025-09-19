@@ -1,18 +1,6 @@
-# Copyright 2018 Capital One Services, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright The Cloud Custodian Authors.
+# SPDX-License-Identifier: Apache-2.0
 
-import six
 from c7n_azure.actions.delete import DeleteAction
 from c7n_azure.actions.lock import LockAction
 from c7n_azure.actions.tagging import (AutoTagDate)
@@ -25,11 +13,14 @@ from c7n_azure.query import QueryResourceManager, QueryMeta, ChildResourceManage
     ChildTypeInfo, TypeMeta
 from c7n_azure.utils import ResourceIdParser
 
-arm_resource_types = {}
+# ARM resources which do not currently support tagging
+# for database it is a C7N known issue (#4543)
+arm_tags_unsupported = ['microsoft.network/dnszones/',
+                        'microsoft.sql/servers/databases',
+                        'microsoft.storage/storageaccounts/blobservices/containers']
 
 
-@six.add_metaclass(TypeMeta)
-class ArmTypeInfo(TypeInfo):
+class ArmTypeInfo(TypeInfo, metaclass=TypeMeta):
     # api client construction information for ARM resources
     id = 'id'
     name = 'name'
@@ -40,11 +31,9 @@ class ArmTypeInfo(TypeInfo):
         'resourceGroup'
     )
     resource_type = None
-    enable_tag_operations = True
 
 
-@six.add_metaclass(QueryMeta)
-class ArmResourceManager(QueryResourceManager):
+class ArmResourceManager(QueryResourceManager, metaclass=QueryMeta):
     class resource_type(ArmTypeInfo):
         service = 'azure.mgmt.resource'
         client = 'ResourceManagementClient'
@@ -65,7 +54,11 @@ class ArmResourceManager(QueryResourceManager):
         return self.augment([r.serialize(True) for r in data])
 
     def tag_operation_enabled(self, resource_type):
-        return self.resource_type.enable_tag_operations
+        return ArmResourceManager.generic_resource_supports_tagging(resource_type)
+
+    @staticmethod
+    def generic_resource_supports_tagging(resource_type):
+        return not resource_type.lower().startswith(tuple(arm_tags_unsupported))
 
     @staticmethod
     def register_arm_specific(registry, resource_class):
@@ -73,10 +66,9 @@ class ArmResourceManager(QueryResourceManager):
         if not issubclass(resource_class, ArmResourceManager):
             return
 
-        arm_resource_types[
-            resource_class.resource_type.resource_type.lower()] = resource_class.resource_type
-
-        if resource_class.resource_type.enable_tag_operations:
+        # Register tag actions for everything except a few non-compliant resources
+        if ArmResourceManager.generic_resource_supports_tagging(
+                resource_class.resource_type.resource_type):
             resource_class.action_registry.register('tag', Tag)
             resource_class.action_registry.register('untag', RemoveTag)
             resource_class.action_registry.register('auto-tag-user', AutoTagUser)
@@ -101,8 +93,7 @@ class ArmResourceManager(QueryResourceManager):
             resource_class.filter_registry.register('diagnostic-settings', DiagnosticSettingsFilter)
 
 
-@six.add_metaclass(QueryMeta)
-class ChildArmResourceManager(ChildResourceManager, ArmResourceManager):
+class ChildArmResourceManager(ChildResourceManager, ArmResourceManager, metaclass=QueryMeta):
 
     class resource_type(ChildTypeInfo, ArmTypeInfo):
         pass
