@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """AWS Generic resource to process across all taggable resources."""
 
+from collections import Counter
 import itertools
 from functools import partial
 
@@ -62,14 +63,15 @@ class DescribeTaggable(query.DescribeSource):
             f"region:{self.manager.config.region}",
             f"accountid:{self.manager.config.account_id}",
             "tag:none",
-            "resourcetype.supports:tags",
         ]
 
         if query.get('resource_types'):
             for rt in query.resource_types:
                 parts.append(f'resourcetype:{rt}')
-        params = {'QueryString': " ".join(parts)}
+        else:
+            parts.append("resourcetype.supports:tags")
         params = {'Filters': {'FilterString': " ".join(parts)}}
+
         return params
 
     def check_policy_key_matches(self, client, query):
@@ -138,12 +140,16 @@ class DescribeTaggable(query.DescribeSource):
     def normalize_explorer_results(self, exp2_batch, query=None):
         page = []
         compliance = {}
+        skipped = Counter()
 
         if query and query.get('non_compliant'):
             compliance = {'ComplianceStatus': False}
             compliance['MissingTagKeys'] = query.get('check_policy_tags', [])
 
         for r in exp2_batch:
+            if r['ResourceType'] in EXPLORER_NO_TAG_SUPPORT:
+                skipped[r['ResourceType']] += 1
+                continue
             e_tags = [p['Data'] for p in r['Properties'] if p['Name'] == 'tags']
             if not e_tags:
                 r_tags = []
@@ -161,6 +167,8 @@ class DescribeTaggable(query.DescribeSource):
                 )
             )
 
+        if skipped:
+            self.manager.log.debug('Skipped non taggable explorer resources  %s' % skipped)
         return page
 
     def get_query_params(self, query_params):
@@ -168,6 +176,80 @@ class DescribeTaggable(query.DescribeSource):
         for item in self.manager.data.get('query'):
             query.update(item)
         return query
+
+
+EXPLORER_NO_TAG_SUPPORT = set("""\
+apigateway:apis/integrations
+apigateway:apis/routes
+apigateway:restapis/deployments
+apigateway:restapis/resources
+apigateway:restapis/resources/methods
+autoscaling:autoScalingGroup
+cloudfront:cache-policy
+cloudfront:continuous-deployment-policy
+cloudfront:field-level-encryption-config
+cloudfront:field-level-encryption-profile
+cloudfront:function
+cloudfront:origin-access-control
+cloudfront:origin-access-identity
+cloudfront:origin-request-policy
+cloudfront:realtime-log-config
+cloudfront:response-headers-policy
+cloudwatch:dashboard
+eks:daemonset
+eks:deployment
+eks:endpointslice
+eks:ingress
+eks:namespace
+eks:persistentvolume
+eks:replicaset
+eks:service
+eks:statefulset
+elasticache:globalreplicationgroup
+events:api-destination
+events:archive
+events:connection
+events:endpoint
+globalaccelerator:accelerator/listener
+globalaccelerator:accelerator/listener/endpoint-group
+glue:table
+iam:group
+iot:cert
+iot:ruledestination
+iot:thing
+iottwinmaker:workspace
+iottwinmaker:workspace/component-type
+iottwinmaker:workspace/entity
+iottwinmaker:workspace/sync-job
+kafka:configuration
+ivschat:logging-configuration
+kendra:index/access-control-configuration
+kendra:index/experience
+lambda:function/version
+lambda:layer/version
+macie2:allow-list
+macie2:custom-data-identifier
+macie2:findings-filter
+macie2:member
+mediaconnect:gateway
+partnercentral:catalog/engagement
+partnercentral:catalog/engagement-invitation
+partnercentral:resourcesnapshot
+personalize:schema
+resource-explorer-2:index
+resource-explorer-2:view
+route53-recovery-control:controlpanel/routingcontrol
+s3:multiregionaccesspoint
+sagemaker:human-loop
+sagemaker:image-version
+ssm:resource-data-sync
+ssm:windowtarget
+ssm:windowtask
+wafv2:ipset
+wafv2:regexpatternset
+wafv2:rulegroup
+wafv2:webacl
+""".split('\n'))
 
 
 @resources.register("taggable")
@@ -181,11 +263,25 @@ class Taggable(query.QueryResourceManager):
     This primarily relies on server side queries against these two
     services to effect functionality, as such the functionality is
     mostly exposed via the policy `query` block which is
-    required. Additionally there are pre-requisites on the account
-    enablement of those two services, service linked role for
-    resource-explorer, and default view. For resource group tagging an organizations tag
-    policy for non_compliant resource querying active on
-    account. note, the tag policy only needs to be in reporting mode.
+    required.
+
+    Additionally there are pre-requisites for account enablement of
+    those two services to be able to use this resource, a service
+    linked role for resource-explorer, and a default view must be
+    available. For resource group tagging an organizations tag policy
+    for non_compliant resource querying active on account. note, the
+    tag policy only needs to be in reporting mode. Due to org policy
+    tag policy size limits, it may be needed to multiplex for enforcement
+    across all taggable resource types.
+
+    *Note* Disabled services, due to inconsistencies with the resource
+    group tagging api and resource-explorer-2 apis we disable
+    autoscaling. As resource-explorer-2 apis don't include them in the
+    filter (resource:supports:tags) because even though they have tags,
+    resource-explorer does not fetch them.
+
+    Its required to use a separate custodian resource type specific
+    policy for the following services.
 
     .. code-block:: yaml
 
@@ -284,15 +380,60 @@ class Taggable(query.QueryResourceManager):
 
 class TagActionDispatch(Action):
 
+    override_actions = {
+        ('autoscaling', 'autoScalingGroup'): 'aws.asg'
+
+    }
+
+    concurrency = 1
+
+    def process_overrides(self, service, rset):
+        """Handle specific resource types where we have native support
+        when resource group tagging doesn't support modification.
+        """
+        arn = Arn.parse(rset[0]['ResourceARN'])
+
+        spec_map = self.get_tag_spec()
+        if arn.resource_type.startswith('autoScalingGroup'):
+            asg_set = []
+            for r in rset:
+                asg_set.append({
+                    'AutoScalingGroupArn': r,
+                    # implied dep on implicit Arn parse behavior
+                    'AutoScalingGroupName': Arn.parse(r['ResourceARN']).resource
+                })
+            manager = self.manager.get_resource_manager(
+                'aws.asg',
+                {'name': 'asg-taggable',
+                 'resource': 'aws.asg',
+                 'actions': [{
+                     'type': 'tag',
+                     # implied default :/
+                     'propogate': True,
+                     'tags': spec_map}]}
+            )
+            manager.actions[0].process(asg_set)
+            return True
+        return False
+
     def process(self, resources):
+        stats = Counter()
         service_batches = {}
+        override_services = {s[0] for s in self.override_actions.keys()}
+
         for r in resources:
-            service_batches.setdefault(Arn.parse(r['ResourceARN']).service, []).append(r)
+            rarn = Arn.parse(r['ResourceARN'])
+            stats[rarn] += 1
+            service_batches.setdefault(rarn.service, []).append(r)
 
         verbose = bool([item for item in self.manager.data['query'] if item.get('verbose_errors')])
 
-        for s, rset in service_batches.items():
+        self.manager.log.debug("Grouped by resources %s" % sorted(stats.items()))
+        for s, rset in sorted(service_batches.items()):
             self.manager.log.debug("bulk tag service:%s resources:%d" % (s, len(rset)))
+            if s in override_services:
+                if self.process_overrides(s, rset):
+                    continue
             try:
                 super().process(rset)
             except ResourceGroupTagError as e:

@@ -962,9 +962,7 @@ class UniversalTag(Tag):
     concurrency = 1
     permissions = ('tag:TagResources',)
 
-    def process(self, resources):
-        self.id_key = self.manager.get_model().id
-
+    def get_tag_spec(self):
         # Legacy
         msg = self.data.get('msg')
         msg = self.data.get('value') or msg
@@ -976,6 +974,11 @@ class UniversalTag(Tag):
         spec_map = dict(self.data.get('tags', {}))
         if msg:
             spec_map[tag] = msg
+        return spec_map
+
+    def process(self, resources):
+        self.id_key = self.manager.get_model().id
+        spec_map = self.get_tag_spec()
 
         batch_size = self.data.get('batch_size', self.batch_size)
         client = self.get_client()
@@ -1406,7 +1409,7 @@ def universal_retry(method, ResourceARNList, **kw):
 
         if errors:
             raise ResourceGroupTagError(
-                response.get('ResponseMetadata'),
+                response,
                 errors,
                 method.__name__
             )

@@ -1141,14 +1141,22 @@ class Tag(Action):
     permissions = ('autoscaling:CreateOrUpdateTags',)
     batch_size = 1
 
+    DEFAULT_MSG = 'AutoScaleGroup does not meet policy guidelines'
+
     def get_tag_set(self):
         tags = []
         key = self.data.get('key', self.data.get('tag', DEFAULT_TAG))
         value = self.data.get(
-            'value', self.data.get(
-                'msg', 'AutoScaleGroup does not meet policy guidelines'))
+            'value', self.data.get('msg', self.DEFAULT_MSG)
+        )
+
         if key and value:
             tags.append({'Key': key, 'Value': value})
+
+        if self.data.get('tags') and (
+            tags and tags[0]['Key'] == DEFAULT_TAG
+            and tags[0]['Value'] == self.DEFAULT_MSG):
+            tags = []
 
         for k, v in self.data.get('tags', {}).items():
             tags.append({'Key': k, 'Value': v})
