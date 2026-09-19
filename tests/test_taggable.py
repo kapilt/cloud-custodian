@@ -6,7 +6,6 @@ import logging
 import pytest
 
 from c7n.exceptions import PolicyValidationError
-from c7n.resources.aws import Arn
 
 from .zpill import ACCOUNT_ID
 

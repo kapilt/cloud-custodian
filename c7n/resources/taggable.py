@@ -379,9 +379,18 @@ class Taggable(query.QueryResourceManager):
 
 
 class TagActionDispatch(Action):
+    """Tag modification for taggable resources using resource group tagging api.
+
+
+    Note while resource group tagging api presents a uniform api across tagging
+    a number of different types of resources, the underlying support for
+    fetching tags and modifying tags can differ by service, additional certain
+    services which do support have idiosyncratic behavior, which means its best
+    to directly have a policy on that resource type for tag modification.
+    """
 
     override_actions = {
-        {'ssm', 'managed-instance'): None,
+        ('ssm', 'managed-instance'): None,
         ('bedrock', 'agent'): None,
         ('bedrock', 'agent-alias'): None,
         ('s3express', 'bucket'): None,
