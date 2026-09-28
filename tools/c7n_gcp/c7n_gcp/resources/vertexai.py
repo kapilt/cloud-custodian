@@ -14,7 +14,8 @@ from c7n.utils import local_session, jmespath_search, type_schema
 from c7n_gcp.actions import MethodAction
 from c7n_gcp.filters.metrics import GCPMetricsFilter
 from c7n_gcp.provider import resources
-from c7n_gcp.query import QueryResourceManager, TypeInfo, ChildResourceManager, ChildTypeInfo
+from c7n_gcp.query import (
+    config_regions, QueryResourceManager, TypeInfo, ChildResourceManager, ChildTypeInfo)
 
 
 REGION_DATA_PATH = Path(__file__).parent.parent / 'regions.json'
@@ -112,10 +113,11 @@ class VertexAIQueryManager(QueryResourceManager):
 
             # Invoke the client enumeration (Vertex AI API supports pagination)
             location_resources = []
-            for page in client.execute_paged_query(enum_op, params):
-                page_items = jmespath_search(path, page)
-                if page_items:
-                    location_resources.extend(page_items)
+            with self._ignore_access_errors():
+                for page in client.execute_paged_query(enum_op, params):
+                    page_items = jmespath_search(path, page)
+                    if page_items:
+                        location_resources.extend(page_items)
 
             # Annotate resources with their location
             for resource in location_resources:
@@ -235,9 +237,8 @@ class VertexAILocation:
 
         Locations can be specified via:
         1. Policy query: {'query': [{'location': 'us-central1'}, {'location': 'us-east1'}]}
-        2. Config regions: --regions us-central1,us-east1
-        3. Config region: --region us-central1
-        4. Default: All Vertex AI supported regions from vertexai_regions.json
+        2. Configured regions
+        3. Default: All Vertex AI supported regions from vertexai_regions.json
         """
 
         # If query specified in policy, use those locations
@@ -245,13 +246,10 @@ class VertexAILocation:
             query_locations = {q['location'] for q in self.data['query'] if 'location' in q}
             return [{'name': loc} for loc in self.regions if loc in query_locations]
 
-        # If config regions specified, use those
-        if self.config and self.config.regions and 'all' not in self.config.regions:
-            return [{'name': r} for r in self.regions if r in self.config.regions]
-
-        # If single config region specified, use that
-        if self.config and self.config.region and self.config.region != 'us-east-1':
-            return [{'name': self.config.region}] if self.config.region in self.regions else []
+        # If cli/config regions specified, use those
+        regions = config_regions(self.config) if self.config else ()
+        if regions:
+            return [{'name': r} for r in self.regions if r in regions]
 
         # Default: return all Vertex AI supported regions
         return [{'name': loc} for loc in self.regions]
@@ -785,6 +783,147 @@ class VertexAIModel(VertexAIQueryManager):
         asset_type = 'aiplatform.googleapis.com/Model'
         permissions = ('aiplatform.models.list',)
         urn_component = 'model'
+
+
+@resources.register('vertex-ai-evaluation-run')
+class VertexAIEvaluationRun(VertexAIQueryManager):
+    """GCP Vertex AI Evaluation Run Resource
+
+    Vertex AI Evaluation Runs assess model or dataset quality against an
+    evaluation set, producing a terminal state and completion time that
+    can drive a retention-review policy on completed runs.
+
+    :example:
+
+    List all Vertex AI Evaluation Runs across all locations:
+
+    .. code-block:: yaml
+
+        policies:
+          - name: vertexai-evaluation-runs-inventory
+            resource: gcp.vertex-ai-evaluation-run
+
+    :example:
+
+    Find terminal evaluation runs older than 30 days:
+
+    .. code-block:: yaml
+
+        policies:
+          - name: vertex-ai-completed-evaluation-runs-past-retention
+            resource: gcp.vertex-ai-evaluation-run
+            filters:
+              - or:
+                  - type: value
+                    key: state
+                    value: SUCCEEDED
+                  - type: value
+                    key: state
+                    value: FAILED
+                  - type: value
+                    key: state
+                    value: CANCELLED
+              - type: value
+                key: completionTime
+                value_type: age
+                op: greater-than
+                value: 30
+    """
+
+    class resource_type(VertexAITypeInfo):
+        component = 'projects.locations.evaluationRuns'
+        enum_spec = ('list', 'evaluationRuns[]', None)
+        default_report_fields = [
+            'name', 'displayName', 'state', 'createTime', 'completionTime'
+        ]
+        permissions = ('aiplatform.evaluationRuns.list',)
+        urn_component = 'evaluation-run'
+
+
+@resources.register('vertex-ai-metadata-store-artifact')
+class VertexAIMetadataStoreArtifact(VertexAIQueryManager):
+    """GCP Vertex AI Metadata Store Artifact Resource
+
+    Vertex AI Metadata Store Artifacts represent inputs and outputs (e.g.
+    datasets, models) tracked for ML lineage, cost attribution, and
+    governance.
+
+    :example:
+
+    Find artifacts missing an owner label:
+
+    .. code-block:: yaml
+
+        policies:
+          - name: vertex-ai-artifacts-missing-owner-label
+            resource: gcp.vertex-ai-metadata-store-artifact
+            filters:
+              - type: value
+                key: labels.owner
+                value: absent
+    """
+
+    class resource_type(VertexAITypeInfo):
+        component = 'projects.locations.metadataStores.artifacts'
+        enum_spec = ('list', 'artifacts[]', None)
+        default_report_fields = ['name', 'displayName', 'createTime', 'updateTime']
+        permissions = (
+            'aiplatform.artifacts.list',
+            'aiplatform.metadataStores.list',
+            )
+        urn_component = 'metadata-store-artifact'
+        urn_id_segments = (-3, -1)
+
+    def _fetch_resources(self, query):
+        """Enumerate artifacts across every location and metadata store.
+
+        Artifacts are children of metadata stores, which are themselves
+        scoped to a location, so this adds a metadata-store enumeration
+        step in between the location loop and the artifact listing that
+        VertexAIQueryManager._fetch_resources otherwise does directly.
+        """
+        session = local_session(self.session_factory)
+        project = session.get_default_project()
+
+        location_query = self._get_location_query()
+        location_manager = self.get_resource_manager(
+            resource_type='vertex-ai-location',
+            data=({'query': location_query} if location_query else {})
+        )
+
+        all_resources = []
+        location_annotation_key = 'c7n:location'
+        enum_op, path, _ = self.resource_type.enum_spec
+
+        for location_instance in location_manager.resources():
+            location = location_instance['name']
+            store_client = self.get_location_client(
+                session, location, 'projects.locations.metadataStores')
+            artifact_client = None
+
+            parent = f'projects/{project}/locations/{location}'
+            with self._ignore_access_errors():
+                for store_page in store_client.execute_paged_query(
+                        'list', {'parent': parent}):
+                    stores = jmespath_search('metadataStores[]', store_page) or []
+                    for store in stores:
+                        if artifact_client is None:
+                            artifact_client = self.get_location_client(
+                                session, location, self.resource_type.component)
+                        artifacts = []
+                        with self._ignore_access_errors():
+                            for artifact_page in artifact_client.execute_paged_query(
+                                    enum_op, {'parent': store['name']}):
+                                page_items = jmespath_search(path, artifact_page)
+                                if page_items:
+                                    artifacts.extend(page_items)
+
+                        for artifact in artifacts:
+                            artifact[location_annotation_key] = location_instance
+
+                        all_resources.extend(artifacts)
+
+        return all_resources
 
 
 @resources.register('vertex-ai-batch-prediction-job')
