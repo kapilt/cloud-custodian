@@ -363,7 +363,11 @@ class Taggable(query.QueryResourceManager):
         universal_taggable = object()
 
     def get_permissions(self):
-        return ("tag:GetResources", "resource-explorer-2:Search",)
+        permissions = ["tag:GetResources", "resource-explorer-2:Search"]
+        query = self.get_source("describe").get_query_params(self.data.get('query', {}))
+        if query.get_policy_tags('check_policy_tags'):
+            permissions.append('tag:ListRequiredTags')
+        return tuple(permissions)
 
     def validate(self):
         if 'query' not in self.data:
