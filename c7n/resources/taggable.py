@@ -363,7 +363,11 @@ class Taggable(query.QueryResourceManager):
         universal_taggable = object()
 
     def get_permissions(self):
-        return ("tag:GetResources", "resource-explorer-2:Search",)
+        permissions = ["tag:GetResources", "resource-explorer-2:Search"]
+        query = self.get_source("describe").get_query_params(self.data.get('query', {}))
+        if query.get_policy_tags('check_policy_tags'):
+            permissions.append('tag:ListRequiredTags')
+        return tuple(permissions)
 
     def validate(self):
         if 'query' not in self.data:
@@ -391,13 +395,16 @@ class TagActionDispatch(Action):
 
     override_actions = {
         ('ssm', 'managed-instance'): None,
+        ('apigateway', 'stage'): None,
+        ('cassandra', 'keyspace'): None,
+        ('ssm', 'managed-instance'): None,
         ('bedrock', 'agent'): None,
         ('bedrock', 'agent-alias'): None,
         ('s3express', 'bucket'): None,
         ('ecs', 'task'): None,
-        ('cloudformation', 'stack'): None,
+        # ('cloudformation', 'stack'): None,
+        ('memorydb', 'parametergroup'): None,
         ('autoscaling', 'autoScalingGroup'): 'aws.asg'
-
     }
 
     concurrency = 1
@@ -409,7 +416,11 @@ class TagActionDispatch(Action):
         arn = Arn.parse(rset[0]['ResourceARN'])
 
         spec_map = self.get_tag_spec()
-        if arn.resource_type.startswith('autoScalingGroup'):
+        if arn.service == 'apigateway':
+            for r in list(rset):
+                if '/stages/' in r['ResourceARN']:
+                    rset.remove(r)
+        elif arn.resource_type.startswith('autoScalingGroup'):
             asg_set = []
             for r in rset:
                 asg_set.append({
@@ -429,6 +440,33 @@ class TagActionDispatch(Action):
             )
             manager.actions[0].process(asg_set)
             return True
+        elif arn.service == 'bedrock':
+            for r in list(rset):
+                # throws an invalid resource arn error against resource group tagging
+                if Arn.parse(r['ResourceARN']).resource_type in (
+                        'agent-alias', 'agent', 'knowledge-base'):
+                    rset.remove(r)
+        elif arn.service == 'cassandra':
+            for r in list(rset):
+                if ':/keyspace/' in r['ResourceARN']:
+                    rset.remove(r)
+        elif arn.service == 'ecs':
+            for r in list(rset):
+                if ":task/" in r['ResourceARN']:
+                    rset.remove(r)
+        elif arn.service == 'memorydb':
+            for r in list(rset):
+                if 'parametergroup/default.' in r['ResourceARN']:
+                    rset.remove(r)
+        elif arn.service == 's3express':
+            for r in list(rset):
+                if ":bucket/" in r['ResourceARN']:
+                    rset.remove(r)
+        elif arn.service == 'ssm':
+            for r in list(rset):
+                # throws an error if the prefix is not mi-
+                if 'managed-instance/i-' in r['ResourceARN']:
+                    rset.remove(r)
         return False
 
     def process(self, resources):
