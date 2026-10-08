@@ -173,7 +173,7 @@ class DescribeTaggable(query.DescribeSource):
 
     def get_query_params(self, query_params):
         query = dict(query_params or [])
-        for item in self.manager.data.get('query'):
+        for item in self.manager.data.get('query', ()):
             query.update(item)
         return query
 
@@ -365,7 +365,7 @@ class Taggable(query.QueryResourceManager):
     def get_permissions(self):
         permissions = ["tag:GetResources", "resource-explorer-2:Search"]
         query = self.get_source("describe").get_query_params(self.data.get('query', {}))
-        if query.get_policy_tags('check_policy_tags'):
+        if query.get('check_policy_tags'):
             permissions.append('tag:ListRequiredTags')
         return tuple(permissions)
 
@@ -394,7 +394,6 @@ class TagActionDispatch(Action):
     """
 
     override_actions = {
-        ('ssm', 'managed-instance'): None,
         ('apigateway', 'stage'): None,
         ('cassandra', 'keyspace'): None,
         ('ssm', 'managed-instance'): None,
