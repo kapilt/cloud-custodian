@@ -1,13 +1,40 @@
 # Copyright The Cloud Custodian Authors.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import itertools
 import logging
 import pytest
 
+from c7n.resources.aws import Arn
 from c7n.exceptions import PolicyValidationError
 
 from .zpill import ACCOUNT_ID
+from .common import data_path
+
+
+def test_taggable_overrides(test):
+
+    policy = test.load_policy({
+        "name": "test-taggable-check",
+        "resource": "aws.taggable",
+        "query": [
+            {"non_tagged": True}
+        ],
+        "actions": [
+            {"type": "tag",
+             "key": "NonCompliant",
+             "value": "FOUND"}
+        ]
+    })
+
+    tag_action = policy.resource_manager.actions[0]
+    with open(data_path('taggable-overrides.json')) as fh:
+        resources = json.loads(fh.read())
+
+    for item in resources:
+        arn = Arn.parse(item['ResourceARN'])
+        tag_action.process_overrides(arn.service, [item])
 
 
 def test_taggable_query_schema_error(test):
